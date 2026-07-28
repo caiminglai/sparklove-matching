@@ -4,10 +4,9 @@ import { Shield, Heart, Users, Sparkles } from 'lucide-react';
 import { loadRows, deleteRow, loadColumns, addColumn } from '../services/user.service';
 import { fetchFieldMappings } from '../services/field-mapping.service';
 import { matchRows } from '../services/match.service';
-import type { Column, MatchCondition, Row } from '../data/types';
+import type { Column, MatchCondition, Row, FlatRow, Rating } from '../data/types';
 import { API_BASE_URL } from '../api/config';
 import ImagePreview from '../components/ImagePreview';
-import UserCard from '../components/UserCard';
 import RatingModal from '../components/RatingModal';
 import ReportModal from '../components/ReportModal';
 import SearchPanel from '../components/SearchPanel';
@@ -16,8 +15,10 @@ import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import ContactPayModal from '../components/ContactPayModal';
 import UserDetailModal from '../components/UserDetailModal';
 import { handleApiError } from '../utils/errorHandler';
+import { useToast } from '../components/Toast';
 
 export default function Home() {
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [columns, setColumns] = useState<Column[]>(loadColumns);
   const [rows, setRows] = useState<Row[]>(() => loadRows());
@@ -91,7 +92,7 @@ export default function Home() {
               if (!cfMap[cf.user_id]) cfMap[cf.user_id] = {};
               cfMap[cf.user_id][cf.field_key] = cf.field_value;
             }
-            rows = rows.map((row: any) => {
+            rows = rows.map((row: FlatRow) => {
               if (row.user_id && cfMap[row.user_id]) {
                 return { ...row, data: { ...row.data, ...cfMap[row.user_id] } };
               }
@@ -191,7 +192,7 @@ export default function Home() {
   const [reportType, setReportType] = useState('');
   const [reportDescription, setReportDescription] = useState('');
   const [reportProofImage, setReportProofImage] = useState<File | null>(null);
-  const [ratings, setRatings] = useState<any[]>([]);
+  const [ratings, setRatings] = useState<Rating[]>([]);
   const [averageRating, setAverageRating] = useState<{ avg: number; count: number } | null>(null);
   const [contactUnlocked, setContactUnlocked] = useState(false);
   const [fullContact, setFullContact] = useState<string | null>(null); // 完整联系方式（解锁后从后端获取）
@@ -345,7 +346,7 @@ export default function Home() {
         setAverageRating(data.average || { avg: 0, count: 0 });
       }
     } catch (e) {
-      // ignored
+      console.warn('loadRatings: 获取评价失败', e);
     }
   }, []);
 
@@ -358,13 +359,13 @@ export default function Home() {
   const submitRating = useCallback(async (ratedId: string) => {
     // 验证ID格式
     if (!/^[a-zA-Z0-9_-]+$/.test(ratedId)) {
-      alert('无效的用户ID');
+      toast('无效的用户ID', 'error');
       return;
     }
 
     const authToken = localStorage.getItem('auth_token');
     if (!authToken) {
-      alert('请先登录');
+      toast('请先登录', 'error');
       return;
     }
     try {
@@ -381,34 +382,34 @@ export default function Home() {
         })
       });
       if (res.ok) {
-        alert('评价成功！');
+        toast('评价成功！', 'success');
         setShowRatingModal(null);
         setRatingValue(5);
         setRatingComment('');
         loadRatings(ratedId);
       } else {
         const data = await res.json();
-        alert(data.message || '评价失败');
+        toast(data.message || '评价失败', 'error');
       }
     } catch (e) {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   }, [ratingValue, ratingComment, loadRatings]);
 
   // 提交举报
   const submitReport = useCallback(async (reportedId: string) => {
     if (!/^[a-zA-Z0-9_-]+$/.test(reportedId)) {
-      alert('无效的用户ID');
+      toast('无效的用户ID', 'error');
       return;
     }
 
     const authToken = localStorage.getItem('auth_token');
     if (!authToken) {
-      alert('请先登录');
+      toast('请先登录', 'error');
       return;
     }
     if (!reportType) {
-      alert('请选择举报类型');
+      toast('请选择举报类型', 'error');
       return;
     }
     try {
@@ -441,24 +442,24 @@ export default function Home() {
         });
       }
       if (res.ok) {
-        alert('举报成功！');
+        toast('举报成功！', 'success');
         setShowReportModal(null);
         setReportType('');
         setReportDescription('');
         setReportProofImage(null);
       } else {
         const data = await res.json();
-        alert(data.message || '举报失败');
+        toast(data.message || '举报失败', 'error');
       }
     } catch (e) {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   }, [reportType, reportDescription, reportProofImage]);
 
   const handleDeleteRow = async (id: string) => {
     // 验证ID格式
     if (!/^[a-zA-Z0-9_-]+$/.test(id)) {
-      alert('无效的用户ID');
+      toast('无效的用户ID', 'error');
       setShowDelModal(false);
       return;
     }
@@ -468,7 +469,7 @@ export default function Home() {
     const row = rows.find(r => r.id === id);
 
     if (row?.user_id && userId && row.user_id !== userId) {
-      alert('只能删除自己的数据');
+      toast('只能删除自己的数据', 'error');
       setShowDelModal(false);
       return;
     }
@@ -484,10 +485,10 @@ export default function Home() {
           setRows(next);
         } else {
           const data = await res.json();
-          alert(data.message || '删除失败');
+          toast(data.message || '删除失败', 'error');
         }
       } catch (e) {
-        alert('网络错误');
+        toast('网络错误', 'error');
       }
     } else {
       const next = deleteRow(id);
@@ -506,7 +507,7 @@ export default function Home() {
     if (!newColKey || !newColLabel) return;
     // 验证列键名格式，防止特殊字符
     if (!/^[a-zA-Z0-9_]+$/.test(newColKey)) {
-      alert('列键名只能包含字母、数字和下划线');
+      toast('列键名只能包含字母、数字和下划线', 'error');
       return;
     }
     const next = addColumn(columns, { key: newColKey, label: newColLabel, type: 'text' });
@@ -517,34 +518,34 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen pb-16" style={{ background: 'linear-gradient(180deg, #FFFDF9 0%, #FAF6F1 30%)' }}>
+    <div className="min-h-screen pb-16" style={{ background: 'linear-gradient(180deg, var(--color-bg-card) 0%, var(--color-bg-main) 30%)' }}>
       <div className="max-w-3xl mx-auto px-4 pt-8">
 
         <div className="relative text-center mb-8 pt-2">
           {/* Decorative circles */}
-          <div className="absolute -top-4 -right-8 w-32 h-32 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, rgba(232,122,93,0.3) 0%, transparent 70%)' }} />
-          <div className="absolute top-8 -left-12 w-24 h-24 rounded-full opacity-15" style={{ background: 'radial-gradient(circle, rgba(107,175,125,0.3) 0%, transparent 70%)' }} />
+          <div className="absolute -top-4 -right-8 w-32 h-32 rounded-full opacity-20" style={{ background: 'radial-gradient(circle, rgba(var(--color-primary-rgb), 0.3) 0%, transparent 70%)' }} />
+          <div className="absolute top-8 -left-12 w-24 h-24 rounded-full opacity-15" style={{ background: 'radial-gradient(circle, rgba(var(--color-success-rgb), 0.3) 0%, transparent 70%)' }} />
 
           <div className="inline-flex items-center gap-3 mb-3">
             <div className="w-12 h-12 rounded-2xl flex items-center justify-center avatar-gradient"
               style={{ animation: 'float 3s ease-in-out infinite' }}>
               <Heart size={22} color="white" fill="white" />
             </div>
-            <h1 className="text-3xl font-bold tracking-wide" style={{ color: '#3D2E20' }}>
+            <h1 className="text-3xl font-bold tracking-wide" style={{ color: 'var(--color-text-primary)' }}>
               微光亦是永恒
             </h1>
           </div>
-          <p className="text-sm" style={{ color: '#9B8B7B' }}>
+          <p className="text-sm" style={{ color: 'var(--color-text-light)' }}>
             精准匹配 · 缘分从数据开始
           </p>
           <div className="flex items-center justify-center gap-3 mt-3">
-            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(232,122,93,0.06)', color: '#E87A5D', border: '1px solid rgba(232,122,93,0.12)' }}>
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--color-primary-rgb), 0.06)', color: 'var(--color-primary)', border: '1px solid rgba(var(--color-primary-rgb), 0.12)' }}>
               <Sparkles size={10} /> 精准筛选
             </span>
-            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(107,175,125,0.06)', color: '#6BAF7D', border: '1px solid rgba(107,175,125,0.12)' }}>
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--color-success-rgb), 0.06)', color: 'var(--color-success)', border: '1px solid rgba(var(--color-success-rgb), 0.12)' }}>
               <Shield size={10} /> 保证金保障
             </span>
-            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(123,140,222,0.06)', color: '#7B8CDE', border: '1px solid rgba(123,140,222,0.12)' }}>
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full" style={{ background: 'rgba(var(--color-info-rgb), 0.06)', color: 'var(--color-info)', border: '1px solid rgba(var(--color-info-rgb), 0.12)' }}>
               <Users size={10} /> 圈子匹配
             </span>
           </div>
@@ -589,18 +590,18 @@ export default function Home() {
         {loading && (
           <div className="flex flex-col items-center justify-center py-12">
             <div className="w-10 h-10 border-4 border-orange-200 border-t-orange-500 rounded-full animate-spin mb-3"></div>
-            <p className="text-sm" style={{ color: '#B5A698' }}>加载中...</p>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>加载中...</p>
           </div>
         )}
 
         {/* 错误提示 */}
         {error && !loading && (
-          <div className="rounded-xl p-4 mb-4 text-center" style={{ background: 'rgba(232,122,93,0.08)', border: '1px solid #F5D0C4' }}>
-            <p className="text-sm mb-2" style={{ color: '#E87A5D' }}>{error}</p>
+          <div className="rounded-xl p-4 mb-4 text-center" style={{ background: 'rgba(var(--color-primary-rgb), 0.08)', border: '1px solid var(--color-bg-warm)' }}>
+            <p className="text-sm mb-2" style={{ color: 'var(--color-primary)' }}>{error}</p>
             <button
               onClick={() => window.location.reload()}
               className="text-xs px-4 py-1.5 rounded-lg text-white"
-              style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)' }}
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}
             >
               刷新重试
             </button>
@@ -610,10 +611,10 @@ export default function Home() {
         {!loading && !error && (
           <>
             {showAddCol && (
-              <div className="flex items-center gap-2 mb-3 p-3 rounded-xl" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
-                <input className="px-3 py-1.5 rounded-lg text-xs" style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', width: '100px', outline: 'none' }} placeholder="字段名" value={newColKey} onChange={e => setNewColKey(e.target.value)} />
-                <input className="px-3 py-1.5 rounded-lg text-xs" style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', width: '100px', outline: 'none' }} placeholder="显示名" value={newColLabel} onChange={e => setNewColLabel(e.target.value)} />
-                <button onClick={handleAddCol} className="text-xs px-3 py-1.5 rounded-lg text-white" style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)' }}>确定</button>
+              <div className="flex items-center gap-2 mb-3 p-3 rounded-xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
+                <input className="px-3 py-1.5 rounded-lg text-xs" style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', width: '100px', outline: 'none' }} placeholder="字段名" value={newColKey} onChange={e => setNewColKey(e.target.value)} />
+                <input className="px-3 py-1.5 rounded-lg text-xs" style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', width: '100px', outline: 'none' }} placeholder="显示名" value={newColLabel} onChange={e => setNewColLabel(e.target.value)} />
+                <button onClick={handleAddCol} className="text-xs px-3 py-1.5 rounded-lg text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>确定</button>
               </div>
             )}
 

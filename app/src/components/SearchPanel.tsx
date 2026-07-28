@@ -4,7 +4,7 @@ import {
   Users, Sparkles, Target, Users2, User, MapPin, Check,
 } from 'lucide-react';
 import { CATEGORIES, PURPOSE_OPTIONS } from '../data/constants';
-import type { Column, MatchCondition } from '../data/types';
+import type { Column, MatchCondition, CustomField, AdminCustomField } from '../data/types';
 import { API_BASE_URL } from '../api/config';
 
 const QUICK_TAGS = [
@@ -97,7 +97,7 @@ export default function SearchPanel({
   const [showCustomFilter, setShowCustomFilter] = useState(false);
   const [customFieldKey, setCustomFieldKey] = useState('');
   const [customFieldValue, setCustomFieldValue] = useState('');
-  const [adminCustomFields, setAdminCustomFields] = useState<any[]>([]);
+  const [adminCustomFields, setAdminCustomFields] = useState<AdminCustomField[]>([]);
   const [showFieldDrop, setShowFieldDrop] = useState<number | null>(null);
   const [showValueDrop, setShowValueDrop] = useState<number | null>(null);
   const dropRef = useRef<HTMLDivElement>(null);
@@ -120,7 +120,7 @@ export default function SearchPanel({
           setAdminCustomFields(data.data);
         }
       })
-      .catch(() => {});
+      .catch(() => { console.warn('加载管理员自定义字段失败'); });
   }, []);
 
   // conditions 持久化到 localStorage
@@ -145,7 +145,7 @@ export default function SearchPanel({
     if (col && col.options && col.options.length > 0) {
       return col;
     }
-    const adminField = adminCustomFields.find((f: any) =>
+    const adminField = adminCustomFields.find((f: AdminCustomField) =>
       f.field_key === columnKey || f.field_label === columnKey);
     if (adminField) {
       const opts = adminField.options && Array.isArray(adminField.options) && adminField.options.length > 0
@@ -185,7 +185,7 @@ export default function SearchPanel({
     if (!customFieldKey.trim()) return;
     const rawKey = customFieldKey.trim();
     const cleanKey = rawKey.toLowerCase().replace(/[^a-z0-9_]/g, '') || rawKey;
-    const adminField = adminCustomFields.find((f: any) =>
+    const adminField = adminCustomFields.find((f: CustomField) =>
       f.field_label === rawKey || f.field_key === rawKey || f.field_key === cleanKey);
     let finalKey: string;
     let finalLabel: string;
@@ -222,7 +222,7 @@ export default function SearchPanel({
     setShowCustomFilter(false);
   };
 
-  const addAdminCustomField = (field: any) => {
+  const addAdminCustomField = (field: AdminCustomField) => {
     const opts = field.options && Array.isArray(field.options) && field.options.length > 0
       ? field.options
       : [];
@@ -242,10 +242,10 @@ export default function SearchPanel({
 
   return (
     <>
-      <div className="flex items-center gap-2 mb-4 overflow-x-auto pb-2" style={{ scrollbarWidth: 'none' }}>
+      <div className="flex flex-wrap items-center gap-1.5 mb-4">
         <button
           onClick={() => onSelectedPurposeChange('')}
-          className={`flex-shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+          className={`flex-shrink-0 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
             !selectedPurpose
               ? 'btn-primary text-white'
               : 'tag-bubble'
@@ -259,13 +259,13 @@ export default function SearchPanel({
             <button
               key={purpose}
               onClick={() => onSelectedPurposeChange(purpose)}
-              className={`flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 ${
+              className={`flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
                 selectedPurpose === purpose
                   ? 'btn-primary text-white'
                   : 'tag-bubble'
               }`}
             >
-              <Icon size={14} />
+              <Icon size={13} />
               {purpose}
             </button>
           );
@@ -276,24 +276,27 @@ export default function SearchPanel({
         background: 'linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,253,249,0.95) 100%)',
         backdropFilter: 'blur(20px)',
         WebkitBackdropFilter: 'blur(20px)',
-        border: '1px solid rgba(240,228,212,0.6)',
+        border: '1px solid rgba(var(--color-border-warm-rgb), 0.6)',
       }}>
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(232,122,93,0.1)' }}>
-              <Search size={12} style={{ color: '#E87A5D' }} />
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(var(--color-primary-rgb), 0.1)' }}>
+              <Search size={12} style={{ color: 'var(--color-primary)' }} />
             </div>
-            <h2 className="text-base font-semibold" style={{ color: '#3D2E20' }}>筛选条件</h2>
+            <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>筛选条件</h2>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={addCond} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: '#E87A5D', border: '1px solid #F5D0C4' }}>
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(167,139,250,0.08)', color: '#A78BFA', border: '1px solid rgba(167,139,250,0.2)' }}>
+              <Sparkles size={11} /> 向量搜索
+            </span>
+            <button onClick={addCond} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: 'var(--color-primary)', border: '1px solid var(--color-bg-warm)' }}>
               <Plus size={12} /> 添加条件
             </button>
             <button onClick={() => { setShowCustomFilter(!showCustomFilter); }}
-              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: '#6BAF7D', border: '1px solid #D6E8DA' }}>
+              className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: 'var(--color-success)', border: '1px solid #D6E8DA' }}>
               <Plus size={12} /> 自定义字段
             </button>
-            <button onClick={clearAll} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: '#B5A698', border: '1px solid #E8DED0' }}>
+            <button onClick={clearAll} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}>
               <Trash2 size={12} /> 清空
             </button>
           </div>
@@ -303,19 +306,19 @@ export default function SearchPanel({
              核心功能：搜索（按昵称/姓名/ID）
              注意：此区域为核心功能，请勿随意改动
              =================================================================== */}
-        <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(123,140,222,0.06)', border: '1px solid rgba(123,140,222,0.15)' }}>
+        <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(var(--color-info-rgb), 0.06)', border: '1px solid rgba(var(--color-info-rgb), 0.15)' }}>
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <input
               type="text"
               className="flex-1 px-3 py-2 rounded-lg text-sm"
-              style={{ background: '#FFFDF9', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+              style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
               placeholder="搜索（按昵称/姓名/ID）"
               value={searchKeyword}
               onChange={(e) => onSearchKeywordChange(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') onSearch(); }}
             />
             <div className="flex items-center gap-2 flex-shrink-0">
-              <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none" style={{ color: '#3D2E20' }}>
+              <label className="flex items-center gap-1.5 text-xs cursor-pointer select-none" style={{ color: 'var(--color-text-primary)' }}>
                 <input
                   type="checkbox"
                   checked={searchExact}
@@ -327,36 +330,36 @@ export default function SearchPanel({
               <button
                 onClick={onSearch}
                 className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg text-white font-medium"
-                style={{ background: 'linear-gradient(135deg, #7B8CDE, #5A6DC8)' }}
+                style={{ background: 'linear-gradient(135deg, var(--color-info), #5A6DC8)' }}
               >
                 <Search size={12} /> 搜索
               </button>
               <button
                 onClick={onResetSearch}
                 className="flex items-center gap-1 text-xs px-3 py-2 rounded-lg font-medium"
-                style={{ background: 'rgba(61,46,32,0.06)', color: '#8B7B6B', border: '1px solid #E8DED0' }}
+                style={{ background: 'rgba(var(--color-text-dark-rgb), 0.06)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}
               >
                 <X size={12} /> 重置
               </button>
             </div>
           </div>
           {activeSearchKeyword && (
-            <div className="mt-2 text-xs" style={{ color: '#7B8CDE' }}>
+            <div className="mt-2 text-xs" style={{ color: 'var(--color-info)' }}>
               当前搜索：「{activeSearchKeyword}」{activeSearchExact ? '（精确匹配）' : '（模糊匹配）'}
             </div>
           )}
         </div>
 
         {showCustomFilter && (
-          <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(107,175,125,0.05)', border: '1px solid rgba(107,175,125,0.15)' }}>
-            <div className="text-xs font-medium mb-2" style={{ color: '#6BAF7D' }}>自定义筛选条件</div>
+          <div className="mb-4 p-3 rounded-xl" style={{ background: 'rgba(var(--color-success-rgb), 0.05)', border: '1px solid rgba(var(--color-success-rgb), 0.15)' }}>
+            <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-success)' }}>自定义筛选条件</div>
             {adminCustomFields.length > 0 && (
               <div className="mb-3">
-                <div className="text-xs mb-1.5" style={{ color: '#B5A698' }}>管理员推荐字段：</div>
+                <div className="text-xs mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>管理员推荐字段：</div>
                 <div className="flex flex-wrap gap-1.5">
-                  {adminCustomFields.map((f: any) => (
+                  {adminCustomFields.map((f: AdminCustomField) => (
                     <button key={f.id} onClick={() => addAdminCustomField(f)}
-                      className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: 'rgba(107,175,125,0.08)', color: '#6BAF7D', border: '1px solid rgba(107,175,125,0.15)' }}>
+                      className="px-2.5 py-1 rounded-lg text-xs font-medium" style={{ background: 'rgba(var(--color-success-rgb), 0.08)', color: 'var(--color-success)', border: '1px solid rgba(var(--color-success-rgb), 0.15)' }}>
                       {f.field_label}
                     </button>
                   ))}
@@ -364,11 +367,11 @@ export default function SearchPanel({
               </div>
             )}
             <div className="flex items-center gap-2">
-              <input className="px-3 py-1.5 rounded-lg text-xs flex-1" style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }} placeholder="字段名（如：星座、宠物、信仰）"
+              <input className="px-3 py-1.5 rounded-lg text-xs flex-1" style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }} placeholder="字段名（如：星座、宠物、信仰）"
                 value={customFieldKey} onChange={e => setCustomFieldKey(e.target.value)} />
-              <input className="px-3 py-1.5 rounded-lg text-xs flex-1" style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }} placeholder="筛选值（可留空）"
+              <input className="px-3 py-1.5 rounded-lg text-xs flex-1" style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }} placeholder="筛选值（可留空）"
                 value={customFieldValue} onChange={e => setCustomFieldValue(e.target.value)} />
-              <button onClick={handleAddCustomFilter} className="text-xs px-3 py-1.5 rounded-lg text-white" style={{ background: 'linear-gradient(135deg, #6BAF7D, #4D945F)' }}>添加</button>
+              <button onClick={handleAddCustomFilter} className="text-xs px-3 py-1.5 rounded-lg text-white" style={{ background: 'linear-gradient(135deg, var(--color-success), #4D945F)' }}>添加</button>
             </div>
           </div>
         )}
@@ -391,20 +394,20 @@ export default function SearchPanel({
                 <div className="relative">
                   <button onClick={() => setShowFieldDrop(showFieldDrop === i ? null : i)}
                     className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm"
-                    style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20' }}>
+                    style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
                     <span>{labelMap[cond.column] || colInfo?.label || (cond.column || '选择字段')}</span>
-                    <ChevronDown size={13} style={{ color: '#B5A698' }} />
+                    <ChevronDown size={13} style={{ color: 'var(--color-text-secondary)' }} />
                   </button>
                   {showFieldDrop === i && (
                     <div className="absolute top-full left-0 right-0 mt-1 z-50 py-2 max-h-64 overflow-y-auto rounded-lg"
-                      style={{ background: '#FFFDF9', border: '1px solid #E8DED0', boxShadow: '0 8px 24px rgba(61,46,32,0.12)' }}>
+                      style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', boxShadow: '0 8px 24px rgba(var(--color-text-dark-rgb), 0.12)' }}>
                       {CATEGORIES.map(cat => (
                         <div key={cat.key}>
-                          <div className="px-3 py-1 text-xs font-medium" style={{ color: '#B5A698' }}>{cat.label}</div>
+                          <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{cat.label}</div>
                           {columns.filter(c => c.category === cat.key && c.key !== 'contact').map(col => (
                             <button key={col.key}
                               className="block w-full text-left px-3 py-1.5 text-sm hover:bg-orange-50 transition-colors"
-                              style={{ color: '#3D2E20' }}
+                              style={{ color: 'var(--color-text-primary)' }}
                               onClick={() => { 
                                 onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c)); 
                                 setShowFieldDrop(null);
@@ -418,11 +421,11 @@ export default function SearchPanel({
                       ))}
                       {columns.filter((c: Column) => c.category === 'custom').length > 0 && (
                         <div>
-                          <div className="px-3 py-1 text-xs font-medium" style={{ color: '#6BAF7D' }}>自定义字段</div>
+                          <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-success)' }}>自定义字段</div>
                           {columns.filter((c: Column) => c.category === 'custom').map((col: Column) => (
                             <button key={col.key}
                               className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50 transition-colors"
-                              style={{ color: '#3D2E20' }}
+                              style={{ color: 'var(--color-text-primary)' }}
                               onClick={() => { 
                                 onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c)); 
                                 setShowFieldDrop(null);
@@ -443,7 +446,7 @@ export default function SearchPanel({
                             {customCols.map(col => (
                               <button key={col.key}
                                 className="block w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
-                                style={{ color: '#3D2E20' }}
+                                style={{ color: 'var(--color-text-primary)' }}
                                 onClick={() => {
                                   onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c));
                                   setShowFieldDrop(null);
@@ -466,25 +469,25 @@ export default function SearchPanel({
                     <button
                       onClick={() => setShowValueDrop(showValueDrop === i ? null : i)}
                       className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left"
-                      style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: cond.value ? '#3D2E20' : '#8B7B6B', outline: 'none' }}>
+                      style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: cond.value ? 'var(--color-text-primary)' : 'var(--color-text-muted)', outline: 'none' }}>
                       <span>{cond.value || `选择${labelMap[cond.column] || colInfo?.label || ''}`}</span>
-                      <ChevronDown size={13} style={{ color: '#B5A698' }} />
+                      <ChevronDown size={13} style={{ color: 'var(--color-text-secondary)' }} />
                     </button>
                   ) : cond.column ? (
                     <input
                       className="w-full px-3 py-2 rounded-lg text-sm"
-                      style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                      style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                       placeholder={`输入${labelMap[cond.column] || colInfo?.label || '关键词'}`}
                       value={cond.value}
                       onFocus={e => (e.target.style.borderColor = '#F5B8A4')}
-                      onBlur={e => (e.target.style.borderColor = '#E8DED0')}
+                      onBlur={e => (e.target.style.borderColor = 'var(--color-border)')}
                       onChange={e => updateCond(i, 'value', e.target.value)}
                     />
                   ) : (
                     <button
                       disabled
                       className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left"
-                      style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#8B7B6B', outline: 'none' }}>
+                      style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', outline: 'none' }}>
                       <span>输入关键词</span>
                     </button>
                   )}
@@ -499,7 +502,7 @@ export default function SearchPanel({
                   <div></div>
                   <div></div>
                   <div className="w-full py-2 px-2 rounded-lg"
-                    style={{ background: '#FFFDF9', border: '1px solid #E8DED0' }}>
+                    style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
                     <div className="flex flex-wrap gap-1.5">
                       {colInfo?.options?.map(opt => {
                         const isSelected = isMultiple
@@ -542,8 +545,8 @@ export default function SearchPanel({
 
         </div>
 
-        <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(240,228,212,0.4)' }}>
-          <span className="text-xs mb-2.5 block font-medium" style={{ color: '#B5A698' }}>快捷筛选</span>
+        <div className="mt-4 pt-4" style={{ borderTop: '1px solid rgba(var(--color-border-warm-rgb), 0.4)' }}>
+          <span className="text-xs mb-2.5 block font-medium" style={{ color: 'var(--color-text-secondary)' }}>快捷筛选</span>
           <div className="flex flex-wrap gap-1.5">
             {QUICK_TAGS.map(tag => (
               <button key={tag.label} onClick={() => quickFilter(tag.key, tag.value)}

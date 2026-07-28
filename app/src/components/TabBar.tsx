@@ -12,7 +12,7 @@ const tabs = [
 export default function TabBar() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-40 glass-nav" style={{
-      borderTop: '1px solid rgba(240,228,212,0.4)',
+      borderTop: '1px solid rgba(var(--color-border-warm-rgb), 0.4)',
       paddingBottom: 'env(safe-area-inset-bottom)',
     }}>
       <div className="max-w-3xl mx-auto flex items-center justify-around py-2 px-2">
@@ -29,7 +29,7 @@ export default function TabBar() {
                   style={{ borderRadius: '16px' }}>
                   <Icon size={22} color="white" strokeWidth={2.5} />
                 </div>
-                <span className="text-xs font-medium mt-1" style={{ color: '#E87A5D' }}>{tab.label}</span>
+                <span className="text-xs font-medium mt-1" style={{ color: 'var(--color-primary)' }}>{tab.label}</span>
               </NavLink>
             );
           }
@@ -41,10 +41,10 @@ export default function TabBar() {
               {({ isActive }) => (
                 <div className="flex flex-col items-center gap-0.5 transition-all duration-200 relative">
                   <div className="p-1.5 rounded-xl transition-all duration-200"
-                    style={{ background: isActive ? 'rgba(232,122,93,0.08)' : 'transparent' }}>
-                    <Icon size={20} style={{ color: isActive ? '#E87A5D' : '#B5A698' }} strokeWidth={isActive ? 2.2 : 1.8} />
+                    style={{ background: isActive ? 'rgba(var(--color-primary-rgb), 0.08)' : 'transparent' }}>
+                    <Icon size={20} style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)' }} strokeWidth={isActive ? 2.2 : 1.8} />
                   </div>
-                  <span className="text-xs font-medium transition-colors duration-200" style={{ color: isActive ? '#E87A5D' : '#B5A698' }}>
+                  <span className="text-xs font-medium transition-colors duration-200" style={{ color: isActive ? 'var(--color-primary)' : 'var(--color-text-secondary)' }}>
                     {tab.label}
                   </span>
                 </div>

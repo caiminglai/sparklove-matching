@@ -38,9 +38,9 @@ export default function UserCard({
       className={`rounded-2xl p-4 mb-3 transition-all duration-200 ${isSelected ? 'ring-2' : ''}`}
       style={{
         background: 'linear-gradient(135deg, rgba(255,255,255,0.98) 0%, rgba(255,253,249,0.98) 100%)',
-        border: isSelected ? '2px solid #E87A5D' : '1px solid rgba(232,122,93,0.08)',
-        boxShadow: isSelected ? '0 4px 20px rgba(232,122,93,0.15)' : '0 2px 12px rgba(61,46,32,0.04)',
-        borderColor: isSelected ? '#E87A5D' : undefined,
+        border: isSelected ? '2px solid var(--color-primary)' : '1px solid rgba(var(--color-primary-rgb), 0.08)',
+        boxShadow: isSelected ? '0 4px 20px rgba(var(--color-primary-rgb), 0.15)' : '0 2px 12px rgba(var(--color-text-dark-rgb), 0.04)',
+        borderColor: isSelected ? 'var(--color-primary)' : undefined,
       }}
     >
       <div className="flex items-start gap-3">
@@ -75,20 +75,20 @@ export default function UserCard({
         {/* 信息 */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
-            <span className="font-semibold text-sm" style={{ color: '#3D2E20' }}>{d.name || '未知'}</span>
-            {d.gender && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: d.gender === '女' ? 'rgba(255,154,158,0.1)' : 'rgba(137,207,240,0.1)', color: d.gender === '女' ? '#E87A5D' : '#5B9BD5' }}>{d.gender}</span>}
-            {d.age && <span className="text-xs" style={{ color: '#9B8B7B' }}>{d.age}岁</span>}
-            {d.city && <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: '#9B8B7B' }}><MapPin size={10} />{d.city}</span>}
-            {score > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(107,175,125,0.1)', color: '#6BAF7D' }}>匹配{score}项</span>}
+            <span className="font-semibold text-sm" style={{ color: 'var(--color-text-primary)' }}>{d.name || '未知'}</span>
+            {d.gender && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: d.gender === '女' ? 'rgba(255,154,158,0.1)' : 'rgba(137,207,240,0.1)', color: d.gender === '女' ? 'var(--color-primary)' : '#5B9BD5' }}>{d.gender}</span>}
+            {d.age && <span className="text-xs" style={{ color: 'var(--color-text-light)' }}>{d.age}岁</span>}
+            {d.city && <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: 'var(--color-text-light)' }}><MapPin size={10} />{d.city}</span>}
+            {score > 0 && <span className="text-xs px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(var(--color-success-rgb), 0.1)', color: 'var(--color-success)' }}>匹配{score}项</span>}
           </div>
           <div className="flex flex-wrap gap-1 mb-1">
-            {d.education && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(123,140,222,0.06)', color: '#7B8CDE' }}>{d.education}</span>}
-            {d.height && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(232,122,93,0.06)', color: '#E87A5D' }}>{d.height}cm</span>}
-            {d.job && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(61,46,32,0.04)', color: '#8B7B6B' }}>{d.job}</span>}
+            {d.education && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(var(--color-info-rgb), 0.06)', color: 'var(--color-info)' }}>{d.education}</span>}
+            {d.height && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(var(--color-primary-rgb), 0.06)', color: 'var(--color-primary)' }}>{d.height}cm</span>}
+            {d.job && <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(var(--color-text-dark-rgb), 0.04)', color: 'var(--color-text-muted)' }}>{d.job}</span>}
           </div>
           {matches.length > 0 && (
             <div className="flex flex-wrap gap-1">
-              {matches.map(m => <span key={m} className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(107,175,125,0.08)', color: '#6BAF7D' }}>✓ {m}</span>)}
+              {matches.map(m => <span key={m} className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(var(--color-success-rgb), 0.08)', color: 'var(--color-success)' }}>✓ {m}</span>)}
             </div>
           )}
         </div>
@@ -96,15 +96,15 @@ export default function UserCard({
         {/* 操作按钮 */}
         <div className="flex flex-col items-center gap-1">
           {showSelectMode ? (
-            <button onClick={() => onToggleSelect(row.id)} className="p-1.5 rounded-lg" style={{ color: isSelected ? '#E87A5D' : '#D4C8B8' }}>
+            <button onClick={() => onToggleSelect(row.id)} className="p-1.5 rounded-lg" style={{ color: isSelected ? 'var(--color-primary)' : '#D4C8B8' }}>
               <Check size={18} />
             </button>
           ) : (
             <>
-              <button onClick={() => onToggleFavorite(row.id)} className="p-1.5 rounded-lg" style={{ color: isFavorite ? '#E87A5D' : '#D4C8B8' }}>
-                <Heart size={16} fill={isFavorite ? '#E87A5D' : 'none'} />
+              <button onClick={() => onToggleFavorite(row.id)} className="p-1.5 rounded-lg" style={{ color: isFavorite ? 'var(--color-primary)' : '#D4C8B8' }}>
+                <Heart size={16} fill={isFavorite ? 'var(--color-primary)' : 'none'} />
               </button>
-              <button onClick={() => onShowDetail(row.id)} className="p-1.5 rounded-lg text-xs" style={{ color: '#9B8B7B' }}>详情</button>
+              <button onClick={() => onShowDetail(row.id)} className="p-1.5 rounded-lg text-xs" style={{ color: 'var(--color-text-light)' }}>详情</button>
             </>
           )}
         </div>
@@ -112,11 +112,11 @@ export default function UserCard({
 
       {/* 底部操作栏 */}
       {!showSelectMode && (
-        <div className="flex items-center gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(232,122,93,0.06)' }}>
-          <button onClick={() => onShowRating(row.id)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg" style={{ color: '#9B8B7B' }}><Star size={12} />评价</button>
-          <button onClick={() => onShowReport(row.id)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg" style={{ color: '#9B8B7B' }}><Flag size={12} />举报</button>
+        <div className="flex items-center gap-2 mt-2 pt-2" style={{ borderTop: '1px solid rgba(var(--color-primary-rgb), 0.06)' }}>
+          <button onClick={() => onShowRating(row.id)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--color-text-light)' }}><Star size={12} />评价</button>
+          <button onClick={() => onShowReport(row.id)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--color-text-light)' }}><Flag size={12} />举报</button>
           {(isOwner || !row.user_id) && (
-            <button onClick={() => onShowDelete(row.id)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg ml-auto" style={{ color: '#E87A5D' }}><Trash2 size={12} />删除</button>
+            <button onClick={() => onShowDelete(row.id)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg ml-auto" style={{ color: 'var(--color-primary)' }}><Trash2 size={12} />删除</button>
           )}
         </div>
       )}

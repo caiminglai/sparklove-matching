@@ -87,35 +87,35 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#FAF6F1' }}>
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-md mx-auto w-full px-4 pt-6">
         <div className="flex items-center gap-3 mb-8">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: '#B5A698' }}>
+          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
         </div>
 
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-4"
-            style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)', boxShadow: '0 4px 16px rgba(232,122,93,0.3)' }}>
+            style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', boxShadow: '0 4px 16px rgba(var(--color-primary-rgb), 0.3)' }}>
             <Heart size={24} color="white" fill="white" />
           </div>
-          <h1 className="text-2xl font-semibold" style={{ color: '#3D2E20' }}>
+          <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)' }}>
             {isLogin ? '欢迎回来' : '加入我们'}
           </h1>
-          <p className="text-sm mt-2" style={{ color: '#8B7B6B' }}>
+          <p className="text-sm mt-2" style={{ color: 'var(--color-text-muted)' }}>
             {isLogin ? '登录后享受更多功能' : '创建账户，加入微光亦是永恒'}
           </p>
         </div>
 
         <div className="space-y-4">
           <div>
-            <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>手机号</label>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>手机号</label>
             <div className="relative">
-              <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#B5A698' }} />
+              <Phone size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-secondary)' }} />
               <input
                 className="w-full pl-10 pr-4 py-3 rounded-xl text-sm"
-                style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                 type="tel"
                 placeholder="请输入手机号"
                 maxLength={11}
@@ -128,12 +128,12 @@ export default function LoginPage() {
 
           {!isLogin && (
             <div>
-              <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>昵称</label>
+              <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>昵称</label>
               <div className="relative">
-                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#B5A698' }} />
+                <User size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-secondary)' }} />
                 <input
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm"
-                  style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                  style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                   type="text"
                   placeholder="请输入昵称"
                   value={nickname}
@@ -145,12 +145,12 @@ export default function LoginPage() {
           )}
 
           <div>
-            <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>密码</label>
+            <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>密码</label>
             <div className="relative">
-              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#B5A698' }} />
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-secondary)' }} />
               <input
                 className="w-full pl-10 pr-10 py-3 rounded-xl text-sm"
-                style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                 type={showPassword ? 'text' : 'password'}
                 placeholder="请输入密码"
                 value={password}
@@ -160,7 +160,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 className="absolute right-3 top-1/2 -translate-y-1/2"
-                style={{ color: '#B5A698' }}
+                style={{ color: 'var(--color-text-secondary)' }}
                 onClick={() => setShowPassword(!showPassword)}
               >
                 {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
@@ -170,12 +170,12 @@ export default function LoginPage() {
 
           {!isLogin && (
             <div>
-              <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>确认密码</label>
+              <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>确认密码</label>
               <div className="relative">
-                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#B5A698' }} />
+                <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-secondary)' }} />
                 <input
                   className="w-full pl-10 pr-4 py-3 rounded-xl text-sm"
-                  style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                  style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                   type={showPassword ? 'text' : 'password'}
                   placeholder="请再次输入密码"
                   value={confirmPassword}
@@ -187,7 +187,7 @@ export default function LoginPage() {
           )}
 
           {error && (
-            <div className="p-3 rounded-xl text-sm text-center" style={{ background: 'rgba(232,122,93,0.08)', color: '#E87A5D', border: '1px solid #F5D0C4' }}>
+            <div className="p-3 rounded-xl text-sm text-center" style={{ background: 'rgba(var(--color-primary-rgb), 0.08)', color: 'var(--color-primary)', border: '1px solid var(--color-bg-warm)' }}>
               {error}
             </div>
           )}
@@ -196,7 +196,7 @@ export default function LoginPage() {
             onClick={handleSubmit}
             disabled={loading}
             className="w-full py-3.5 rounded-xl text-sm font-medium text-white transition-all disabled:opacity-50"
-            style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)', boxShadow: '0 2px 12px rgba(232,122,93,0.2)' }}
+            style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', boxShadow: '0 2px 12px rgba(var(--color-primary-rgb), 0.2)' }}
           >
             {loading ? '处理中...' : (isLogin ? '登 录' : '注 册')}
           </button>
@@ -205,14 +205,14 @@ export default function LoginPage() {
             <button
               onClick={() => { setIsLogin(!isLogin); setError(''); }}
               className="text-sm"
-              style={{ color: '#E87A5D' }}
+              style={{ color: 'var(--color-primary)' }}
             >
               {isLogin ? '还没有账号？立即注册' : '已有账号？立即登录'}
             </button>
           </div>
 
           <div className="text-center pt-4">
-            <Link to="/" className="text-xs" style={{ color: '#B5A698' }}>
+            <Link to="/" className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
               游客模式继续浏览
             </Link>
           </div>

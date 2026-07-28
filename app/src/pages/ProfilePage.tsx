@@ -1,14 +1,17 @@
 import { useState, useEffect, useRef } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router';
 import { User, Camera, Save, LogOut, ArrowLeft, Star, Edit2, ChevronRight, Settings, Trash2, Plus, X as XIcon } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
+import type { CustomField } from '../data/types';
 import { handleApiError } from '../utils/errorHandler';
 import { loadColumns } from '../services/user.service';
 import { fetchFieldMappings } from '../services/field-mapping.service';
 import { DEPOSIT_RULES } from '../data/constants';
 import type { Column, Row } from '../data/types';
+import { useToast } from '../components/Toast';
 
 export default function ProfilePage() {
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [columns, setColumns] = useState<Column[]>(loadColumns);
   // 从后端拉取字段映射，统一数据源（API 不可用时保留本地默认值）
@@ -64,7 +67,7 @@ export default function ProfilePage() {
           });
           setSelectedTags(tags);
           if (Array.isArray(data.user.custom_fields)) {
-            setCustomFields(data.user.custom_fields.map((f: any) => ({
+            setCustomFields(data.user.custom_fields.map((f: CustomField) => ({
               field_key: f.field_key,
               field_value: f.field_value,
             })));
@@ -92,7 +95,7 @@ export default function ProfilePage() {
 
   const handleSave = async () => {
     if (!formData.name) {
-      alert('请填写昵称');
+      toast('请填写昵称', 'error');
       return;
     }
 
@@ -115,10 +118,10 @@ export default function ProfilePage() {
         setEditMode(false);
         loadMyData();
       } else {
-        alert('保存失败');
+        toast('保存失败', 'error');
       }
     } catch (e) {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   };
 
@@ -132,10 +135,10 @@ export default function ProfilePage() {
       if (res.ok) {
         handleLogout();
       } else {
-        alert('删除失败');
+        toast('删除失败', 'error');
       }
     } catch (e) {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   };
 
@@ -150,7 +153,7 @@ export default function ProfilePage() {
 
   const addCustomField = async () => {
     if (!newFieldKey.trim() || !newFieldValue.trim()) {
-      alert('请填写标签名和标签值');
+      toast('请填写标签名和标签值', 'error');
       return;
     }
     try {
@@ -172,10 +175,10 @@ export default function ProfilePage() {
         setShowAddField(false);
       } else {
         const data = await res.json().catch(() => ({}));
-        alert(data.message || '添加失败');
+        toast(data.message || '添加失败', 'error');
       }
     } catch {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   };
 
@@ -188,10 +191,10 @@ export default function ProfilePage() {
       if (res.ok) {
         setCustomFields(prev => prev.filter(f => f.field_key !== fieldKey));
       } else {
-        alert('删除失败');
+        toast('删除失败', 'error');
       }
     } catch {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   };
 
@@ -209,7 +212,7 @@ export default function ProfilePage() {
         setCustomFields(prev => prev.map(f => f.field_key === fieldKey ? { ...f, field_value: newValue } : f));
       }
     } catch {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   };
 
@@ -219,13 +222,13 @@ export default function ProfilePage() {
 
     // 验证文件类型
     if (!file.type.startsWith('image/')) {
-      alert('请上传图片文件');
+      toast('请上传图片文件', 'error');
       return;
     }
 
     // 验证文件大小（限制5MB）
     if (file.size > 5 * 1024 * 1024) {
-      alert('图片大小不能超过5MB');
+      toast('图片大小不能超过5MB', 'error');
       return;
     }
 
@@ -255,26 +258,26 @@ export default function ProfilePage() {
           // 重新加载用户数据
           await loadMyData();
           setAvatarPreview(null); // 清除预览
-          alert('头像上传成功！');
+          toast('头像上传成功！', 'success');
         } else {
-          alert(result.message || '上传失败');
+          toast(result.message || '上传失败', 'error');
         }
       } else {
         const errorData = await res.json().catch(() => ({}));
-        alert(errorData.message || '上传失败，请重试');
+        toast(errorData.message || '上传失败，请重试', 'error');
       }
     } catch (e) {
-      alert('网络错误，请检查网络连接后重试');
+      toast('网络错误，请检查网络连接后重试', 'error');
     } finally {
       setUploading(false);
     }
   };
   if (!userId) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF6F1' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-main)' }}>
         <div className="text-center">
-          <p className="mb-4" style={{ color: '#8B7B6B' }}>请先登录</p>
-          <Link to="/login" className="px-6 py-2 rounded-lg text-white text-sm" style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)' }}>
+          <p className="mb-4" style={{ color: 'var(--color-text-muted)' }}>请先登录</p>
+          <Link to="/login" className="px-6 py-2 rounded-lg text-white text-sm" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>
             登录
           </Link>
         </div>
@@ -284,22 +287,22 @@ export default function ProfilePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF6F1' }}>
-        <p style={{ color: '#B5A698' }}>加载中...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-main)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>加载中...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-8" style={{ background: '#FAF6F1' }}>
+    <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: '#B5A698' }}>
+          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
-          <h1 className="text-lg font-medium" style={{ color: '#3D2E20' }}>个人中心</h1>
+          <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>个人中心</h1>
           {editMode && (
-            <button onClick={() => setEditMode(false)} className="ml-auto text-sm" style={{ color: '#E87A5D' }}>
+            <button onClick={() => setEditMode(false)} className="ml-auto text-sm" style={{ color: 'var(--color-primary)' }}>
               取消
             </button>
           )}
@@ -307,7 +310,7 @@ export default function ProfilePage() {
 
         {userData ? (
           <>
-            <div className="rounded-2xl p-5 mb-4" style={{ background: 'linear-gradient(180deg, #FFFDF9, #FDF8F1)', border: '1px solid #F0E4D4' }}>
+            <div className="rounded-2xl p-5 mb-4" style={{ background: 'linear-gradient(180deg, var(--color-bg-card), #FDF8F1)', border: '1px solid var(--color-border-light)' }}>
               <div className="flex items-center gap-4 mb-4">
                 <div className="relative">
                   <input 
@@ -365,13 +368,13 @@ export default function ProfilePage() {
                   )}
                 </div>
                 <div className="flex-1">
-                  <div className="font-medium" style={{ color: '#3D2E20' }}>{userData.data?.name || userNickname}</div>
-                  <div className="text-xs mt-1" style={{ color: '#B5A698' }}>
+                  <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{userData.data?.name || userNickname}</div>
+                  <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
                     注册时间: {new Date(userData.createdAt).toLocaleDateString('zh-CN')}
                   </div>
                 </div>
                 {!editMode && (
-                  <button onClick={() => setEditMode(true)} className="p-2 rounded-lg" style={{ color: '#E87A5D', background: 'rgba(232,122,93,0.08)' }}>
+                  <button onClick={() => setEditMode(true)} className="p-2 rounded-lg" style={{ color: 'var(--color-primary)', background: 'rgba(var(--color-primary-rgb), 0.08)' }}>
                     <Edit2 size={16} />
                   </button>
                 )}
@@ -381,20 +384,20 @@ export default function ProfilePage() {
                 <button 
                   onClick={() => navigate('/deposit')}
                   className="text-center p-3 rounded-xl cursor-pointer" 
-                  style={{ background: '#FDF8F1', border: '1px solid #F0E4D4' }}
+                  style={{ background: '#FDF8F1', border: '1px solid var(--color-border-light)' }}
                 >
-                  <div className="text-lg font-semibold" style={{ color: '#E87A5D' }}>{userData.deposit || 0}</div>
-                  <div className="text-xs" style={{ color: '#B5A698' }}>保证金(元)</div>
+                  <div className="text-lg font-semibold" style={{ color: 'var(--color-primary)' }}>{userData.deposit || 0}</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>保证金(元)</div>
                 </button>
-                <div className="text-center p-3 rounded-xl" style={{ background: '#FDF8F1', border: '1px solid #F0E4D4' }}>
-                  <div className="text-lg font-semibold" style={{ color: '#6BAF7D' }}>{userData.data?.hobbies ? userData.data.hobbies.split(',').length : 0}</div>
-                  <div className="text-xs" style={{ color: '#B5A698' }}>兴趣标签</div>
+                <div className="text-center p-3 rounded-xl" style={{ background: '#FDF8F1', border: '1px solid var(--color-border-light)' }}>
+                  <div className="text-lg font-semibold" style={{ color: 'var(--color-success)' }}>{userData.data?.hobbies ? userData.data.hobbies.split(',').length : 0}</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>兴趣标签</div>
                 </div>
-                <div className="text-center p-3 rounded-xl" style={{ background: '#FDF8F1', border: '1px solid #F0E4D4' }}>
-                  <div className="text-lg font-semibold" style={{ color: '#8B7B6B' }}>
+                <div className="text-center p-3 rounded-xl" style={{ background: '#FDF8F1', border: '1px solid var(--color-border-light)' }}>
+                  <div className="text-lg font-semibold" style={{ color: 'var(--color-text-muted)' }}>
                     {userData.data?.purpose || '未设置'}
                   </div>
-                  <div className="text-xs" style={{ color: '#B5A698' }}>目的</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>目的</div>
                 </div>
               </div>
             </div>
@@ -405,7 +408,7 @@ export default function ProfilePage() {
                   if (col.type === 'tags') {
                     return (
                       <div key={col.key}>
-                        <label className="text-xs mb-2 block" style={{ color: '#8B7B6B' }}>{col.label}</label>
+                        <label className="text-xs mb-2 block" style={{ color: 'var(--color-text-muted)' }}>{col.label}</label>
                         <div className="flex flex-wrap gap-1.5">
                           {(col.options || []).map(opt => {
                             const isOn = (selectedTags[col.key] || []).includes(opt);
@@ -413,9 +416,9 @@ export default function ProfilePage() {
                               <button key={opt} onClick={() => toggleTag(col.key, opt)}
                                 className="px-3 py-1.5 rounded-lg text-xs transition-all"
                                 style={{
-                                  background: isOn ? 'rgba(232,122,93,0.08)' : '#FDF8F1',
-                                  border: `1px solid ${isOn ? '#F5B8A4' : '#F0E4D4'}`,
-                                  color: isOn ? '#E87A5D' : '#B5A698',
+                                  background: isOn ? 'rgba(var(--color-primary-rgb), 0.08)' : '#FDF8F1',
+                                  border: `1px solid ${isOn ? '#F5B8A4' : 'var(--color-border-light)'}`,
+                                  color: isOn ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                                 }}>
                                 {opt}
                               </button>
@@ -429,12 +432,12 @@ export default function ProfilePage() {
                   if (col.type === 'select') {
                     return (
                       <div key={col.key}>
-                        <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>{col.label}</label>
+                        <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>{col.label}</label>
                         <select className="w-full px-3 py-2.5 rounded-lg text-sm appearance-none"
-                          style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                          style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                           value={String(formData[col.key] || '')} onChange={e => setVal(col.key, e.target.value)}>
-                          <option value="" style={{ background: '#FFFDF9' }}>请选择</option>
-                          {(col.options || []).map(o => <option key={o} value={o} style={{ background: '#FFFDF9' }}>{o}</option>)}
+                          <option value="" style={{ background: 'var(--color-bg-card)' }}>请选择</option>
+                          {(col.options || []).map(o => <option key={o} value={o} style={{ background: 'var(--color-bg-card)' }}>{o}</option>)}
                         </select>
                       </div>
                     );
@@ -442,9 +445,9 @@ export default function ProfilePage() {
 
                   return (
                     <div key={col.key}>
-                      <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>{col.label}</label>
+                      <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>{col.label}</label>
                       <input className="w-full px-3 py-2.5 rounded-lg text-sm"
-                        style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                        style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                         type={col.type === 'number' ? 'number' : 'text'}
                         placeholder={`输入${col.label}`}
                         value={String(formData[col.key] || '')}
@@ -454,10 +457,10 @@ export default function ProfilePage() {
                 })}
 
                 {/* 自定义标签管理 */}
-                <div className="rounded-xl p-4 mt-2" style={{ background: 'rgba(107,175,125,0.04)', border: '1px solid rgba(107,175,125,0.15)' }}>
+                <div className="rounded-xl p-4 mt-2" style={{ background: 'rgba(var(--color-success-rgb), 0.04)', border: '1px solid rgba(var(--color-success-rgb), 0.15)' }}>
                   <div className="flex items-center justify-between mb-3">
-                    <span className="text-xs font-medium" style={{ color: '#6BAF7D' }}>我的自定义标签</span>
-                    <button onClick={() => setShowAddField(!showAddField)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg" style={{ color: '#6BAF7D', border: '1px solid rgba(107,175,125,0.2)' }}>
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>我的自定义标签</span>
+                    <button onClick={() => setShowAddField(!showAddField)} className="flex items-center gap-1 text-xs px-2 py-1 rounded-lg" style={{ color: 'var(--color-success)', border: '1px solid rgba(var(--color-success-rgb), 0.2)' }}>
                       <Plus size={10} /> 添加
                     </button>
                   </div>
@@ -466,10 +469,10 @@ export default function ProfilePage() {
                     <div className="space-y-2 mb-3">
                       {customFields.map(cf => (
                         <div key={cf.field_key} className="flex items-center gap-2">
-                          <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'rgba(107,175,125,0.08)', color: '#6BAF7D' }}>{cf.field_key}</span>
+                          <span className="text-xs px-2 py-1 rounded-md" style={{ background: 'rgba(var(--color-success-rgb), 0.08)', color: 'var(--color-success)' }}>{cf.field_key}</span>
                           <input
                             className="flex-1 px-2 py-1 rounded-lg text-xs"
-                            style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                            style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                             value={cf.field_value}
                             onChange={e => {
                               setCustomFields(prev => prev.map(f => f.field_key === cf.field_key ? { ...f, field_value: e.target.value } : f));
@@ -489,27 +492,27 @@ export default function ProfilePage() {
                   )}
 
                   {customFields.length === 0 && !showAddField && (
-                    <p className="text-xs mb-3" style={{ color: '#B5A698' }}>还没有自定义标签，点击"添加"创建</p>
+                    <p className="text-xs mb-3" style={{ color: 'var(--color-text-secondary)' }}>还没有自定义标签，点击"添加"创建</p>
                   )}
 
                   {showAddField && (
                     <div className="flex items-center gap-2">
-                      <input className="flex-1 px-2 py-1.5 rounded-lg text-xs" style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }} placeholder="标签名（如：最爱颜色）" value={newFieldKey} onChange={e => setNewFieldKey(e.target.value)} />
-                      <input className="flex-1 px-2 py-1.5 rounded-lg text-xs" style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }} placeholder="标签值（如：蓝色）" value={newFieldValue} onChange={e => setNewFieldValue(e.target.value)} />
-                      <button onClick={addCustomField} className="text-xs px-3 py-1.5 rounded-lg text-white" style={{ background: 'linear-gradient(135deg, #6BAF7D, #4D945F)' }}>确定</button>
+                      <input className="flex-1 px-2 py-1.5 rounded-lg text-xs" style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }} placeholder="标签名（如：最爱颜色）" value={newFieldKey} onChange={e => setNewFieldKey(e.target.value)} />
+                      <input className="flex-1 px-2 py-1.5 rounded-lg text-xs" style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }} placeholder="标签值（如：蓝色）" value={newFieldValue} onChange={e => setNewFieldValue(e.target.value)} />
+                      <button onClick={addCustomField} className="text-xs px-3 py-1.5 rounded-lg text-white" style={{ background: 'linear-gradient(135deg, var(--color-success), #4D945F)' }}>确定</button>
                     </div>
                   )}
                 </div>
 
                 <button onClick={handleSave}
                   className="w-full py-3.5 rounded-xl text-sm font-medium text-white mt-4"
-                  style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)', boxShadow: '0 2px 12px rgba(232,122,93,0.2)' }}>
+                  style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', boxShadow: '0 2px 12px rgba(var(--color-primary-rgb), 0.2)' }}>
                   保存修改
                 </button>
               </div>
             ) : (
-              <div className="rounded-2xl p-5" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
-                <h3 className="text-sm font-medium mb-3" style={{ color: '#3D2E20' }}>我的资料</h3>
+              <div className="rounded-2xl p-5" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
+                <h3 className="text-sm font-medium mb-3" style={{ color: 'var(--color-text-primary)' }}>我的资料</h3>
                 <div className="space-y-2">
                   {columns.filter(c => {
                     const val = userData.data?.[c.key as keyof typeof userData.data];
@@ -517,21 +520,21 @@ export default function ProfilePage() {
                   }).map(col => {
                     const val = String(userData.data?.[col.key as keyof typeof userData.data]);
                     return (
-                      <div key={col.key} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid #F0E4D4' }}>
-                        <span className="text-xs" style={{ color: '#B5A698' }}>{col.label}</span>
-                        <span className="text-sm" style={{ color: '#3D2E20' }}>{val}</span>
+                      <div key={col.key} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{col.label}</span>
+                        <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{val}</span>
                       </div>
                     );
                   })}
                   {customFields.length > 0 && (
                     <>
-                      <div className="py-2 mt-1" style={{ borderTop: '1px solid #F0E4D4' }}>
-                        <span className="text-xs font-medium" style={{ color: '#6BAF7D' }}>自定义标签</span>
+                      <div className="py-2 mt-1" style={{ borderTop: '1px solid var(--color-border-light)' }}>
+                        <span className="text-xs font-medium" style={{ color: 'var(--color-success)' }}>自定义标签</span>
                       </div>
                       {customFields.map(cf => (
-                        <div key={cf.field_key} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid #F0E4D4' }}>
-                          <span className="text-xs" style={{ color: '#B5A698' }}>{cf.field_key}</span>
-                          <span className="text-sm" style={{ color: '#3D2E20' }}>{cf.field_value}</span>
+                        <div key={cf.field_key} className="flex items-center justify-between py-2" style={{ borderBottom: '1px solid var(--color-border-light)' }}>
+                          <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{cf.field_key}</span>
+                          <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{cf.field_value}</span>
                         </div>
                       ))}
                     </>
@@ -541,37 +544,37 @@ export default function ProfilePage() {
             )}
           </>
         ) : (
-          <div className="rounded-2xl p-8 text-center" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
-            <User size={48} style={{ color: '#F0E4D4', margin: '0 auto' }} />
-            <p className="mt-4 mb-4" style={{ color: '#8B7B6B' }}>还没有发布过资料</p>
-            <Link to="/post" className="inline-block px-6 py-2.5 rounded-xl text-sm text-white" style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)' }}>
+          <div className="rounded-2xl p-8 text-center" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
+            <User size={48} style={{ color: 'var(--color-border-light)', margin: '0 auto' }} />
+            <p className="mt-4 mb-4" style={{ color: 'var(--color-text-muted)' }}>还没有发布过资料</p>
+            <Link to="/post" className="inline-block px-6 py-2.5 rounded-xl text-sm text-white" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>
               发布资料
             </Link>
           </div>
         )}
 
         <div className="mt-4 space-y-2">
-          <Link to="/my-posts" className="flex items-center justify-between p-4 rounded-xl" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
+          <Link to="/my-posts" className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(232,122,93,0.08)' }}>
-                <Star size={14} style={{ color: '#E87A5D' }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(var(--color-primary-rgb), 0.08)' }}>
+                <Star size={14} style={{ color: 'var(--color-primary)' }} />
               </div>
-              <span className="text-sm" style={{ color: '#3D2E20' }}>我的发布</span>
+              <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>我的发布</span>
             </div>
-            <ChevronRight size={14} style={{ color: '#B5A698' }} />
+            <ChevronRight size={14} style={{ color: 'var(--color-text-secondary)' }} />
           </Link>
 
-          <Link to="/settings" className="flex items-center justify-between p-4 rounded-xl" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
+          <Link to="/settings" className="flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(107,175,125,0.08)' }}>
-                <Settings size={14} style={{ color: '#6BAF7D' }} />
+              <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(var(--color-success-rgb), 0.08)' }}>
+                <Settings size={14} style={{ color: 'var(--color-success)' }} />
               </div>
-              <span className="text-sm" style={{ color: '#3D2E20' }}>设置</span>
+              <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>设置</span>
             </div>
-            <ChevronRight size={14} style={{ color: '#B5A698' }} />
+            <ChevronRight size={14} style={{ color: 'var(--color-text-secondary)' }} />
           </Link>
 
-          <button onClick={handleLogout} className="w-full flex items-center justify-between p-4 rounded-xl" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
+          <button onClick={handleLogout} className="w-full flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(212,133,106,0.08)' }}>
                 <LogOut size={14} style={{ color: '#D4856A' }} />
@@ -581,7 +584,7 @@ export default function ProfilePage() {
           </button>
 
           {userData && (
-            <button onClick={() => setShowDeleteModal(true)} className="w-full flex items-center justify-between p-4 rounded-xl" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
+            <button onClick={() => setShowDeleteModal(true)} className="w-full flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
               <div className="flex items-center gap-3">
                 <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(220,38,38,0.05)' }}>
                   <Trash2 size={14} style={{ color: '#DC2626' }} />
@@ -594,15 +597,15 @@ export default function ProfilePage() {
       </div>
 
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(61,46,32,0.3)' }}>
-          <div className="rounded-2xl p-5 w-full max-w-sm" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4', boxShadow: '0 8px 32px rgba(61,46,32,0.12)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(var(--color-text-dark-rgb), 0.3)' }}>
+          <div className="rounded-2xl p-5 w-full max-w-sm" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)', boxShadow: '0 8px 32px rgba(var(--color-text-dark-rgb), 0.12)' }}>
             <h3 className="text-sm font-medium mb-2" style={{ color: '#DC2626' }}>删除账号</h3>
-            <p className="text-xs mb-4" style={{ color: '#8B7B6B' }}>
+            <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>
               确定要删除您的账号吗？此操作不可恢复，保证金将原路退回。
             </p>
             <div className="flex gap-2">
               <button onClick={handleDelete} className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white" style={{ background: '#DC2626' }}>确认删除</button>
-              <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2.5 rounded-lg text-sm" style={{ background: '#F5EDE3', color: '#8B7B6B', border: '1px solid #E8DED0' }}>取消</button>
+              <button onClick={() => setShowDeleteModal(false)} className="flex-1 py-2.5 rounded-lg text-sm" style={{ background: 'var(--color-bg-input)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>取消</button>
             </div>
           </div>
         </div>

@@ -5,12 +5,12 @@ import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import type { Row } from '../data/types';
 
 const CIRCLE_CONFIGS = [
-  { key: 'hobbies', label: '兴趣圈', icon: Sparkles, color: '#E87A5D', desc: '因兴趣相聚' },
-  { key: 'food', label: '美食圈', icon: Utensils, color: '#D4A054', desc: '以美食会友' },
-  { key: 'sport', label: '运动圈', icon: Dumbbell, color: '#6BAF7D', desc: '一起动起来' },
-  { key: 'music', label: '音乐圈', icon: Music, color: '#7B8CDE', desc: '用音乐连接' },
-  { key: 'city', label: '同城圈', icon: MapPin, color: '#C47BAF', desc: '身边的朋友' },
-  { key: 'personality', label: '性格圈', icon: Heart, color: '#E87A5D', desc: '同频相吸' },
+  { key: 'hobbies', label: '兴趣圈', icon: Sparkles, color: 'var(--color-primary)', desc: '因兴趣相聚' },
+  { key: 'food', label: '美食圈', icon: Utensils, color: 'var(--color-primary)', desc: '以美食会友' },
+  { key: 'sport', label: '运动圈', icon: Dumbbell, color: 'var(--color-success)', desc: '一起动起来' },
+  { key: 'music', label: '音乐圈', icon: Music, color: 'var(--color-info)', desc: '用音乐连接' },
+  { key: 'city', label: '同城圈', icon: MapPin, color: 'var(--color-info)', desc: '身边的朋友' },
+  { key: 'personality', label: '性格圈', icon: Heart, color: 'var(--color-primary)', desc: '同频相吸' },
 ];
 
 const CIRCLE_TAG_MAP: Record<string, string[]> = {
@@ -81,7 +81,7 @@ export default function CirclesPage() {
   const totalCircles = circleGroups.length;
 
   return (
-    <div className="min-h-screen pb-20" style={{ background: '#FAF6F1' }}>
+    <div className="min-h-screen pb-20" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-3xl mx-auto px-4 pt-6">
         {/* Header */}
         <div className="text-center mb-6">
@@ -90,17 +90,17 @@ export default function CirclesPage() {
               style={{ background: `linear-gradient(135deg, ${activeConfig.color}, ${activeConfig.color}cc)`, boxShadow: `0 2px 8px ${activeConfig.color}40` }}>
               <ActiveIcon size={18} color="white" />
             </div>
-            <h1 className="text-2xl font-semibold" style={{ color: '#3D2E20', letterSpacing: '0.02em' }}>
+            <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)', letterSpacing: '0.02em' }}>
               圈子
             </h1>
           </div>
-          <p className="text-sm" style={{ color: '#B5A698' }}>
+          <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>
             每个人既是自己的圈子，又是别人的圈子
           </p>
           <div className="flex items-center justify-center gap-4 mt-2">
-            <span className="text-xs" style={{ color: '#B5A698' }}>{totalPeople} 位圈友</span>
+            <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{totalPeople} 位圈友</span>
             <span className="text-xs" style={{ color: '#D4C8B8' }}>·</span>
-            <span className="text-xs" style={{ color: '#B5A698' }}>{totalCircles} 个圈子</span>
+            <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{totalCircles} 个圈子</span>
           </div>
         </div>
 
@@ -115,9 +115,9 @@ export default function CirclesPage() {
                 onClick={() => { setActiveCircle(config.key); setSearchTag(''); }}
                 className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{
-                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : '#FFFDF9',
-                  color: isActive ? 'white' : '#8B7B6B',
-                  border: isActive ? 'none' : '1px solid #F0E4D4',
+                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : 'var(--color-bg-card)',
+                  color: isActive ? 'white' : 'var(--color-text-muted)',
+                  border: isActive ? 'none' : '1px solid var(--color-border-light)',
                   boxShadow: isActive ? `0 2px 8px ${config.color}30` : 'none',
                 }}
               >
@@ -130,10 +130,10 @@ export default function CirclesPage() {
 
         {/* Search */}
         <div className="relative mb-4">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: '#B5A698' }} />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--color-text-secondary)' }} />
           <input
             className="w-full pl-10 pr-4 py-2.5 rounded-xl text-sm"
-            style={{ background: '#FFFDF9', border: '1px solid #F0E4D4', color: '#3D2E20', outline: 'none' }}
+            style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)', color: 'var(--color-text-primary)', outline: 'none' }}
             placeholder={`搜索${activeConfig.label}标签...`}
             value={searchTag}
             onChange={e => setSearchTag(e.target.value)}
@@ -145,13 +145,13 @@ export default function CirclesPage() {
           style={{ background: `${activeConfig.color}08`, border: `1px solid ${activeConfig.color}20` }}>
           <ActiveIcon size={14} style={{ color: activeConfig.color }} />
           <span className="text-xs" style={{ color: activeConfig.color }}>{activeConfig.desc}</span>
-          <span className="text-xs ml-auto" style={{ color: '#B5A698' }}>点击圈子查看圈友</span>
+          <span className="text-xs ml-auto" style={{ color: 'var(--color-text-secondary)' }}>点击圈子查看圈友</span>
         </div>
 
         {/* Loading */}
         {loading && (
           <div className="text-center py-12">
-            <p className="text-sm" style={{ color: '#B5A698' }}>加载圈子中...</p>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>加载圈子中...</p>
           </div>
         )}
 
@@ -162,12 +162,12 @@ export default function CirclesPage() {
               <div key={group.tag}
                 className="rounded-xl p-4 cursor-pointer transition-all"
                 style={{
-                  background: '#FFFDF9',
-                  border: '1px solid #F0E4D4',
+                  background: 'var(--color-bg-card)',
+                  border: '1px solid var(--color-border-light)',
                 }}
                 onClick={() => navigate(`/circle/${activeCircle}/${encodeURIComponent(group.tag)}`)}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeConfig.color}40`; e.currentTarget.style.boxShadow = `0 2px 12px ${activeConfig.color}10`; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#F0E4D4'; e.currentTarget.style.boxShadow = 'none'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-light)'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
@@ -175,7 +175,7 @@ export default function CirclesPage() {
                       style={{ background: `${activeConfig.color}12`, color: activeConfig.color, border: `1px solid ${activeConfig.color}25` }}>
                       {group.tag[0]}
                     </span>
-                    <span className="text-sm font-medium" style={{ color: '#3D2E20' }}>{group.tag}</span>
+                    <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{group.tag}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-0.5 rounded-full"
@@ -198,7 +198,7 @@ export default function CirclesPage() {
                       {user.data?.avatar && (
                         <img 
                           src={normalizeAvatarUrl(user.data.avatar) || undefined} 
-                          alt={user.data?.name || 'avatar'} 
+                          alt={user.data?.name || '用户头像'} 
                           className="w-full h-full object-cover absolute inset-0"
                           onError={(e) => {
                             const target = e.target as HTMLImageElement;
@@ -210,7 +210,7 @@ export default function CirclesPage() {
                     </div>
                   ))}
                   {group.count > 8 && (
-                    <span className="text-xs ml-1" style={{ color: '#B5A698' }}>+{group.count - 8}</span>
+                    <span className="text-xs ml-1" style={{ color: 'var(--color-text-secondary)' }}>+{group.count - 8}</span>
                   )}
                 </div>
               </div>
@@ -218,7 +218,7 @@ export default function CirclesPage() {
 
             {filteredGroups.length === 0 && (
               <div className="text-center py-12">
-                <Users size={28} style={{ color: '#F0E4D4', margin: '0 auto' }} />
+                <Users size={28} style={{ color: 'var(--color-border-light)', margin: '0 auto' }} />
                 <p className="mt-2 text-sm" style={{ color: '#D4C8B8' }}>
                   {searchTag ? '没有找到匹配的圈子' : '暂无圈子数据'}
                 </p>

@@ -1,12 +1,13 @@
-
 import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { ArrowLeft, FileText, MapPin, Heart, Trash2, Eye, Clock, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, MapPin, Heart, Trash2, Clock, Plus } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import { loadColumns } from '../services/user.service';
 import type { Row } from '../data/types';
+import { useToast } from '../components/Toast';
 
 export default function MyPostsPage() {
+  const { toast } = useToast();
   const navigate = useNavigate();
   const columns = loadColumns();
   const [rows, setRows] = useState<Row[]>([]);
@@ -44,7 +45,7 @@ export default function MyPostsPage() {
         }
       }
     } catch (e) {
-      // ignored
+      console.warn('删除帖子失败', e);
     } finally {
       setLoading(false);
     }
@@ -60,19 +61,19 @@ export default function MyPostsPage() {
         setRows([]);
         setShowDelModal(null);
       } else {
-        alert('删除失败');
+        toast('删除失败', 'error');
       }
     } catch (e) {
-      alert('网络错误');
+      toast('网络错误', 'error');
     }
   };
 
   if (!userId) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF6F1' }}>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-main)' }}>
         <div className="text-center">
-          <p className="mb-4" style={{ color: '#8B7B6B' }}>请先登录</p>
-          <Link to="/login" className="px-6 py-2 rounded-lg text-white text-sm" style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)' }}>
+          <p className="mb-4" style={{ color: 'var(--color-text-muted)' }}>请先登录</p>
+          <Link to="/login" className="px-6 py-2 rounded-lg text-white text-sm" style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>
             登录
           </Link>
         </div>
@@ -82,20 +83,20 @@ export default function MyPostsPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: '#FAF6F1' }}>
-        <p style={{ color: '#B5A698' }}>加载中...</p>
+      <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-main)' }}>
+        <p style={{ color: 'var(--color-text-secondary)' }}>加载中...</p>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen pb-8" style={{ background: '#FAF6F1' }}>
+    <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/profile" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: '#B5A698' }}>
+          <Link to="/profile" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
-          <h1 className="text-lg font-medium" style={{ color: '#3D2E20' }}>我的发布</h1>
+          <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>我的发布</h1>
         </div>
 
         {rows.length > 0 ? (
@@ -107,7 +108,7 @@ export default function MyPostsPage() {
               });
 
               return (
-                <div key={row.id} className="rounded-2xl p-4" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
+                <div key={row.id} className="rounded-2xl p-4" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
                   {/* 头像+名字 */}
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-12 h-12 rounded-2xl avatar-gradient flex items-center justify-center text-lg font-bold overflow-hidden"
@@ -126,14 +127,14 @@ export default function MyPostsPage() {
                       )}
                     </div>
                     <div className="flex-1">
-                      <div className="font-medium" style={{ color: '#3D2E20' }}>{row.data?.name || '匿名'}</div>
+                      <div className="font-medium" style={{ color: 'var(--color-text-primary)' }}>{row.data?.name || '匿名'}</div>
                       <div className="flex items-center gap-2 mt-0.5">
-                        <span className="text-xs" style={{ color: '#B5A698' }}>
+                        <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                           <Clock size={10} className="inline mr-1" />
                           {new Date(row.createdAt).toLocaleDateString('zh-CN')}
                         </span>
                         {row.deposit > 0 && (
-                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(107,175,125,0.08)', color: '#6BAF7D' }}>
+                          <span className="text-xs px-1.5 py-0.5 rounded" style={{ background: 'rgba(var(--color-success-rgb), 0.08)', color: 'var(--color-success)' }}>
                             保证金 ¥{row.deposit}
                           </span>
                         )}
@@ -156,14 +157,14 @@ export default function MyPostsPage() {
                       return (
                         <span key={col.key}
                           className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium"
-                          style={{ background: 'rgba(232,122,93,0.06)', color: '#8B7B6B', border: '1px solid rgba(240,228,212,0.6)' }}>
+                          style={{ background: 'rgba(var(--color-primary-rgb), 0.06)', color: 'var(--color-text-muted)', border: '1px solid rgba(var(--color-border-warm-rgb), 0.6)' }}>
                           {col.label}: {val.length > 10 ? val.slice(0, 10) + '...' : val}
                         </span>
                       );
                     })}
                     {visibleCols.length > 8 && (
                       <span className="inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-medium"
-                        style={{ background: 'rgba(232,122,93,0.06)', color: '#E87A5D' }}>
+                        style={{ background: 'rgba(var(--color-primary-rgb), 0.06)', color: 'var(--color-primary)' }}>
                         +{visibleCols.length - 8}
                       </span>
                     )}
@@ -173,34 +174,34 @@ export default function MyPostsPage() {
             })}
 
             {/* 统计 */}
-            <div className="rounded-2xl p-4 mt-4" style={{ background: 'linear-gradient(180deg, #FFFDF9, #FDF8F1)', border: '1px solid #F0E4D4' }}>
+            <div className="rounded-2xl p-4 mt-4" style={{ background: 'linear-gradient(180deg, var(--color-bg-card), #FDF8F1)', border: '1px solid var(--color-border-light)' }}>
               <div className="grid grid-cols-3 gap-3 text-center">
                 <div>
-                  <div className="text-lg font-semibold" style={{ color: '#E87A5D' }}>{rows.length}</div>
-                  <div className="text-xs" style={{ color: '#B5A698' }}>发布数</div>
+                  <div className="text-lg font-semibold" style={{ color: 'var(--color-primary)' }}>{rows.length}</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>发布数</div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold" style={{ color: '#6BAF7D' }}>{rows.reduce((s, r) => s + (r.deposit || 0), 0)}</div>
-                  <div className="text-xs" style={{ color: '#B5A698' }}>保证金(元)</div>
+                  <div className="text-lg font-semibold" style={{ color: 'var(--color-success)' }}>{rows.reduce((s, r) => s + (r.deposit || 0), 0)}</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>保证金(元)</div>
                 </div>
                 <div>
-                  <div className="text-lg font-semibold" style={{ color: '#8B7B6B' }}>
+                  <div className="text-lg font-semibold" style={{ color: 'var(--color-text-muted)' }}>
                     {rows.filter(r => r.data?.avatar).length}
                   </div>
-                  <div className="text-xs" style={{ color: '#B5A698' }}>有照片</div>
+                  <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>有照片</div>
                 </div>
               </div>
             </div>
           </div>
         ) : (
           <div className="text-center py-16">
-            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(232,122,93,0.06)' }}>
-              <FileText size={28} style={{ color: '#E87A5D', opacity: 0.4 }} />
+            <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(var(--color-primary-rgb), 0.06)' }}>
+              <FileText size={28} style={{ color: 'var(--color-primary)', opacity: 0.4 }} />
             </div>
-            <p className="text-sm font-medium mb-1" style={{ color: '#B5A698' }}>还没有发布过资料</p>
+            <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>还没有发布过资料</p>
             <p className="text-xs mb-4" style={{ color: '#D4C8B8' }}>发布资料让更多人看到你</p>
             <Link to="/post" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-white text-sm font-medium"
-              style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)' }}>
+              style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>
               <Plus size={14} /> 发布资料
             </Link>
           </div>
@@ -209,15 +210,15 @@ export default function MyPostsPage() {
 
       {/* 删除确认弹窗 */}
       {showDelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(61,46,32,0.3)' }}>
-          <div className="rounded-2xl p-5 w-full max-w-sm" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4', boxShadow: '0 8px 32px rgba(61,46,32,0.12)' }}>
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4" style={{ background: 'rgba(var(--color-text-dark-rgb), 0.3)' }}>
+          <div className="rounded-2xl p-5 w-full max-w-sm" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)', boxShadow: '0 8px 32px rgba(var(--color-text-dark-rgb), 0.12)' }}>
             <h3 className="text-sm font-medium mb-2" style={{ color: '#DC2626' }}>删除资料</h3>
-            <p className="text-xs mb-4" style={{ color: '#8B7B6B' }}>
+            <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>
               确定要删除这条资料吗？如果已缴纳保证金，将全额退回。
             </p>
             <div className="flex gap-2">
               <button onClick={() => handleDelete(showDelModal)} className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white" style={{ background: '#DC2626' }}>确认删除</button>
-              <button onClick={() => setShowDelModal(null)} className="flex-1 py-2.5 rounded-lg text-sm" style={{ background: '#F5EDE3', color: '#8B7B6B', border: '1px solid #E8DED0' }}>取消</button>
+              <button onClick={() => setShowDelModal(null)} className="flex-1 py-2.5 rounded-lg text-sm" style={{ background: 'var(--color-bg-input)', color: 'var(--color-text-muted)', border: '1px solid var(--color-border)' }}>取消</button>
             </div>
           </div>
         </div>

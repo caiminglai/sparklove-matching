@@ -39,7 +39,7 @@ export const API_ENDPOINTS = {
 } as const;
 
 // 动态获取基础路径（支持 /jzxr 子路径部署和根路径部署）
-const getBasePath = (): string => {
+export const getBasePath = (): string => {
   if (typeof window !== 'undefined' && window.location.pathname.startsWith('/jzxr')) return '/jzxr';
   return '';
 };

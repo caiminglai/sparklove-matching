@@ -2,6 +2,8 @@
  * 常量配置（纯数据，无业务逻辑，无 API 调用）
  */
 
+import type { Column } from './types';
+
 // 外貌与个人属性
 export const SKIN_TONE_OPTIONS = ['白皙', '偏白', '自然', '小麦色', '偏黑', '健康色'];
 export const ZODIAC_OPTIONS = ['白羊座', '金牛座', '双子座', '巨蟹座', '狮子座', '处女座', '天秤座', '天蝎座', '射手座', '摩羯座', '水瓶座', '双鱼座'];
@@ -107,3 +109,40 @@ export const DEPOSIT_RULES = Object.assign([
   emotionalDamage: 10,
   deleteRefund: 10,
 }) as string[] & { amount: number; platformFee: number; emotionalDamage: number; deleteRefund: number };
+
+// 默认列配置（user.service 和 field-mapping.service 共用）
+export const DEFAULT_COLUMNS: Column[] = [
+  { key: 'purpose', label: '目的', type: 'select', options: PURPOSE_OPTIONS, category: '基本' },
+  { key: 'name', label: '昵称', type: 'text', category: '基本' },
+  { key: 'gender', label: '性别', type: 'select', options: GENDER_OPTIONS, category: '基本' },
+  { key: 'age', label: '年龄', type: 'text', category: '基本' },
+  { key: 'height', label: '身高', type: 'text', category: '基本' },
+  { key: 'weight', label: '体重', type: 'text', category: '基本' },
+  { key: 'city', label: '城市', type: 'select', options: CITY_OPTIONS, category: '基本' },
+  { key: 'skinTone', label: '肤色', type: 'select', options: SKIN_TONE_OPTIONS, category: '外貌' },
+  { key: 'faceType', label: '脸型', type: 'select', options: FACE_TYPE_OPTIONS, category: '外貌' },
+  { key: 'eyeType', label: '眼型', type: 'select', options: EYE_TYPE_OPTIONS, category: '外貌' },
+  { key: 'mouthType', label: '嘴型', type: 'select', options: MOUTH_TYPE_OPTIONS, category: '外貌' },
+  { key: 'bodyType', label: '身材', type: 'select', options: BODY_TYPE_OPTIONS, category: '外貌' },
+  { key: 'zodiac', label: '星座', type: 'select', options: ZODIAC_OPTIONS, category: '属性' },
+  { key: 'bloodType', label: '血型', type: 'select', options: BLOOD_TYPE_OPTIONS, category: '属性' },
+  { key: 'marriage', label: '婚姻', type: 'select', options: MARRIAGE_OPTIONS, category: '属性' },
+  { key: 'children', label: '子女', type: 'select', options: CHILDREN_OPTIONS, category: '属性' },
+  { key: 'education', label: '学历', type: 'select', options: EDUCATION_OPTIONS, category: '属性' },
+  { key: 'job', label: '职业', type: 'text', category: '属性' },
+  { key: 'income', label: '收入', type: 'select', options: INCOME_OPTIONS, category: '属性' },
+  { key: 'house', label: '住房', type: 'select', options: HOUSE_OPTIONS, category: '属性' },
+  { key: 'car', label: '购车', type: 'select', options: CAR_OPTIONS, category: '属性' },
+  { key: 'personality', label: '性格', type: 'select', options: PERSONALITY_OPTIONS, category: '个性' },
+  { key: 'smoke', label: '吸烟', type: 'select', options: SMOKE_OPTIONS, category: '个性' },
+  { key: 'drink', label: '饮酒', type: 'select', options: DRINK_OPTIONS, category: '个性' },
+  { key: 'religion', label: '宗教信仰', type: 'select', options: RELIGION_OPTIONS, category: '个性' },
+  { key: 'pet', label: '宠物', type: 'select', options: PET_OPTIONS, category: '个性' },
+  { key: 'hobbies', label: '兴趣爱好', type: 'tags', options: HOBBY_OPTIONS, category: '兴趣' },
+  { key: 'food', label: '美食偏好', type: 'tags', options: FOOD_OPTIONS, category: '兴趣' },
+  { key: 'sport', label: '运动爱好', type: 'tags', options: SPORT_OPTIONS, category: '兴趣' },
+  { key: 'music', label: '音乐偏好', type: 'tags', options: MUSIC_OPTIONS, category: '兴趣' },
+  { key: 'interestTags', label: '兴趣标签', type: 'tags', options: [...HOBBY_OPTIONS, ...SPORT_OPTIONS], category: '兴趣' },
+  { key: 'expectation', label: '期望', type: 'text', category: '其他' },
+  { key: 'contact', label: '联系方式', type: 'text', category: '其他' },
+];

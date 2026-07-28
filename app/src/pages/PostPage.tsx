@@ -4,8 +4,10 @@ import { ArrowLeft } from 'lucide-react';
 import { loadColumns, loadRows, addRow } from '../services/user.service';
 import type { Row } from '../data/types';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
+import { useToast } from '../components/Toast';
 
 export default function PostPage() {
+  const { toast } = useToast();
   const navigate = useNavigate();
   const [columns] = useState(() => loadColumns());
   const [data, setData] = useState<Record<string, string | number>>({});
@@ -16,9 +18,8 @@ export default function PostPage() {
 
   useEffect(() => {
     if (!userId || !authToken) {
-      if (confirm('发布资料需要先登录。是否前往登录？')) {
-        navigate('/login');
-      }
+      toast('发布资料需要先登录', 'error');
+      navigate('/login');
       return;
     }
   }, []);
@@ -33,7 +34,7 @@ export default function PostPage() {
   };
 
   const handleSubmit = async () => {
-    if (!data.name) { alert('请填写昵称'); return; }
+    if (!data.name) { toast('请填写昵称', 'error'); return; }
 
     const finalData = { ...data };
     Object.entries(selectedTags).forEach(([key, tags]) => {
@@ -61,10 +62,10 @@ export default function PostPage() {
         if (res.ok) {
           navigate('/profile');
         } else {
-          alert('发布失败');
+          toast('发布失败', 'error');
         }
       } catch (e) {
-        alert('网络错误');
+        toast('网络错误', 'error');
       }
     } else {
       addRow(loadRows(), row);
@@ -73,22 +74,22 @@ export default function PostPage() {
   };
 
   return (
-    <div className="min-h-screen" style={{ background: '#FAF6F1' }}>
+    <div className="min-h-screen" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: '#B5A698' }}>
+          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
-          <h1 className="text-lg font-medium" style={{ color: '#3D2E20' }}>发布资料</h1>
+          <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>发布资料</h1>
         </div>
 
         {/* Avatar Upload */}
         <div className="mb-5">
-          <label className="text-xs mb-2 block" style={{ color: '#8B7B6B' }}>头像照片</label>
+          <label className="text-xs mb-2 block" style={{ color: 'var(--color-text-muted)' }}>头像照片</label>
           <div className="flex items-center gap-4">
             <div className="w-20 h-20 rounded-2xl flex items-center justify-center text-2xl font-bold avatar-gradient overflow-hidden"
-              style={{ background: 'linear-gradient(135deg, #F5B8A4, #E87A5D)' }}>
+              style={{ background: 'linear-gradient(135deg, #F5B8A4, var(--color-primary))' }}>
               {normalizeAvatarUrl(data.avatar as string) ? (
                 <img 
                   src={normalizeAvatarUrl(data.avatar as string) || ''} 
@@ -120,10 +121,10 @@ export default function PostPage() {
                 id="avatar-upload"
               />
               <label htmlFor="avatar-upload" className="inline-block px-4 py-2 rounded-xl text-sm cursor-pointer transition-all"
-                style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#E87A5D' }}>
+                style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-primary)' }}>
                 上传照片
               </label>
-              <p className="text-xs mt-1.5" style={{ color: '#B5A698' }}>支持 JPG、PNG 格式</p>
+              <p className="text-xs mt-1.5" style={{ color: 'var(--color-text-secondary)' }}>支持 JPG、PNG 格式</p>
             </div>
           </div>
         </div>
@@ -134,7 +135,7 @@ export default function PostPage() {
             if (col.type === 'tags') {
               return (
                 <div key={col.key}>
-                  <label className="text-xs mb-2 block" style={{ color: '#8B7B6B' }}>{col.label}</label>
+                  <label className="text-xs mb-2 block" style={{ color: 'var(--color-text-muted)' }}>{col.label}</label>
                   <div className="flex flex-wrap gap-1.5">
                     {(col.options || []).map(opt => {
                       const isOn = (selectedTags[col.key] || []).includes(opt);
@@ -142,9 +143,9 @@ export default function PostPage() {
                         <button key={opt} onClick={() => toggleTag(col.key, opt)}
                           className="px-3 py-1.5 rounded-lg text-xs transition-all"
                           style={{
-                            background: isOn ? 'rgba(232,122,93,0.08)' : '#FDF8F1',
-                            border: `1px solid ${isOn ? '#F5B8A4' : '#F0E4D4'}`,
-                            color: isOn ? '#E87A5D' : '#B5A698',
+                            background: isOn ? 'rgba(var(--color-primary-rgb), 0.08)' : '#FDF8F1',
+                            border: `1px solid ${isOn ? '#F5B8A4' : 'var(--color-border-light)'}`,
+                            color: isOn ? 'var(--color-primary)' : 'var(--color-text-secondary)',
                           }}>
                           {opt}
                         </button>
@@ -158,12 +159,12 @@ export default function PostPage() {
             if (col.type === 'select') {
               return (
                 <div key={col.key}>
-                  <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>{col.label}</label>
+                  <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>{col.label}</label>
                   <select className="w-full px-3 py-2.5 rounded-lg text-sm appearance-none"
-                    style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                    style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                     value={String(data[col.key] || '')} onChange={e => setVal(col.key, e.target.value)}>
-                    <option value="" style={{ background: '#FFFDF9' }}>请选择</option>
-                    {(col.options || []).map(o => <option key={o} value={o} style={{ background: '#FFFDF9' }}>{o}</option>)}
+                    <option value="" style={{ background: 'var(--color-bg-card)' }}>请选择</option>
+                    {(col.options || []).map(o => <option key={o} value={o} style={{ background: 'var(--color-bg-card)' }}>{o}</option>)}
                   </select>
                 </div>
               );
@@ -171,14 +172,14 @@ export default function PostPage() {
 
             return (
               <div key={col.key}>
-                <label className="text-xs mb-1.5 block" style={{ color: '#8B7B6B' }}>{col.label} {col.key === 'name' ? '*' : ''}</label>
+                <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>{col.label} {col.key === 'name' ? '*' : ''}</label>
                 <input className="w-full px-3 py-2.5 rounded-lg text-sm transition-all"
-                  style={{ background: '#F5EDE3', border: '1px solid #E8DED0', color: '#3D2E20', outline: 'none' }}
+                  style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
                   type={col.type === 'number' ? 'number' : 'text'}
                   placeholder={`输入${col.label}`}
                   value={String(data[col.key] || '')}
                   onFocus={e => (e.target.style.borderColor = '#F5B8A4')}
-                  onBlur={e => (e.target.style.borderColor = '#E8DED0')}
+                  onBlur={e => (e.target.style.borderColor = 'var(--color-border)')}
                   onChange={e => setVal(col.key, e.target.value)} />
               </div>
             );
@@ -187,7 +188,7 @@ export default function PostPage() {
 
         <button onClick={handleSubmit}
           className="w-full mt-5 mb-8 py-3.5 rounded-xl text-sm font-medium text-white transition-all"
-          style={{ background: 'linear-gradient(135deg, #E87A5D, #D96A4D)', boxShadow: '0 2px 12px rgba(232,122,93,0.2)' }}>
+          style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))', boxShadow: '0 2px 12px rgba(var(--color-primary-rgb), 0.2)' }}>
           发布
         </button>
       </div>

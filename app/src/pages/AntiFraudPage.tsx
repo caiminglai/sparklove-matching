@@ -128,40 +128,40 @@ const TIPS = [
 
 export default function AntiFraudPage() {
   return (
-    <div className="min-h-screen" style={{ background: '#FAF6F1' }}>
+    <div className="min-h-screen" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6 pb-8">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: '#B5A698' }}>
+          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
-          <Shield size={16} style={{ color: '#6BAF7D' }} />
-          <h1 className="text-lg font-medium" style={{ color: '#3D2E20' }}>防诈安全中心</h1>
+          <Shield size={16} style={{ color: 'var(--color-success)' }} />
+          <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>防诈安全中心</h1>
         </div>
 
-        <div className="rounded-xl p-4 mb-4" style={{ background: 'linear-gradient(135deg, rgba(232,122,93,0.08), #FFFDF9)', border: '1px solid #F5D0C4' }}>
+        <div className="rounded-xl p-4 mb-4" style={{ background: 'linear-gradient(135deg, rgba(var(--color-primary-rgb), 0.08), var(--color-bg-card))', border: '1px solid var(--color-bg-warm)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <AlertTriangle size={15} style={{ color: '#E87A5D' }} />
-            <span className="text-sm font-medium" style={{ color: '#E87A5D' }}>温馨提示</span>
+            <AlertTriangle size={15} style={{ color: 'var(--color-primary)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>温馨提示</span>
           </div>
-          <p className="text-xs leading-relaxed" style={{ color: '#8B7B6B' }}>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
             本平台不保留站内私信功能。交换联系方式后，请务必通过下方官方渠道交叉核实对方关键信息，谨防诈骗。
           </p>
         </div>
 
-        <div className="rounded-xl p-4 mb-4" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
+        <div className="rounded-xl p-4 mb-4" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
           <div className="flex items-center gap-2 mb-3">
-            <Shield size={15} style={{ color: '#6BAF7D' }} />
-            <span className="text-sm font-medium" style={{ color: '#6BAF7D' }}>防诈守则</span>
+            <Shield size={15} style={{ color: 'var(--color-success)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>防诈守则</span>
           </div>
           <div className="space-y-3">
             {TIPS.map((tip, idx) => (
               <div key={idx} className="flex items-start gap-3">
-                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'rgba(107,175,125,0.08)' }}>
-                  <tip.icon size={14} style={{ color: '#6BAF7D' }} />
+                <div className="w-7 h-7 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: 'rgba(var(--color-success-rgb), 0.08)' }}>
+                  <tip.icon size={14} style={{ color: 'var(--color-success)' }} />
                 </div>
                 <div>
-                  <div className="text-xs font-medium" style={{ color: '#3D2E20' }}>{tip.title}</div>
-                  <div className="text-xs mt-0.5" style={{ color: '#8B7B6B' }}>{tip.text}</div>
+                  <div className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{tip.title}</div>
+                  <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-muted)' }}>{tip.text}</div>
                 </div>
               </div>
             ))}
@@ -169,15 +169,15 @@ export default function AntiFraudPage() {
         </div>
 
         <div className="rounded-xl p-3.5 mb-4" style={{ background: 'rgba(212,160,84,0.04)', border: '1px solid rgba(212,160,84,0.15)' }}>
-          <p className="text-xs leading-relaxed" style={{ color: '#8B7B6B' }}>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
             注：我国目前暂无面向普通公众的“他人婚姻状态”“个人犯罪记录”“传染病检查结果”等公开查询网站。相关核实需通过官方政务服务申请、正规医院检测或司法机关渠道进行。
           </p>
         </div>
 
-        <div className="rounded-xl p-4 mb-6" style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}>
+        <div className="rounded-xl p-4 mb-6" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
           <div className="flex items-center gap-2 mb-3">
-            <Link2 size={15} style={{ color: '#E87A5D' }} />
-            <span className="text-sm font-medium" style={{ color: '#E87A5D' }}>官方信息核实工具</span>
+            <Link2 size={15} style={{ color: 'var(--color-primary)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>官方信息核实工具</span>
           </div>
           <div className="space-y-2.5">
             {VERIFY_LINKS.map((item, idx) => (
@@ -187,27 +187,27 @@ export default function AntiFraudPage() {
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center justify-between p-3 rounded-xl transition-all hover:translate-y-[-1px]"
-                style={{ background: '#fff', border: '1px solid rgba(240,228,212,0.6)' }}
+                style={{ background: '#fff', border: '1px solid rgba(var(--color-border-warm-rgb), 0.6)' }}
               >
                 <div className="flex-1 min-w-0 mr-3">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-xs font-medium" style={{ color: '#3D2E20' }}>{item.title}</span>
-                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(232,122,93,0.08)', color: '#E87A5D' }}>{item.tag}</span>
+                    <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{item.title}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: 'rgba(var(--color-primary-rgb), 0.08)', color: 'var(--color-primary)' }}>{item.tag}</span>
                   </div>
-                  <p className="text-[11px] leading-relaxed" style={{ color: '#9B8B7B' }}>{item.desc}</p>
+                  <p className="text-[11px] leading-relaxed" style={{ color: 'var(--color-text-light)' }}>{item.desc}</p>
                 </div>
-                <ExternalLink size={14} style={{ color: '#B5A698' }} />
+                <ExternalLink size={14} style={{ color: 'var(--color-text-secondary)' }} />
               </a>
             ))}
           </div>
         </div>
 
-        <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(196,81,92,0.03)', border: '1px solid #F0D0D4' }}>
+        <div className="rounded-xl p-4 mb-6" style={{ background: 'rgba(var(--color-danger-rgb), 0.03)', border: '1px solid var(--color-bg-pink)' }}>
           <div className="flex items-center gap-2 mb-2">
-            <Phone size={15} style={{ color: '#C4515C' }} />
-            <span className="text-sm font-medium" style={{ color: '#C4515C' }}>如遇诈骗</span>
+            <Phone size={15} style={{ color: 'var(--color-danger)' }} />
+            <span className="text-sm font-medium" style={{ color: 'var(--color-danger)' }}>如遇诈骗</span>
           </div>
-          <p className="text-xs leading-relaxed" style={{ color: '#8B7B6B' }}>
+          <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
             请立即停止联系并保存证据，拨打 110 或 96110 反诈专线报警，也可通过上方“网络不良信息举报”入口提交举报。
           </p>
         </div>

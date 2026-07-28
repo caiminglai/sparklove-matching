@@ -3,13 +3,13 @@ import { useNavigate } from 'react-router';
 import { CATEGORIES, FIELD_LABELS } from '../data/constants';
 import { normalizeAvatarUrl } from '../api/config';
 import { maskContact } from './UserCard';
-import type { Row, Column } from '../data/types';
+import type { Row, Column, Rating } from '../data/types';
 
 interface UserDetailModalProps {
   userId: string;
   row: Row | undefined;
   columns: Column[];
-  ratings: any[];
+  ratings: Rating[];
   averageRating: { avg: number; count: number } | null;
   contactUnlocked: boolean;
   fullContact: string | null;
@@ -40,19 +40,19 @@ export default function UserDetailModal({
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-end fade-in"
-      style={{ background: 'rgba(61,46,32,0.25)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
+      style={{ background: 'rgba(var(--color-text-dark-rgb), 0.25)', backdropFilter: 'blur(4px)', WebkitBackdropFilter: 'blur(4px)' }}
       onClick={onClose}
     >
       <div
         className="w-full max-w-md h-full overflow-y-auto slide-in-right"
-        style={{ background: 'linear-gradient(180deg, #FFFDF9 0%, #FAF6F1 100%)', boxShadow: '-8px 0 40px rgba(61,46,32,0.1)' }}
+        style={{ background: 'linear-gradient(180deg, var(--color-bg-card) 0%, var(--color-bg-main) 100%)', boxShadow: '-8px 0 40px rgba(var(--color-text-dark-rgb), 0.1)' }}
         onClick={e => e.stopPropagation()}
       >
         {/* Header with gradient */}
-        <div className="sticky top-0 z-10 px-5 py-4" style={{ background: 'rgba(255,253,249,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(240,228,212,0.4)' }}>
+        <div className="sticky top-0 z-10 px-5 py-4" style={{ background: 'rgba(255,253,249,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(var(--color-border-warm-rgb), 0.4)' }}>
           <div className="flex items-center justify-between">
-            <h3 className="text-base font-semibold" style={{ color: '#3D2E20' }}>详细资料</h3>
-            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-orange-50/50 transition-colors" style={{ color: '#B5A698', background: 'rgba(240,228,212,0.2)' }}>
+            <h3 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>详细资料</h3>
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-orange-50/50 transition-colors" style={{ color: 'var(--color-text-secondary)', background: 'rgba(var(--color-border-warm-rgb), 0.2)' }}>
               <X size={16} />
             </button>
           </div>
@@ -85,14 +85,14 @@ export default function UserDetailModal({
                   )}
                 </div>
                 <div>
-                  <div className="text-lg font-semibold" style={{ color: '#3D2E20' }}>{detailData.name}</div>
+                  <div className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>{detailData.name}</div>
                   <div className="flex items-center gap-2 mt-1">
-                    {detailData.gender && <span className="text-xs" style={{ color: '#B5A698' }}>{detailData.gender}</span>}
-                    {detailData.age && <span className="text-xs" style={{ color: '#B5A698' }}>{detailData.age}岁</span>}
-                    {detailData.city && <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: '#B5A698' }}><MapPin size={9} />{detailData.city}</span>}
+                    {detailData.gender && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{detailData.gender}</span>}
+                    {detailData.age && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{detailData.age}岁</span>}
+                    {detailData.city && <span className="inline-flex items-center gap-0.5 text-xs" style={{ color: 'var(--color-text-secondary)' }}><MapPin size={9} />{detailData.city}</span>}
                   </div>
                   {detailData.purpose && (
-                    <span className="text-xs px-2.5 py-0.5 rounded-full mt-1.5 inline-block font-medium" style={{ background: 'rgba(232,122,93,0.06)', color: '#E87A5D', border: '1px solid rgba(232,122,93,0.12)' }}>
+                    <span className="text-xs px-2.5 py-0.5 rounded-full mt-1.5 inline-block font-medium" style={{ background: 'rgba(var(--color-primary-rgb), 0.06)', color: 'var(--color-primary)', border: '1px solid rgba(var(--color-primary-rgb), 0.12)' }}>
                       {detailData.purpose}
                     </span>
                   )}
@@ -107,9 +107,9 @@ export default function UserDetailModal({
                 });
                 if (!hasData) return null;
                 return (
-                  <div key={cat.key} className="rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(240,228,212,0.4)' }}>
-                    <div className="text-xs font-semibold mb-2.5 flex items-center gap-1.5" style={{ color: '#B5A698' }}>
-                      <span className="w-1 h-3 rounded-full" style={{ background: '#E87A5D' }} />
+                  <div key={cat.key} className="rounded-xl p-3.5" style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(var(--color-border-warm-rgb), 0.4)' }}>
+                    <div className="text-xs font-semibold mb-2.5 flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                      <span className="w-1 h-3 rounded-full" style={{ background: 'var(--color-primary)' }} />
                       {cat.label}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -128,20 +128,20 @@ export default function UserDetailModal({
               })}
 
               {detailData.contact && (
-                <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(232,122,93,0.06), rgba(232,122,93,0.02))', border: '1px solid rgba(232,122,93,0.12)' }}>
-                  <div className="text-xs font-semibold mb-1" style={{ color: '#E87A5D' }}>联系方式</div>
+                <div className="rounded-xl p-4" style={{ background: 'linear-gradient(135deg, rgba(var(--color-primary-rgb), 0.06), rgba(var(--color-primary-rgb), 0.02))', border: '1px solid rgba(var(--color-primary-rgb), 0.12)' }}>
+                  <div className="text-xs font-semibold mb-1" style={{ color: 'var(--color-primary)' }}>联系方式</div>
                   {contactUnlocked ? (
                     <>
-                      <div className="text-sm font-medium" style={{ color: '#3D2E20' }}>{fullContact || detailData.contact}</div>
-                      <div className="mt-2 text-xs" style={{ color: '#6BAF7D' }}>✓ 已解锁，可查看完整联系方式</div>
+                      <div className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{fullContact || detailData.contact}</div>
+                      <div className="mt-2 text-xs" style={{ color: 'var(--color-success)' }}>✓ 已解锁，可查看完整联系方式</div>
                     </>
                   ) : (
                     <>
-                      <div className="text-sm font-medium" style={{ color: '#3D2E20' }}>{maskContact(detailData.contact)}</div>
+                      <div className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{maskContact(detailData.contact)}</div>
                       <button
                         onClick={() => onShowPay(userId)}
                         className="mt-2 w-full py-2 rounded-lg text-xs font-medium"
-                        style={{ background: 'linear-gradient(135deg, #E87A5D, #F5A623)', color: '#fff' }}
+                        style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-star))', color: '#fff' }}
                       >
                         💰 支付 9.9 元查看完整联系方式
                       </button>
@@ -151,16 +151,16 @@ export default function UserDetailModal({
               )}
 
               {/* 用户评价 */}
-              <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(240,228,212,0.4)' }}>
+              <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(var(--color-border-warm-rgb), 0.4)' }}>
                 <div className="flex items-center justify-between mb-3">
-                  <div className="text-xs font-semibold flex items-center gap-1.5" style={{ color: '#B5A698' }}>
-                    <Star size={12} fill={averageRating?.count > 0 ? '#F5A623' : 'none'} style={{ color: averageRating?.count > 0 ? '#F5A623' : '#B5A698' }} />
+                  <div className="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
+                    <Star size={12} fill={averageRating?.count > 0 ? 'var(--color-star)' : 'none'} style={{ color: averageRating?.count > 0 ? 'var(--color-star)' : 'var(--color-text-secondary)' }} />
                     用户评价
                   </div>
                   <button
                     onClick={(e) => { e.stopPropagation(); onShowRating(userId); }}
                     className="text-xs px-3 py-1.5 rounded-lg font-medium"
-                    style={{ background: 'rgba(107,175,125,0.1)', color: '#6BAF7D' }}
+                    style={{ background: 'rgba(var(--color-success-rgb), 0.1)', color: 'var(--color-success)' }}
                   >
                     写评价
                   </button>
@@ -168,34 +168,34 @@ export default function UserDetailModal({
                 {averageRating?.count > 0 ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
-                      <span className="text-2xl font-bold" style={{ color: '#3D2E20' }}>{averageRating.avg.toFixed(1)}</span>
+                      <span className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{averageRating.avg.toFixed(1)}</span>
                       <div className="flex gap-0.5">
                         {[1, 2, 3, 4, 5].map(i => (
-                          <Star key={i} size={14} fill={i <= Math.round(averageRating.avg) ? '#F5A623' : 'none'} style={{ color: '#F5A623' }} />
+                          <Star key={i} size={14} fill={i <= Math.round(averageRating.avg) ? 'var(--color-star)' : 'none'} style={{ color: 'var(--color-star)' }} />
                         ))}
                       </div>
-                      <span className="text-xs" style={{ color: '#B5A698' }}>({averageRating.count}条评价)</span>
+                      <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>({averageRating.count}条评价)</span>
                     </div>
                     <div className="space-y-2">
                       {ratings.slice(0, 5).map((rating, index) => (
-                        <div key={index} className="p-2 rounded-lg" style={{ background: 'rgba(240,228,212,0.3)' }}>
+                        <div key={index} className="p-2 rounded-lg" style={{ background: 'rgba(var(--color-border-warm-rgb), 0.3)' }}>
                           <div className="flex items-center justify-between mb-1">
-                            <span className="text-xs font-medium" style={{ color: '#3D2E20' }}>{rating.rater_name || '匿名用户'}</span>
+                            <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>{rating.rater_name || '匿名用户'}</span>
                             <div className="flex gap-0.5">
                               {[1, 2, 3, 4, 5].map(i => (
-                                <Star key={i} size={10} fill={i <= rating.rating ? '#F5A623' : 'none'} style={{ color: '#F5A623' }} />
+                                <Star key={i} size={10} fill={i <= rating.rating ? 'var(--color-star)' : 'none'} style={{ color: 'var(--color-star)' }} />
                               ))}
                             </div>
                           </div>
                           {rating.comment && (
-                            <p className="text-xs" style={{ color: '#8B7B6B' }}>{rating.comment}</p>
+                            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>{rating.comment}</p>
                           )}
                         </div>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  <p className="text-xs text-center py-4" style={{ color: '#B5A698' }}>暂无评价，来写第一条评价吧！</p>
+                  <p className="text-xs text-center py-4" style={{ color: 'var(--color-text-secondary)' }}>暂无评价，来写第一条评价吧！</p>
                 )}
               </div>
 
@@ -204,7 +204,7 @@ export default function UserDetailModal({
                 <button
                   onClick={(e) => { e.stopPropagation(); onShowRating(userId); }}
                   className="flex-1 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5"
-                  style={{ background: 'rgba(107,175,125,0.1)', color: '#6BAF7D', border: '1px solid rgba(107,175,125,0.2)' }}
+                  style={{ background: 'rgba(var(--color-success-rgb), 0.1)', color: 'var(--color-success)', border: '1px solid rgba(var(--color-success-rgb), 0.2)' }}
                 >
                   <Star size={14} />
                   评价
@@ -212,7 +212,7 @@ export default function UserDetailModal({
                 <button
                   onClick={(e) => { e.stopPropagation(); navigate('/anti-fraud'); }}
                   className="flex-1 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5"
-                  style={{ background: 'linear-gradient(135deg, rgba(107,175,125,0.1), rgba(107,175,125,0.05))', color: '#6BAF7D', border: '1px solid rgba(107,175,125,0.2)' }}
+                  style={{ background: 'linear-gradient(135deg, rgba(var(--color-success-rgb), 0.1), rgba(var(--color-success-rgb), 0.05))', color: 'var(--color-success)', border: '1px solid rgba(var(--color-success-rgb), 0.2)' }}
                 >
                   <Shield size={14} />
                   防诈核实
@@ -220,7 +220,7 @@ export default function UserDetailModal({
                 <button
                   onClick={(e) => { e.stopPropagation(); onShowReport(userId); }}
                   className="flex-1 py-3 rounded-xl text-sm font-medium flex items-center justify-center gap-1.5"
-                  style={{ background: 'rgba(196,81,92,0.1)', color: '#C4515C', border: '1px solid rgba(196,81,92,0.2)' }}
+                  style={{ background: 'rgba(var(--color-danger-rgb), 0.1)', color: 'var(--color-danger)', border: '1px solid rgba(var(--color-danger-rgb), 0.2)' }}
                 >
                   <Flag size={14} />
                   举报

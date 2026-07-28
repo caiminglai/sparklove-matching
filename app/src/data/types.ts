@@ -56,3 +56,27 @@ export interface MatchCondition {
   column: string;
   value: string;
 }
+
+/** 评价数据 */
+export interface Rating {
+  rater_name?: string;
+  rating: number;
+  comment?: string;
+}
+
+/** 自定义字段（管理员/用户扩展字段） */
+export interface CustomField {
+  field_key: string;
+  field_value: string;
+}
+
+/** 管理员自定义字段配置（从后端 /custom-fields 获取） */
+export interface AdminCustomField {
+  id?: number;
+  field_key: string;
+  field_label: string;
+  options?: string[];
+}
+
+/** 扁平行数据（后端/旧localStorage中的扁平格式，字段在顶层而非 data 下） */
+export type FlatRow = Row & Record<string, string | number | undefined>;

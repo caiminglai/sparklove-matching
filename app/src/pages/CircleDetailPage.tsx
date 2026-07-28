@@ -1,33 +1,23 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router';
 import { ArrowLeft, Heart, Users, Sparkles, Utensils, Dumbbell, Music, MapPin, ChevronLeft } from 'lucide-react';
-import { API_BASE_URL, API_ENDPOINTS, normalizeAvatarUrl } from '../api/config';
+import { API_BASE_URL, normalizeAvatarUrl, getBasePath } from '../api/config';
 import type { Row } from '../data/types';
 import ImagePreview from '../components/ImagePreview';
-
-const getBasePath = () => {
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/jzxr')) return '/jzxr';
-  return '';
-};
+import { maskContact } from '../components/UserCard';
+import { useToast } from '../components/Toast';
 
 const CIRCLE_CONFIGS: Record<string, { label: string; icon: typeof Heart; color: string }> = {
-  hobbies: { label: '兴趣圈', icon: Sparkles, color: '#E87A5D' },
-  food: { label: '美食圈', icon: Utensils, color: '#D4A054' },
-  sport: { label: '运动圈', icon: Dumbbell, color: '#6BAF7D' },
-  music: { label: '音乐圈', icon: Music, color: '#7B8CDE' },
-  city: { label: '同城圈', icon: MapPin, color: '#C47BAF' },
-  personality: { label: '性格圈', icon: Heart, color: '#E87A5D' },
+  hobbies: { label: '兴趣圈', icon: Sparkles, color: 'var(--color-primary)' },
+  food: { label: '美食圈', icon: Utensils, color: 'var(--color-primary)' },
+  sport: { label: '运动圈', icon: Dumbbell, color: 'var(--color-success)' },
+  music: { label: '音乐圈', icon: Music, color: 'var(--color-info)' },
+  city: { label: '同城圈', icon: MapPin, color: 'var(--color-info)' },
+  personality: { label: '性格圈', icon: Heart, color: 'var(--color-primary)' },
 };
 
-function maskContact(contact: string) {
-  if (!contact) return '';
-  if (/^\d{11}$/.test(contact)) {
-    return contact.slice(0, 3) + '****' + contact.slice(7);
-  }
-  return contact.slice(0, 3) + '****' + contact.slice(-2);
-}
-
 export default function CircleDetailPage() {
+  const { toast } = useToast();
   const { circleKey, tag } = useParams();
   const navigate = useNavigate();
   const [rows, setRows] = useState<Row[]>([]);
@@ -67,11 +57,11 @@ export default function CircleDetailPage() {
   const detailData = detailRow?.data;
 
   return (
-    <div className="min-h-screen pb-8" style={{ background: '#FAF6F1' }}>
+    <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-3xl mx-auto px-4 pt-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate('/circles')} className="p-2 rounded-lg hover:bg-orange-50" style={{ color: '#B5A698' }}>
+          <button onClick={() => navigate('/circles')} className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
             <ChevronLeft size={20} />
           </button>
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
@@ -79,18 +69,18 @@ export default function CircleDetailPage() {
             <Icon size={18} color="white" />
           </div>
           <div>
-            <h1 className="text-lg font-medium" style={{ color: '#3D2E20' }}>{decodedTag}</h1>
-            <p className="text-xs" style={{ color: '#B5A698' }}>{config.label} · {circleUsers.length}位圈友</p>
+            <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>{decodedTag}</h1>
+            <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{config.label} · {circleUsers.length}位圈友</p>
           </div>
         </div>
 
         {/* Banner */}
         <div className="rounded-2xl p-5 mb-5"
           style={{ background: `linear-gradient(135deg, ${config.color}10, ${config.color}05)`, border: `1px solid ${config.color}20` }}>
-          <p className="text-sm" style={{ color: '#3D2E20' }}>
+          <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
             <span style={{ color: config.color, fontWeight: 600 }}>{decodedTag}</span> 圈的圈友们
           </p>
-          <p className="text-xs mt-1" style={{ color: '#B5A698' }}>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
             每个人既是自己的圈子，又是别人的圈子。在这里，找到与你同频的人。
           </p>
         </div>
@@ -98,7 +88,7 @@ export default function CircleDetailPage() {
         {/* Loading */}
         {loading && (
           <div className="text-center py-12">
-            <p className="text-sm" style={{ color: '#B5A698' }}>加载中...</p>
+            <p className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>加载中...</p>
           </div>
         )}
 
@@ -108,10 +98,10 @@ export default function CircleDetailPage() {
             {circleUsers.map(user => (
               <div key={user.id}
                 className="rounded-xl p-4 cursor-pointer transition-all"
-                style={{ background: '#FFFDF9', border: '1px solid #F0E4D4' }}
+                style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}
                 onClick={() => setShowDetail(user.id)}
                 onMouseEnter={e => { e.currentTarget.style.borderColor = `${config.color}40`; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = '#F0E4D4'; }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-light)'; }}
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 overflow-hidden cursor-pointer relative"
@@ -127,7 +117,7 @@ export default function CircleDetailPage() {
                     {user.data?.avatar && (
                       <img 
                         src={normalizeAvatarUrl(user.data.avatar) || undefined} 
-                        alt={user.data?.name || 'avatar'} 
+                        alt={user.data?.name || '用户头像'} 
                         className="w-full h-full object-cover absolute inset-0"
                         onError={(e) => {
                           const target = e.target as HTMLImageElement;
@@ -139,12 +129,12 @@ export default function CircleDetailPage() {
                   </div>
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium" style={{ color: '#3D2E20' }}>{user.data?.name || '匿名'}</span>
-                      {user.data?.gender && <span className="text-xs" style={{ color: '#B5A698' }}>{user.data.gender}</span>}
-                      {user.data?.age && <span className="text-xs" style={{ color: '#B5A698' }}>{user.data.age}岁</span>}
+                      <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{user.data?.name || '匿名'}</span>
+                      {user.data?.gender && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{user.data.gender}</span>}
+                      {user.data?.age && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{user.data.age}岁</span>}
                     </div>
                     <div className="flex items-center gap-2 mt-1">
-                      {user.data?.city && <span className="text-xs" style={{ color: '#B5A698' }}>{user.data.city}</span>}
+                      {user.data?.city && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{user.data.city}</span>}
                       {user.data?.purpose && (
                         <span className="text-xs px-2 py-0.5 rounded-full"
                           style={{ background: `${config.color}08`, color: config.color, border: `1px solid ${config.color}18` }}>
@@ -161,7 +151,7 @@ export default function CircleDetailPage() {
                     k !== 'name' && k !== 'contact' && k !== 'purpose' && k !== 'gender' && k !== 'age' && v && String(v).trim()
                   ).slice(0, 5).map(([key, val]) => (
                     <span key={key} className="inline-flex items-center px-2 py-0.5 rounded-md text-xs"
-                      style={{ background: '#FDF8F1', border: '1px solid #F0E4D4', color: '#8B7B6B' }}>
+                      style={{ background: '#FDF8F1', border: '1px solid var(--color-border-light)', color: 'var(--color-text-muted)' }}>
                       {String(val).length > 10 ? String(val).slice(0, 10) + '...' : String(val)}
                     </span>
                   ))}
@@ -171,7 +161,7 @@ export default function CircleDetailPage() {
 
             {circleUsers.length === 0 && (
               <div className="text-center py-12">
-                <Users size={28} style={{ color: '#F0E4D4', margin: '0 auto' }} />
+                <Users size={28} style={{ color: 'var(--color-border-light)', margin: '0 auto' }} />
                 <p className="mt-2 text-sm" style={{ color: '#D4C8B8' }}>这个圈子还没有人</p>
                 <Link to="/post" className="inline-block mt-3 text-sm px-4 py-2 rounded-lg text-white"
                   style={{ background: `linear-gradient(135deg, ${config.color}, ${config.color}cc)` }}>
@@ -185,12 +175,12 @@ export default function CircleDetailPage() {
 
       {/* Detail Modal */}
       {showDetail && detailData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-end" style={{ background: 'rgba(61,46,32,0.3)' }} onClick={() => setShowDetail(null)}>
+        <div className="fixed inset-0 z-50 flex items-center justify-end" style={{ background: 'rgba(var(--color-text-dark-rgb), 0.3)' }} onClick={() => setShowDetail(null)}>
           <div className="w-full max-w-md max-h-[85vh] overflow-y-auto rounded-2xl p-5"
-            style={{ background: '#FFFDF9', border: '1px solid #F0E4D4', boxShadow: '0 8px 32px rgba(61,46,32,0.12)' }}
+            style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)', boxShadow: '0 8px 32px rgba(var(--color-text-dark-rgb), 0.12)' }}
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-base font-medium" style={{ color: '#3D2E20' }}>详细资料</h3>
+              <h3 className="text-base font-medium" style={{ color: 'var(--color-text-primary)' }}>详细资料</h3>
               <button onClick={() => setShowDetail(null)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: '#D4C8B8' }}>✕</button>
             </div>
 
@@ -208,7 +198,7 @@ export default function CircleDetailPage() {
                   {detailData.avatar && (
                     <img 
                       src={normalizeAvatarUrl(detailData.avatar) || undefined} 
-                      alt={detailData.name || 'avatar'} 
+                      alt={detailData.name || '用户头像'} 
                       className="w-full h-full object-cover absolute inset-0"
                       onError={(e) => {
                         const target = e.target as HTMLImageElement;
@@ -220,12 +210,12 @@ export default function CircleDetailPage() {
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-medium" style={{ color: '#3D2E20' }}>{detailData.name || '匿名'}</span>
-                    {detailData.gender && <span className="text-xs" style={{ color: '#B5A698' }}>{detailData.gender}</span>}
-                    {detailData.age && <span className="text-xs" style={{ color: '#B5A698' }}>{detailData.age}岁</span>}
+                    <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{detailData.name || '匿名'}</span>
+                    {detailData.gender && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{detailData.gender}</span>}
+                    {detailData.age && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{detailData.age}岁</span>}
                   </div>
                   <div className="flex items-center gap-2 mt-1">
-                    {detailData.city && <span className="text-xs" style={{ color: '#B5A698' }}>{detailData.city}</span>}
+                    {detailData.city && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{detailData.city}</span>}
                     {detailData.purpose && (
                       <span className="text-xs px-2 py-0.5 rounded-full"
                         style={{ background: `${config.color}08`, color: config.color, border: `1px solid ${config.color}18` }}>
@@ -242,7 +232,7 @@ export default function CircleDetailPage() {
                   k !== 'name' && k !== 'contact' && k !== 'purpose' && v && String(v).trim()
                 ).map(([key, val]) => (
                   <span key={key} className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs"
-                    style={{ background: '#FDF8F1', border: '1px solid #F0E4D4', color: '#8B7B6B' }}>
+                    style={{ background: '#FDF8F1', border: '1px solid var(--color-border-light)', color: 'var(--color-text-muted)' }}>
                     {String(val)}
                   </span>
                 ))}
@@ -268,13 +258,13 @@ export default function CircleDetailPage() {
               </div>
 
               {detailData.contact && (
-                <div className="p-3 rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(232,122,93,0.06), rgba(232,122,93,0.02))', border: '1px solid rgba(232,122,93,0.12)' }}>
-                  <div className="text-xs font-semibold mb-1" style={{ color: '#E87A5D' }}>联系方式</div>
-                  <div className="text-sm font-medium" style={{ color: '#3D2E20' }}>{maskContact(detailData.contact)}</div>
+                <div className="p-3 rounded-xl" style={{ background: 'linear-gradient(135deg, rgba(var(--color-primary-rgb), 0.06), rgba(var(--color-primary-rgb), 0.02))', border: '1px solid rgba(var(--color-primary-rgb), 0.12)' }}>
+                  <div className="text-xs font-semibold mb-1" style={{ color: 'var(--color-primary)' }}>联系方式</div>
+                  <div className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{maskContact(detailData.contact)}</div>
                   <button 
                     onClick={() => setShowPayModal(true)}
                     className="mt-2 w-full py-2 rounded-lg text-xs font-medium"
-                    style={{ background: 'linear-gradient(135deg, #E87A5D, #F5A623)', color: '#fff' }}
+                    style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-star))', color: '#fff' }}
                   >
                     💰 支付 9.9 元查看完整联系方式
                   </button>
@@ -288,7 +278,7 @@ export default function CircleDetailPage() {
             {showPayModal && (
               <div className="fixed inset-0 z-[60] flex items-center justify-center" style={{ background: 'rgba(0,0,0,0.5)' }} onClick={() => setShowPayModal(false)}>
                 <div className="bg-white rounded-2xl p-6 w-80 max-w-[90%] mx-4" onClick={e => e.stopPropagation()}>
-                  <h3 className="text-lg font-bold mb-2 text-center" style={{ color: '#E87A5D' }}>查看联系方式</h3>
+                  <h3 className="text-lg font-bold mb-2 text-center" style={{ color: 'var(--color-primary)' }}>查看联系方式</h3>
                   <p className="text-sm text-center mb-4" style={{ color: '#666' }}>
                     支付 9.9 元后，即可查看完整联系方式<br/>
                     <span className="text-xs" style={{ color: '#999' }}>（转账后截图发给客服，客服手动解锁）</span>
@@ -305,13 +295,13 @@ export default function CircleDetailPage() {
                       <img src={`${getBasePath()}/alipay-qr.png`} alt="支付宝收款码" className="w-40 h-40 mx-auto rounded-lg" style={{ objectFit: 'cover' }} />
                     </div>
                   </div>
-                  <p className="text-xs text-center mt-3" style={{ color: '#B5A698' }}>
+                  <p className="text-xs text-center mt-3" style={{ color: 'var(--color-text-secondary)' }}>
                     支付完成后截图发给客服解锁
                   </p>
                   <button
-                    onClick={() => { navigator.clipboard.writeText('chanmiao0430').then(() => alert('客服微信号已复制: chanmiao0430')); }}
+                    onClick={() => { navigator.clipboard.writeText('chanmiao0430').then(() => toast('客服微信号已复制: chanmiao0430', 'success')); }}
                     className="mt-2 w-full py-2 rounded-xl text-xs font-medium"
-                    style={{ background: '#FFF5E8', color: '#E87A5D', border: '1px solid #F5D4C0' }}
+                    style={{ background: '#FFF5E8', color: 'var(--color-primary)', border: '1px solid #F5D4C0' }}
                   >
                     联系客服微信：chanmiao0430（点击复制）
                   </button>

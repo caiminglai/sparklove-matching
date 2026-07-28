@@ -107,19 +107,19 @@ export default function SliderCaptcha({ onVerified, onReset }: Props) {
     <div className="w-full">
       <div
         className="relative rounded-xl overflow-hidden mb-3 select-none"
-        style={{ background: '#F5EDE3', border: '1px solid #E8DED0' }}
+        style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)' }}
       >
         {captcha ? (
           <div className="relative" style={{ width: captcha.width, height: captcha.height, maxWidth: '100%' }}>
             <img
               src={captcha.background}
-              alt="captcha"
+              alt="验证码背景"
               className="block w-full h-full"
               draggable={false}
             />
             <img
               src={captcha.piece}
-              alt="piece"
+              alt="拼图块"
               className="absolute top-0 left-0"
               style={{
                 width: captcha.pieceW,
@@ -134,7 +134,7 @@ export default function SliderCaptcha({ onVerified, onReset }: Props) {
             />
           </div>
         ) : (
-          <div className="h-36 flex items-center justify-center text-sm" style={{ color: '#8B7B6B' }}>
+          <div className="h-36 flex items-center justify-center text-sm" style={{ color: 'var(--color-text-muted)' }}>
             {loading ? '加载中...' : error || '验证码加载失败'}
           </div>
         )}
@@ -143,7 +143,7 @@ export default function SliderCaptcha({ onVerified, onReset }: Props) {
       <div
         ref={trackRef}
         className="relative h-10 rounded-full"
-        style={{ background: '#F5EDE3', border: '1px solid #E8DED0' }}
+        style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)' }}
         onMouseMove={e => handleMove(e.clientX)}
         onMouseUp={handleEnd}
         onMouseLeave={handleEnd}
@@ -155,9 +155,9 @@ export default function SliderCaptcha({ onVerified, onReset }: Props) {
           style={{
             width: captcha ? captcha.pieceW : 40,
             transform: `translateX(${offsetX}px)`,
-            background: verified ? '#7CB342' : dragging ? '#E87A5D' : '#FFFDF9',
-            color: verified ? '#fff' : '#3D2E20',
-            border: '1px solid #E8DED0',
+            background: verified ? '#7CB342' : dragging ? 'var(--color-primary)' : 'var(--color-bg-card)',
+            color: verified ? '#fff' : 'var(--color-text-primary)',
+            border: '1px solid var(--color-border)',
             cursor: verified ? 'default' : 'grab',
             touchAction: 'none',
           }}
@@ -168,14 +168,14 @@ export default function SliderCaptcha({ onVerified, onReset }: Props) {
         </div>
         <div
           className="absolute inset-0 flex items-center justify-center text-xs pointer-events-none"
-          style={{ color: '#8B7B6B' }}
+          style={{ color: 'var(--color-text-muted)' }}
         >
           {verified ? '验证通过' : '拖动左侧滑块完成拼图'}
         </div>
       </div>
 
       {error && !verified && (
-        <div className="mt-2 text-xs text-center" style={{ color: '#E87A5D' }}>
+        <div className="mt-2 text-xs text-center" style={{ color: 'var(--color-primary)' }}>
           {error}
         </div>
       )}

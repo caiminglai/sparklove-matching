@@ -2,11 +2,17 @@
  * 统一错误处理工具
  */
 
+/** 可被注入的 toast 函数，由 React 组件在初始化时设置 */
+export let toastFn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null = null;
+
 /**
  * 显示友好的错误提示
  */
 export function showError(message: string): void {
-  // 优先使用 alert，后续可替换为 Toast 组件
+  if (toastFn) {
+    toastFn(message, 'error');
+    return;
+  }
   alert(message);
 }
 

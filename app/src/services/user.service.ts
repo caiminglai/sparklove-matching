@@ -5,15 +5,8 @@
  */
 
 import { API_BASE_URL, API_ENDPOINTS } from '../api/config';
-import type { Row, Column } from '../data/types';
-import {
-  PURPOSE_OPTIONS, GENDER_OPTIONS, CITY_OPTIONS, HOUSE_OPTIONS, CAR_OPTIONS,
-  FACE_TYPE_OPTIONS, EYE_TYPE_OPTIONS, MOUTH_TYPE_OPTIONS, BODY_TYPE_OPTIONS,
-  SKIN_TONE_OPTIONS, ZODIAC_OPTIONS, BLOOD_TYPE_OPTIONS, MARRIAGE_OPTIONS,
-  CHILDREN_OPTIONS, EDUCATION_OPTIONS, INCOME_OPTIONS, PERSONALITY_OPTIONS,
-  SMOKE_OPTIONS, DRINK_OPTIONS, RELIGION_OPTIONS, PET_OPTIONS, HOBBY_OPTIONS,
-  FOOD_OPTIONS, SPORT_OPTIONS, MUSIC_OPTIONS
-} from '../data/constants';
+import type { Row, Column, FlatRow } from '../data/types';
+import { DEFAULT_COLUMNS } from '../data/constants';
 
 const LS_ROWS = 'match_rows';
 const LS_COLUMNS = 'match_columns';
@@ -36,7 +29,7 @@ export function loadRows(): Row[] {
     const raw = localStorage.getItem(LS_ROWS);
     if (raw) {
       const rows = JSON.parse(raw);
-      return rows.map((row: any) => {
+      return rows.map((row: FlatRow) => {
         if (row.data) return row;
         return {
           ...row,
@@ -78,7 +71,7 @@ export function loadRows(): Row[] {
         };
       });
     }
-  } catch { /* empty */ }
+  } catch { console.warn('loadRows: localStorage JSON 解析失败'); }
 
   return [
     { id: 'r1', deposit: 29.9, createdAt: Date.now(), data: { name: '小雅', gender: '女', age: 25, height: 165, weight: '50kg', skinTone: '白皙', zodiac: '金牛座', bloodType: 'O型', city: '西安', marriage: '未婚', children: '无', education: '本科', job: '设计师', income: '10-20万', house: '租房', car: '无', faceType: '圆脸', eyeType: '杏眼', mouthType: '樱桃', bodyType: '匀称', hobbies: '看书,摄影', food: '火锅,川菜', sport: '瑜伽,游泳', music: '民谣,古风', smoke: '否', drink: '偶尔', religion: '无', pet: '猫', personality: '温柔', expectation: '成熟稳重，有上进心', contact: 'wx_xiaoya', interestTags: '摄影,旅行', purpose: '相亲交友' } },
@@ -101,7 +94,7 @@ export function saveRows(rows: Row[]) {
       credentials: 'include',
       body: JSON.stringify(rows)
     });
-  } catch (e) { /* ignored */ }
+  } catch (e) { console.warn('saveRows: 网络同步失败', e); }
 }
 
 export async function syncRowsFromServer(): Promise<Row[]> {
@@ -115,7 +108,7 @@ export async function syncRowsFromServer(): Promise<Row[]> {
     });
     const data = await res.json();
     if (data.success && data.data) {
-      const cleaned = data.data.map((row: any) => {
+      const cleaned = data.data.map((row: FlatRow) => {
         if (row.data) return row;
         return {
           ...row,
@@ -138,50 +131,9 @@ export async function syncRowsFromServer(): Promise<Row[]> {
       localStorage.setItem(LS_ROWS, JSON.stringify(cleaned));
       return cleaned;
     }
-  } catch (e) { /* ignored */ }
+  } catch (e) { console.warn('syncRowsFromServer: 同步失败', e); }
   return [];
 }
-
-const DEFAULT_COLUMNS: Column[] = [
-  { key: 'purpose', label: '目的', type: 'select', options: PURPOSE_OPTIONS, category: '基本' },
-  { key: 'name', label: '昵称', type: 'text', category: '基本' },
-  { key: 'gender', label: '性别', type: 'select', options: GENDER_OPTIONS, category: '基本' },
-  { key: 'age', label: '年龄', type: 'text', category: '基本' },
-  { key: 'height', label: '身高', type: 'text', category: '基本' },
-  { key: 'weight', label: '体重', type: 'text', category: '基本' },
-  { key: 'city', label: '城市', type: 'select', options: CITY_OPTIONS, category: '基本' },
-
-  { key: 'skinTone', label: '肤色', type: 'select', options: SKIN_TONE_OPTIONS, category: '外貌' },
-  { key: 'faceType', label: '脸型', type: 'select', options: FACE_TYPE_OPTIONS, category: '外貌' },
-  { key: 'eyeType', label: '眼型', type: 'select', options: EYE_TYPE_OPTIONS, category: '外貌' },
-  { key: 'mouthType', label: '嘴型', type: 'select', options: MOUTH_TYPE_OPTIONS, category: '外貌' },
-  { key: 'bodyType', label: '身材', type: 'select', options: BODY_TYPE_OPTIONS, category: '外貌' },
-
-  { key: 'zodiac', label: '星座', type: 'select', options: ZODIAC_OPTIONS, category: '属性' },
-  { key: 'bloodType', label: '血型', type: 'select', options: BLOOD_TYPE_OPTIONS, category: '属性' },
-  { key: 'marriage', label: '婚姻', type: 'select', options: MARRIAGE_OPTIONS, category: '属性' },
-  { key: 'children', label: '子女', type: 'select', options: CHILDREN_OPTIONS, category: '属性' },
-  { key: 'education', label: '学历', type: 'select', options: EDUCATION_OPTIONS, category: '属性' },
-  { key: 'job', label: '职业', type: 'text', category: '属性' },
-  { key: 'income', label: '收入', type: 'select', options: INCOME_OPTIONS, category: '属性' },
-  { key: 'house', label: '住房', type: 'select', options: HOUSE_OPTIONS, category: '属性' },
-  { key: 'car', label: '购车', type: 'select', options: CAR_OPTIONS, category: '属性' },
-
-  { key: 'personality', label: '性格', type: 'select', options: PERSONALITY_OPTIONS, category: '个性' },
-  { key: 'smoke', label: '吸烟', type: 'select', options: SMOKE_OPTIONS, category: '个性' },
-  { key: 'drink', label: '饮酒', type: 'select', options: DRINK_OPTIONS, category: '个性' },
-  { key: 'religion', label: '宗教信仰', type: 'select', options: RELIGION_OPTIONS, category: '个性' },
-  { key: 'pet', label: '宠物', type: 'select', options: PET_OPTIONS, category: '个性' },
-
-  { key: 'hobbies', label: '兴趣爱好', type: 'tags', options: HOBBY_OPTIONS, category: '兴趣' },
-  { key: 'food', label: '美食偏好', type: 'tags', options: FOOD_OPTIONS, category: '兴趣' },
-  { key: 'sport', label: '运动爱好', type: 'tags', options: SPORT_OPTIONS, category: '兴趣' },
-  { key: 'music', label: '音乐偏好', type: 'tags', options: MUSIC_OPTIONS, category: '兴趣' },
-  { key: 'interestTags', label: '兴趣标签', type: 'tags', options: [...HOBBY_OPTIONS, ...SPORT_OPTIONS], category: '兴趣' },
-
-  { key: 'expectation', label: '期望', type: 'text', category: '其他' },
-  { key: 'contact', label: '联系方式', type: 'text', category: '其他' },
-];
 
 export function loadColumns(): Column[] {
   checkVersion();
@@ -207,8 +159,7 @@ export function loadColumns(): Column[] {
         return merged;
       }
     }
-  } catch { /* empty */ }
-
+  } catch { console.warn('loadColumns: localStorage JSON 解析失败'); }
   return DEFAULT_COLUMNS;
 }
 
