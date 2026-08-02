@@ -4,6 +4,7 @@
 
 # ===== 依赖 =====
 node_modules/
+node-modules-temp/
 
 # ===== 环境变量 =====
 .env
@@ -42,12 +43,15 @@ coverage/
 .continue/
 .crossnote/
 
-# ===== 图片(全是测试图片,不提交)=====
+# ===== 图片(测试图片不提交,收款码例外)=====
 *.jpg
 *.png
 *.jpeg
 *.gif
 *.webp
+# 保留收款码图片(生产资源,server.js 会读取 app/public/ 下的图片)
+!app/public/wechat-qr.png
+!app/public/alipay-qr.png
 
 # ===== 文档(不提交)=====
 *.pdf

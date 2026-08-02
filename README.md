@@ -1,32 +1,32 @@
 # 精准匹配 - 相亲平台
 
-基于 Web 的相亲匹配平台。给一个人贴很多标签，按特定标签筛选，相当于线上 Excel 表格。
+基于 Web 的相亲匹配平台.给一个人贴很多标签,按特定标签筛选,相当于线上 Excel 表格.
 
 ## 技术栈
 
 | 层级 | 技术 |
 |------|------|
 | 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS |
-| 后端 | Node.js 原生 HTTP 服务器（非 Express） |
-| 数据库 | PostgreSQL + pg + deasync 同步 API + pgvector（向量搜索扩展） |
+| 后端 | Node.js 原生 HTTP 服务器(非 Express) |
+| 数据库 | PostgreSQL + pg + deasync 同步 API + pgvector(向量搜索扩展) |
 | 部署 | 阿里云 + Nginx + PM2 |
 
 ## 目录结构
 
 ```
 2.my-two-website/
-├── app/                    # 前端（React + Vite）
+├── app/                    # 前端(React + Vite)
 │   ├── src/
-│   │   ├── components/     # 公共组件（13 个）
-│   │   ├── pages/          # 页面组件（11 个）
+│   │   ├── components/     # 公共组件(13 个)
+│   │   ├── pages/          # 页面组件(11 个)
 │   │   ├── services/       # 业务服务层
 │   │   └── api/            # API 请求配置
 │   └── vite.config.ts
 │
-├── backend/                # 后端（三层架构）
-│   ├── db/                 # 数据访问层（含 vector.js 向量模块）
-│   ├── routes/             # API 路由层（含 vector.js 向量路由）
-│   ├── services/           # 业务逻辑层（含 vector.service.js）
+├── backend/                # 后端(三层架构)
+│   ├── db/                 # 数据访问层(含 vector.js 向量模块)
+│   ├── routes/             # API 路由层(含 vector.js 向量路由)
+│   ├── services/           # 业务逻辑层(含 vector.service.js)
 │   ├── admin/              # 管理后台 HTML 模板
 │   ├── server.js           # 服务器入口
 │
@@ -39,13 +39,15 @@
 ## 快速启动
 
 ```bash
-# 后端（终端1）
+# 后端(终端1,国内用户推荐用镜像源加速)
 cd E:\website\2.my-two-website\backend
+npm install --registry=https://registry.npmmirror.com
 npm start
 # -> http://localhost:8080
 
-# 前端（终端2）
+# 前端(终端2)
 cd E:\website\2.my-two-website\app
+npm install --registry=https://registry.npmmirror.com
 npm run dev
 # -> http://localhost:4000/jzxr
 ```
@@ -61,30 +63,30 @@ npm run dev
 
 ## 核心功能
 
-- 用户注册/登录（手机号 + 密码）
-- 资料发布（40+ 字段）
+- 用户注册/登录(手机号 + 密码)
+- 资料发布(40+ 字段)
 - 关键词搜索 + 多条件筛选
 - 多条件 AND 匹配
-- 向量相似匹配（pgvector，mock/openai 双模式）
-- 双向匹配推荐（用户画像 ↔ 择偶要求）
+- 向量相似匹配(pgvector,mock/openai 双模式)
+- 双向匹配推荐(用户画像 ↔ 择偶要求)
 - 评价体系
 - 举报系统
 - 保证金机制
 - 联系方式加密解锁
-- 管理后台（用户管理、审核、统计）
+- 管理后台(用户管理、审核、统计)
 
 ## 文档
 
 | 文档 | 内容 |
 |------|------|
-| [项目总览](docs/项目总览.md) | 项目入口，技术栈，快速启动 |
-| [架构与API](docs/架构与API.md) | 三层架构，数据库 Schema，API 接口 |
-| [部署运维](docs/部署运维.md) | 服务器配置，Nginx，PM2，部署流程 |
-| [运维记录](docs/运维记录.md) | 改进报告，修复记录，测试指南 |
+| [项目总览](docs/项目总览.md) | 项目入口,技术栈,快速启动 |
+| [架构与API](docs/架构与API.md) | 三层架构,数据库 Schema,API 接口 |
+| [部署运维](docs/部署运维.md) | 服务器配置,Nginx,PM2,部署流程 |
+| [运维记录](docs/运维记录.md) | 改进报告,修复记录,测试指南 |
 
 ## 环境要求
 
-- Node.js >= 18.0.0（推荐 v20.20.2）
+- Node.js >= 18.0.0(推荐 v20.20.2)
 - npm >= 10.0.0
 - PostgreSQL 18 + pgvector 扩展
 

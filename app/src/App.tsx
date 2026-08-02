@@ -1,5 +1,5 @@
 import { Routes, Route, useLocation } from 'react-router'
-import { lazy, Suspense } from 'react'
+import { lazy, Suspense, type ReactElement } from 'react'
 import TabBar from './components/TabBar'
 import ErrorBoundary from './components/ErrorBoundary'
 import { ToastProvider } from './components/Toast'
@@ -58,9 +58,9 @@ function LoadingFallback() {
   )
 }
 
-export default function App() {
+export default function App(): ReactElement {
   const location = useLocation()
-  const showTab = !HIDE_TAB_PATHS.some(p => location.pathname.startsWith(p))    
+  const showTab = !HIDE_TAB_PATHS.some(p => location.pathname.startsWith(p))
 
   return (
     <ToastProvider>
