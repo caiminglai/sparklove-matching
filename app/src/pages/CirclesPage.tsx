@@ -6,12 +6,12 @@ import type { Row } from '../data/types';
 import { getAuthToken, getAuthHeaders } from '../utils/auth';
 
 const CIRCLE_CONFIGS = [
-  { key: 'hobbies', label: '兴趣圈', icon: Sparkles, color: 'var(--color-primary)', desc: '因兴趣相聚' },
-  { key: 'food', label: '美食圈', icon: Utensils, color: 'var(--color-primary)', desc: '以美食会友' },
-  { key: 'sport', label: '运动圈', icon: Dumbbell, color: 'var(--color-success)', desc: '一起动起来' },
-  { key: 'music', label: '音乐圈', icon: Music, color: 'var(--color-info)', desc: '用音乐连接' },
-  { key: 'city', label: '同城圈', icon: MapPin, color: 'var(--color-info)', desc: '身边的朋友' },
-  { key: 'personality', label: '性格圈', icon: Heart, color: 'var(--color-primary)', desc: '同频相吸' },
+  { key: 'hobbies', label: '兴趣圈', icon: Sparkles, color: '#E87A5D', desc: '因兴趣相聚' },
+  { key: 'food', label: '美食圈', icon: Utensils, color: '#D4A054', desc: '以美食会友' },
+  { key: 'sport', label: '运动圈', icon: Dumbbell, color: '#6BAF7D', desc: '一起动起来' },
+  { key: 'music', label: '音乐圈', icon: Music, color: '#7B8CDE', desc: '用音乐连接' },
+  { key: 'city', label: '同城圈', icon: MapPin, color: '#C47BAF', desc: '身边的朋友' },
+  { key: 'personality', label: '性格圈', icon: Heart, color: '#E87A5D', desc: '同频相吸' },
 ];
 
 const CIRCLE_TAG_MAP: Record<string, string[]> = {
@@ -114,9 +114,9 @@ export default function CirclesPage() {
                 onClick={() => { setActiveCircle(config.key); setSearchTag(''); }}
                 className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{
-                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : `${config.color}15`,
-                  color: isActive ? 'white' : config.color,
-                  border: isActive ? 'none' : `1px solid ${config.color}30`,
+                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : 'var(--color-bg-card)',
+                  color: isActive ? 'white' : 'var(--color-text-muted)',
+                  border: isActive ? 'none' : '1px solid var(--color-border-light)',
                   boxShadow: isActive ? `0 2px 8px ${config.color}30` : 'none',
                 }}
               >
