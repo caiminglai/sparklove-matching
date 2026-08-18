@@ -220,7 +220,7 @@ export default function LoginPage() {
       </div>
 
       <div className="mt-auto pb-8 text-center">
-        <p className="text-xs" style={{ color: '#D4C8B8' }}>
+        <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
           登录即表示同意我们的服务条款和隐私政策
         </p>
       </div>

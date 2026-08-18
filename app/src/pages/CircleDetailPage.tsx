@@ -164,7 +164,7 @@ export default function CircleDetailPage() {
             {circleUsers.length === 0 && (
               <div className="text-center py-12">
                 <Users size={28} style={{ color: 'var(--color-border-light)', margin: '0 auto' }} />
-                <p className="mt-2 text-sm" style={{ color: '#D4C8B8' }}>这个圈子还没有人</p>
+                <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>这个圈子还没有人</p>
                 <Link to="/post" className="inline-block mt-3 text-sm px-4 py-2 rounded-lg text-white"
                   style={{ background: `linear-gradient(135deg, ${config.color}, ${config.color}cc)` }}>
                   成为第一个圈友
@@ -183,7 +183,7 @@ export default function CircleDetailPage() {
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-medium" style={{ color: 'var(--color-text-primary)' }}>详细资料</h3>
-              <button onClick={() => setShowDetail(null)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: '#D4C8B8' }}>✕</button>
+              <button onClick={() => setShowDetail(null)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: 'var(--color-text-muted)' }}>✕</button>
             </div>
 
             <div className="space-y-4">

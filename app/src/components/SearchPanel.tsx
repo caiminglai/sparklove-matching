@@ -525,7 +525,7 @@ export default function SearchPanel({
                     )}
                   </div>
 
-                  <span className="text-sm" style={{ color: '#D4C8B8' }}>=</span>
+                  <span className="text-sm" style={{ color: 'var(--color-text-muted)' }}>=</span>
 
                   <div className="relative">
                     {cond.column && hasOptions ? (
@@ -556,7 +556,7 @@ export default function SearchPanel({
                     )}
                   </div>
 
-                  <button onClick={() => removeCond(i)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: '#D4C8B8' }}>
+                  <button onClick={() => removeCond(i)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: 'var(--color-text-muted)' }}>
                     <X size={14} />
                   </button>
 

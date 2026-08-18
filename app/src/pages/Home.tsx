@@ -642,7 +642,7 @@ export default function Home() {
           })()}
         />
 
-        <p className="text-xs mb-6 px-1" style={{ color: '#D4C8B8' }}>
+        <p className="text-xs mb-6 px-1" style={{ color: 'var(--color-text-muted)' }}>
           提示：年龄支持范围写法如 "25-30"，也支持 {"'>25'"}、{"'<30'"} 等比较写法。多项选择可用逗号分隔。
         </p>
 

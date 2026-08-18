@@ -149,12 +149,12 @@ const UserListItem = React.memo(function UserListItem({
             <button
               onClick={(e) => { e.stopPropagation(); onToggleFavorite(row.id); }}
               className={`p-2 rounded-xl transition-colors ${isFavorite ? 'bg-red-50/50' : 'hover:bg-red-50/50'}`}
-              style={{ color: isFavorite ? 'var(--color-primary)' : '#D4C8B8' }}
+              style={{ color: isFavorite ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
               title={isFavorite ? '取消收藏' : '收藏'}>
               <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(row.id); }}
-              className="p-2 rounded-xl hover:bg-red-50/50 transition-colors" style={{ color: '#D4C8B8' }} title="删除">
+              className="p-2 rounded-xl hover:bg-red-50/50 transition-colors" style={{ color: 'var(--color-text-muted)' }} title="删除">
               <Trash2 size={14} />
             </button>
           </div>
@@ -341,7 +341,7 @@ export default function UserList({
             <Heart size={28} style={{ color: 'var(--color-primary)', opacity: 0.4 }} />
           </div>
           <p className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>暂无匹配结果</p>
-          <p className="text-xs mt-1" style={{ color: '#D4C8B8' }}>试试调整筛选条件，或发布自己的资料</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--color-text-muted)' }}>试试调整筛选条件，或发布自己的资料</p>
           <button onClick={onAdd} className="inline-flex items-center gap-1.5 mt-4 text-sm px-5 py-2.5 rounded-xl text-white btn-primary font-medium">
             <Plus size={14} /> 发布资料
           </button>
@@ -394,7 +394,7 @@ export default function UserList({
         <div className="flex flex-col items-center gap-1.5">
           <div className="flex items-center justify-center gap-1.5">
             <Heart size={10} style={{ color: 'var(--color-primary)', opacity: 0.5 }} fill="currentColor" />
-            <p className="text-xs" style={{ color: '#D4C8B8' }}>微光亦是永恒 — 让每一次相遇都精准</p>
+            <p className="text-xs" style={{ color: 'var(--color-text-muted)' }}>微光亦是永恒 — 让每一次相遇都精准</p>
           </div>
           <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
             <a href="https://beian.miit.gov.cn/" target="_blank" rel="noopener noreferrer">浙ICP备2026048677号-1</a>

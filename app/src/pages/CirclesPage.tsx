@@ -98,7 +98,7 @@ export default function CirclesPage() {
           </p>
           <div className="flex items-center justify-center gap-4 mt-2">
             <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{totalPeople} 位圈友</span>
-            <span className="text-xs" style={{ color: '#D4C8B8' }}>·</span>
+            <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>·</span>
             <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{totalCircles} 个圈子</span>
           </div>
         </div>
@@ -115,7 +115,7 @@ export default function CirclesPage() {
                 className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{
                   background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : 'var(--color-bg-card)',
-                  color: isActive ? 'white' : 'var(--color-text-muted)',
+                  color: isActive ? 'white' : 'var(--color-text-primary)',
                   border: isActive ? 'none' : '1px solid var(--color-border-light)',
                   boxShadow: isActive ? `0 2px 8px ${config.color}30` : 'none',
                 }}
@@ -181,7 +181,7 @@ export default function CirclesPage() {
                       style={{ background: `${activeConfig.color}08`, color: activeConfig.color, border: `1px solid ${activeConfig.color}18` }}>
                       {group.count}人
                     </span>
-                    <ChevronRight size={14} style={{ color: '#D4C8B8' }} />
+                    <ChevronRight size={14} style={{ color: 'var(--color-text-muted)' }} />
                   </div>
                 </div>
 
@@ -218,7 +218,7 @@ export default function CirclesPage() {
             {filteredGroups.length === 0 && (
               <div className="text-center py-12">
                 <Users size={28} style={{ color: 'var(--color-border-light)', margin: '0 auto' }} />
-                <p className="mt-2 text-sm" style={{ color: '#D4C8B8' }}>
+                <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>
                   {searchTag ? '没有找到匹配的圈子' : '暂无圈子数据'}
                 </p>
                 <Link to="/post" className="inline-block mt-3 text-sm px-4 py-2 rounded-lg text-white"

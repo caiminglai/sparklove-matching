@@ -142,7 +142,7 @@ export default function MyPostsPage() {
                     <button
                       onClick={() => setShowDelModal(row.id)}
                       className="p-2 rounded-lg hover:bg-red-50 transition-colors"
-                      style={{ color: '#D4C8B8' }}
+                      style={{ color: 'var(--color-text-muted)' }}
                       title="删除"
                     >
                       <Trash2 size={16} />
@@ -198,7 +198,7 @@ export default function MyPostsPage() {
               <FileText size={28} style={{ color: 'var(--color-primary)', opacity: 0.4 }} />
             </div>
             <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-text-secondary)' }}>还没有发布过资料</p>
-            <p className="text-xs mb-4" style={{ color: '#D4C8B8' }}>发布资料让更多人看到你</p>
+            <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>发布资料让更多人看到你</p>
             <Link to="/post" className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-white text-sm font-medium"
               style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>
               <Plus size={14} /> 发布资料

@@ -150,7 +150,7 @@ export default function QrPage() {
     ctx.fillText('\u2713 保证金保障真实信息', 180, 515);
 
     // Footer
-    ctx.fillStyle = '#D4C8B8';
+    ctx.fillStyle = '#8B7B6B';
     ctx.font = '10px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('长按识别二维码 · 或用浏览器打开', 180, 545);

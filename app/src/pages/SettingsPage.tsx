@@ -171,7 +171,7 @@ export default function SettingsPage() {
                         <div className="text-sm" style={{ color: 'var(--color-text-primary)' }}>{item.label}</div>
                         <div className="text-xs mt-0.5" style={{ color: 'var(--color-text-secondary)' }}>{item.desc}</div>
                       </div>
-                      {!item.disabled && <ChevronRight size={14} style={{ color: '#D4C8B8' }} />}
+                      {!item.disabled && <ChevronRight size={14} style={{ color: 'var(--color-text-muted)' }} />}
                     </>
                   );
                   if (item.disabled) {
@@ -267,7 +267,7 @@ export default function SettingsPage() {
                 onClick={handleChangePassword}
                 disabled={changing}
                 className="flex-1 py-2.5 rounded-lg text-sm font-medium text-white"
-                style={{ background: changing ? '#D4C8B8' : 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}
+                style={{ background: changing ? 'var(--color-border-light)' : 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}
               >
                 {changing ? '修改中...' : '确认修改'}
               </button>
