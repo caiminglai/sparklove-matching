@@ -4,6 +4,7 @@ import { DEPOSIT_RULES } from '../data/constants';
 import { API_BASE_URL, getBasePath } from '../api/config';
 import { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
+import { getAuthToken } from '../utils/auth';
 
 export default function DepositPage() {
   const { toast } = useToast();
@@ -36,7 +37,7 @@ export default function DepositPage() {
   // 检查支付订单状态
   const checkPaymentStatus = async (orderId: string) => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       if (!token) return;
 
       const res = await fetch(`${API_BASE_URL}/payment/status?orderId=${orderId}`, {
@@ -61,7 +62,7 @@ export default function DepositPage() {
 
   const loadDepositStatus = async () => {
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       if (!token) {
         setLoadingStatus(false);
         return;
@@ -118,7 +119,7 @@ export default function DepositPage() {
       formData.append('proof', uploadedProof);
       formData.append('amount', String(DEPOSIT_RULES.amount));
 
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       const res = await fetch(`${API_BASE_URL}/deposit/upload-proof`, {
         method: 'POST',
         headers: {
@@ -152,7 +153,7 @@ export default function DepositPage() {
   const handleAutoPayment = async () => {
     setCreatingOrder(true);
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       const res = await fetch(`${API_BASE_URL}/payment/create`, {
         method: 'POST',
         headers: {

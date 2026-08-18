@@ -4,8 +4,12 @@ import { ArrowLeft, Heart, Users, Sparkles, Utensils, Dumbbell, Music, MapPin, C
 import { API_BASE_URL, normalizeAvatarUrl, getBasePath } from '../api/config';
 import type { Row } from '../data/types';
 import ImagePreview from '../components/ImagePreview';
-import { maskContact } from '../components/UserCard';
+import { maskContact } from '../utils/mask';
 import { useToast } from '../components/Toast';
+import { getAuthToken, getAuthHeaders } from '../utils/auth';
+
+// 客服微信号配置（原硬编码在 JSX 中，现抽到顶部便于统一管理）
+const CUSTOMER_SERVICE_WECHAT = 'chanmiao0430';
 
 const CIRCLE_CONFIGS: Record<string, { label: string; icon: typeof Heart; color: string }> = {
   hobbies: { label: '兴趣圈', icon: Sparkles, color: 'var(--color-primary)' },
@@ -31,9 +35,7 @@ export default function CircleDetailPage() {
   const Icon = config.icon;
 
   useEffect(() => {
-    const authToken = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const headers = getAuthHeaders();
 
     fetch(`${API_BASE_URL}/users?limit=200`, { headers })
       .then(res => res.json())
@@ -299,11 +301,11 @@ export default function CircleDetailPage() {
                     支付完成后截图发给客服解锁
                   </p>
                   <button
-                    onClick={() => { navigator.clipboard.writeText('chanmiao0430').then(() => toast('客服微信号已复制: chanmiao0430', 'success')); }}
+                    onClick={() => { navigator.clipboard.writeText(CUSTOMER_SERVICE_WECHAT).then(() => toast(`客服微信号已复制: ${CUSTOMER_SERVICE_WECHAT}`, 'success')); }}
                     className="mt-2 w-full py-2 rounded-xl text-xs font-medium"
                     style={{ background: '#FFF5E8', color: 'var(--color-primary)', border: '1px solid #F5D4C0' }}
                   >
-                    联系客服微信：chanmiao0430（点击复制）
+                    联系客服微信：{CUSTOMER_SERVICE_WECHAT}（点击复制）
                   </button>
                   <button 
                     onClick={() => setShowPayModal(false)}

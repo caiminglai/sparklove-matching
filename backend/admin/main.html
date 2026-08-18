@@ -1505,13 +1505,7 @@ function renderDepositsTable(){
 function viewProof(proofPath, depositId){
   var modal=document.getElementById('viewProofModal');
   var img=document.getElementById('proofImage');
-  var finalSrc;
-  if(proofPath.startsWith(BASE+'/jzxr/') || proofPath.startsWith('/jzxr/')){
-    finalSrc=proofPath;
-  }else{
-    var _rp=String(proofPath).replace(/^\/+/,'');
-    finalSrc=BASE+'/jzxr/'+_rp;
-  }
+  var finalSrc=resolveProofUrl(proofPath);
   img.onerror=function(){
     if(depositId){
       var xhr=new XMLHttpRequest();
@@ -1522,7 +1516,7 @@ function viewProof(proofPath, depositId){
           var d=JSON.parse(xhr.responseText);
           if(d.success&&d.data&&d.data.proof_path){
             img.onerror=null;
-            img.src=BASE+'/jzxr/'+String(d.data.proof_path).replace(/^\/+/,'');
+            img.src=resolveProofUrl(d.data.proof_path);
           }
         }
       };
@@ -2136,7 +2130,7 @@ function addCustomField(){
       }
     }
   };
-  xhr.send(JSON.stringify({name:name,key:key}));
+  xhr.send(JSON.stringify({field_key:key,field_label:name,field_type:'text'}));
 }
 
 function deleteCustomField(id){

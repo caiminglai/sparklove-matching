@@ -4,28 +4,18 @@ const paymentsDb = require('../db/payments.js');
 const adminService = require('../services/admin.service');
 const fs = require('fs');
 const path = require('path');
+// 统一使用 utils/multipart.js 的常量与解析器，避免重复定义
+const { ALLOWED_IMAGE_EXTENSIONS, MAGIC_NUMBERS } = require('../utils/multipart');
 
-let DEPOSIT_RULES;
-try {
-  const tableData = require('../data/table');
-  DEPOSIT_RULES = tableData.DEPOSIT_RULES || { amount: 29.9 };
-} catch (e) {
-  DEPOSIT_RULES = { amount: 29.9 };
-}
+// 修复：原 try { require('../data/table') } catch 永远 MODULE_NOT_FOUND，假装可配置实际恒为默认
+// 改为从环境变量读取（默认 29.9）
+const DEPOSIT_RULES = { amount: parseFloat(process.env.DEPOSIT_AMOUNT) || 29.9 };
 
-const ALLOWED_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.gif', '.webp'];
-const MAGIC_NUMBERS = {
-  '.png': Buffer.from([0x89, 0x50, 0x4E, 0x47]),
-  '.jpg': Buffer.from([0xFF, 0xD8, 0xFF]),
-  '.jpeg': Buffer.from([0xFF, 0xD8, 0xFF]),
-  '.gif': Buffer.from([0x47, 0x49, 0x46]),
-  '.webp': Buffer.from([0x52, 0x49, 0x46, 0x46]),
-};
+// 兼容引用：内部用 ALLOWED_EXTENSIONS / MAGIC_NUMBERS 名称
+const ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS;
 
-function sendJson(res, statusCode, obj) {
-  res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
-  res.end(JSON.stringify(obj));
-}
+// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
+const { sendJson } = require('../utils/sendJson');
 
 function uploadAvatar(req, res) {
   const authHeader = req.headers.authorization;
@@ -103,7 +93,8 @@ function uploadAvatar(req, res) {
   });
 }
 
-function uploadDepositProof(req, res, ADMIN_TOKEN) {
+// 修复：原第三参 ADMIN_TOKEN 永远 undefined（server.js 调用时未传），且函数内未使用，删除
+function uploadDepositProof(req, res) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) { sendJson(res, 401, { success: false, message: '未登录' }); return; }
   const token = authHeader.slice(7);

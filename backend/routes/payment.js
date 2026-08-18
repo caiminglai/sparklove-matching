@@ -29,9 +29,11 @@ function isPaymentConfigured() {
 }
 
 function generateNonceStr(length = 32) {
+  // 修复：原用 Math.random() 密码学不安全，可被预测重放。改用 crypto.randomBytes
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  const bytes = crypto.randomBytes(length);
   let result = '';
-  for (let i = 0; i < length; i++) result += chars.charAt(Math.floor(Math.random() * chars.length));
+  for (let i = 0; i < length; i++) result += chars.charAt(bytes[i] % chars.length);
   return result;
 }
 
@@ -62,7 +64,8 @@ async function createWechatOrder(userId, amount, clientIp) {
   const xml = buildXml(params);
   const https = require('https');
   return new Promise((resolve, reject) => {
-    const req = https.request({ hostname: 'api.mch.weixin.qq.com', port: 443, path: '/pay/unifiedorder', method: 'POST' }, (res) => {
+    // 修复：原无超时，微信侧挂起会无限等待占用连接。加 10 秒超时
+    const req = https.request({ hostname: 'api.mch.weixin.qq.com', port: 443, path: '/pay/unifiedorder', method: 'POST', timeout: 10000 }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
       res.on('end', () => {
@@ -76,6 +79,7 @@ async function createWechatOrder(userId, amount, clientIp) {
       });
     });
     req.on('error', reject);
+    req.on('timeout', () => { req.destroy(new Error('微信下单接口超时')); });
     req.write(xml);
     req.end();
   });
@@ -263,7 +267,7 @@ async function alipayNotify(req, res, readBodyWithLimit) {
   try {
     const body = await readBodyWithLimit(req);
     const params = {};
-    body.split('&').forEach(pair => { const [key, value] = pair.split('='); params[key] = decodeURIComponent(value || ''); });
+    body.split('&').forEach(pair => { const idx = pair.indexOf('='); const key = pair.substring(0, idx); const value = pair.substring(idx + 1); params[key] = decodeURIComponent(value || ''); });
     const result = handleAlipayNotify(params);
     if (result.success) { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('success'); }
     else { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('fail'); }

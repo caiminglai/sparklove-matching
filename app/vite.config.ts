@@ -5,7 +5,7 @@ import path from 'path'
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
-  const basePath = (env.VITE_BASE_URL || '/jzxr').replace(/\/+$/, '') + '/'
+  const basePath = (env.VITE_BASE_PATH || '/jzxr').replace(/\/+$/, '') + '/'
   
   return {
     base: basePath,

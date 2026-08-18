@@ -1,21 +1,23 @@
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { Heart, Shield, Sparkles, Users } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { Shield, Heart, Users, Sparkles } from 'lucide-react';
-import { loadRows, deleteRow, loadColumns, addColumn } from '../services/user.service';
-import { fetchFieldMappings } from '../services/field-mapping.service';
-import { matchRows } from '../services/match.service';
-import type { Column, MatchCondition, Row, FlatRow, Rating } from '../data/types';
 import { API_BASE_URL } from '../api/config';
+import ContactPayModal from '../components/ContactPayModal';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import ImagePreview from '../components/ImagePreview';
 import RatingModal from '../components/RatingModal';
 import ReportModal from '../components/ReportModal';
 import SearchPanel from '../components/SearchPanel';
-import UserList from '../components/UserList';
-import DeleteConfirmModal from '../components/DeleteConfirmModal';
-import ContactPayModal from '../components/ContactPayModal';
-import UserDetailModal from '../components/UserDetailModal';
-import { handleApiError } from '../utils/errorHandler';
 import { useToast } from '../components/Toast';
+import UserDetailModal from '../components/UserDetailModal';
+import UserList from '../components/UserList';
+import type { Column, FlatRow, MatchCondition, Rating, Row } from '../data/types';
+import { fetchFieldMappings } from '../services/field-mapping.service';
+import { matchRows } from '../services/match.service';
+import { addColumn, loadColumns, loadRows } from '../services/user.service';
+import { getAuthHeaders, getAuthToken } from '../utils/auth';
+import { waitForBootstrapSafeWindow, withInFlightDedup } from '../utils/bootstrap-guard';
+import { handleApiError } from '../utils/errorHandler';
 
 export default function Home() {
   const { toast } = useToast();
@@ -24,20 +26,6 @@ export default function Home() {
   const [rows, setRows] = useState<Row[]>(() => loadRows());
   const [selectedPurpose, setSelectedPurpose] = useState<string>('');
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
-
-  // 从后端拉取字段中文映射表，动态更新列定义（API不可用时回退到本地默认值）
-  useEffect(() => {
-    fetchFieldMappings().then(apiColumns => {
-      setColumns(prev => {
-        // 保留用户自定义字段（category === 'custom'），标准字段用API返回的
-        const customCols = prev.filter(c => c.category === 'custom');
-        // 合并：API标准字段 + 用户自定义字段
-        const merged = [...apiColumns, ...customCols];
-        localStorage.setItem('match_columns', JSON.stringify(merged));
-        return merged;
-      });
-    }).catch(() => {});
-  }, []);
 
   // 分页相关状态（必须在 loadUsers 函数之前定义）
   const [currentPage, setCurrentPage] = useState(1);
@@ -64,7 +52,14 @@ export default function Home() {
   };
 
   // 加载用户数据（支持分页 + 搜索）
-  const loadUsers = async (page: number, keyword: string = activeSearchKeyword, exact: boolean = activeSearchExact) => {
+  // 【关于首屏延迟的说明】
+  //   开发环境下 Vite HMR 的 SSE 长连接会在页面加载后 ~50-300ms 期间经历一次重置，
+  //   该连接被 reset 时，HTTP/1.1 同连接上排队的 API 请求会被连带中断，Chrome 会
+  //   打印 net::ERR_ABORTED 红字。因此 page===1（首屏）时，所有请求会统一等待
+  //   waitForBootstrapSafeWindow()（模块加载后 500ms）再发起，并通过 withInFlightDedup
+  //   做 in-flight Promise 去重，避免 StrictMode 双 mount 重复请求。
+  //   page>1（翻页）时不受影响。
+  const loadUsers = async (page: number, keyword: string = activeSearchKeyword, exact: boolean = activeSearchExact, _signal?: AbortSignal) => {
     if (page === 1) {
       setLoading(true);
     } else {
@@ -73,32 +68,88 @@ export default function Home() {
     setError(null);
 
     try {
-      const authToken = localStorage.getItem('auth_token');
-      const headers: Record<string, string> = authToken ? { 'Authorization': `Bearer ${authToken}` } : {};
-      const [usersRes, cfRes] = await Promise.all([
-        fetch(buildApiUrl(page, keyword, exact), { headers }),
-        fetch(`${API_BASE_URL}/users/all-custom-fields`).catch(() => null),
-      ]);
-      const usersData = await usersRes.json();
-      if (usersData.success && usersData.data) {
+      const headers = getAuthHeaders();
+
+      // 首屏请求走 bootstrap 安全窗口 + 去重，翻页请求直接走
+      // 【重要】必须在 factory 内部就完成 .json() 解析并返回纯数据对象。
+      //   原因：withInFlightDedup 共享同一个 Promise，而 React StrictMode 会双 mount，
+      //   导致同一个 Response 对象被第二次调用 .json() → body stream already read 报错。
+      //   让 factory 直接返回解析后的 data（或 null），重复消费时不依赖可读流。
+      type FetchUsersResult = { users: unknown | null; customFields: unknown | null; };
+      const doFetch = async (): Promise<FetchUsersResult> => {
+        if (page === 1) await waitForBootstrapSafeWindow();
+        const [usersRes, cfRes] = await Promise.all([
+          fetch(buildApiUrl(page, keyword, exact), { headers }),
+          fetch(`${API_BASE_URL}/users/all-custom-fields`).catch(() => null),
+        ]);
+        let users: unknown | null = null;
+        if (usersRes && usersRes.ok) {
+          try { users = await usersRes.json(); } catch { users = null; }
+        }
+        let customFields: unknown | null = null;
+        if (cfRes && (cfRes as Response).ok) {
+          try { customFields = await (cfRes as Response).json(); } catch { customFields = null; }
+        }
+        return { users, customFields };
+      };
+
+      const { users, customFields } = page === 1
+        ? await withInFlightDedup<FetchUsersResult>('users:page1', doFetch as () => Promise<FetchUsersResult>)
+        : await doFetch();
+
+      // =====================================================================
+      // 【关键修复：field-mappings 改在 users 请求成功后再发起】
+      // 根因：Vite HMR SSE reset 会 RST 掉一条 HTTP/1.1 TCP 连接，首屏 4 个并行 API
+      //       中排在该连接上的那个会被连带中止 → Chrome 控制台红字 net::ERR_ABORTED。
+      //       观察发现 custom-fields / users / all-custom-fields 3 个接口永远能成功，
+      //       说明它们抢到了干净连接。因此把 field-mappings 推迟到「users 已经成功
+      //       拿到响应」之后再发起，此时 API 连接已被验证可用，不会再撞上重置中的
+      //       连接，彻底避免 ERR_ABORTED 红字。
+      //       field-mappings 首屏有 DEFAULT_COLUMNS + localStorage 缓存兜底，
+      //       晚几百毫秒再更新完全不影响 UX。
+      // =====================================================================
+      if (page === 1) {
+        fetchFieldMappings().then(apiColumns => {
+          setColumns(prev => {
+            const customCols = prev.filter(c => c.category === 'custom');
+            const merged = [...apiColumns, ...customCols];
+            localStorage.setItem('match_columns', JSON.stringify(merged));
+            return merged;
+          });
+        }).catch(() => { });
+      }
+
+      const usersData = (users && typeof users === 'object' && (users as { success?: boolean; }).success)
+        ? users as { success: true; data?: FlatRow[]; total?: number; }
+        : null;
+
+      if (usersData && usersData.data) {
         let rows = usersData.data;
 
         // 合并自定义字段到行数据
-        if (cfRes && cfRes.ok) {
-          const cfData = await cfRes.json();
-          if (cfData.success && Array.isArray(cfData.data)) {
-            const cfMap: Record<string, Record<string, string>> = {};
-            for (const cf of cfData.data) {
-              if (!cfMap[cf.user_id]) cfMap[cf.user_id] = {};
-              cfMap[cf.user_id][cf.field_key] = cf.field_value;
-            }
-            rows = rows.map((row: FlatRow) => {
-              if (row.user_id && cfMap[row.user_id]) {
-                return { ...row, data: { ...row.data, ...cfMap[row.user_id] } };
-              }
-              return row;
-            });
+        const cfData = customFields &&
+          typeof customFields === 'object' &&
+          (customFields as { success?: boolean; }).success &&
+          Array.isArray((customFields as { data?: unknown[]; }).data)
+          ? (customFields as { data: Array<{ user_id?: string; field_key?: string; field_value?: string; }>; }).data
+          : null;
+
+        if (cfData && cfData.length > 0) {
+          const cfMap: Record<string, Record<string, string>> = {};
+          for (const cf of cfData) {
+            const uid = cf?.user_id;
+            const fk = cf?.field_key;
+            const fv = cf?.field_value;
+            if (!uid || !fk) continue;
+            if (!cfMap[uid]) cfMap[uid] = {};
+            cfMap[uid][fk] = typeof fv === 'string' || typeof fv === 'number' || typeof fv === 'boolean' ? String(fv) : '';
           }
+          rows = rows.map((row: FlatRow) => {
+            if (row.user_id && cfMap[row.user_id]) {
+              return { ...row, data: { ...row.data, ...cfMap[row.user_id] } };
+            }
+            return row;
+          });
         }
 
         setRows(rows);
@@ -124,6 +175,7 @@ export default function Home() {
   const handleSearch = () => {
     setHasSearched(false);
     setConditions([{ column: '', value: '' }]);
+    setFavoritesFilter(false);
     setActiveSearchKeyword(searchKeyword);
     setActiveSearchExact(searchExact);
     loadUsers(1, searchKeyword, searchExact);
@@ -135,6 +187,7 @@ export default function Home() {
     setSearchExact(false);
     setHasSearched(false);
     setConditions([{ column: '', value: '' }]);
+    setFavoritesFilter(false);
     setActiveSearchKeyword('');
     setActiveSearchExact(false);
     loadUsers(1, '', false);
@@ -155,6 +208,8 @@ export default function Home() {
   };
 
   // 初始加载
+  // 【不做 cleanup.abort】：React StrictMode 双 mount 时，主动 abort 会被 Chrome 打印为 ERR_ABORTED 红字；
+  // 取消请求对首屏没有实际收益（网络请求很快返回，in-flight 结果还可复用），故不中断。
   useEffect(() => {
     const userId = localStorage.getItem('user_id');
     setCurrentUserId(userId);
@@ -165,7 +220,8 @@ export default function Home() {
 
   const [conditions, setConditions] = useState<MatchCondition[]>(() => {
     const saved = localStorage.getItem('match_conditions');
-    return saved ? JSON.parse(saved) : [{ column: '', value: '' }];
+    if (!saved) return [{ column: '', value: '' }];
+    try { return JSON.parse(saved) as MatchCondition[]; } catch { return [{ column: '', value: '' }]; }
   });
   const [hasSearched, setHasSearched] = useState(false);
   const [showAddCol, setShowAddCol] = useState(false);
@@ -177,7 +233,8 @@ export default function Home() {
   const [previewImage, setPreviewImage] = useState<string | null>(null);
   const [favorites, setFavorites] = useState<string[]>(() => {
     const saved = localStorage.getItem('match_favorites');
-    return saved ? JSON.parse(saved) : [];
+    if (!saved) return [];
+    try { return JSON.parse(saved) as string[]; } catch { return []; }
   });
   const [selectedRows, setSelectedRows] = useState<string[]>([]);
   const [showSelectMode, setShowSelectMode] = useState(false);
@@ -187,13 +244,14 @@ export default function Home() {
   const [showPayModal, setShowPayModal] = useState(false);
   const [payContactTarget, setPayContactTarget] = useState<string | null>(null);
   const [showReportModal, setShowReportModal] = useState<string | null>(null);
+  const [favoritesFilter, setFavoritesFilter] = useState(false); // 收藏筛选模式
   const [ratingValue, setRatingValue] = useState(5);
   const [ratingComment, setRatingComment] = useState('');
   const [reportType, setReportType] = useState('');
   const [reportDescription, setReportDescription] = useState('');
   const [reportProofImage, setReportProofImage] = useState<File | null>(null);
   const [ratings, setRatings] = useState<Rating[]>([]);
-  const [averageRating, setAverageRating] = useState<{ avg: number; count: number } | null>(null);
+  const [averageRating, setAverageRating] = useState<{ avg: number; count: number; } | null>(null);
   const [contactUnlocked, setContactUnlocked] = useState(false);
   const [fullContact, setFullContact] = useState<string | null>(null); // 完整联系方式（解锁后从后端获取）
 
@@ -222,11 +280,10 @@ export default function Home() {
       const isValidId = /^[a-zA-Z0-9_-]+$/.test(currentUserId) && /^[a-zA-Z0-9_-]+$/.test(showDetail);
       if (!isValidId) return;
 
-      const authToken = localStorage.getItem('auth_token');
-      if (!authToken) return;
+      if (!getAuthToken()) return;
 
       fetch(`${API_BASE_URL}/users/${encodeURIComponent(showDetail)}/check-unlock`, {
-        headers: { 'Authorization': `Bearer ${authToken}` }
+        headers: getAuthHeaders()
       })
         .then(res => res.json())
         .then(data => {
@@ -282,7 +339,10 @@ export default function Home() {
     , [hasSearched, filteredRows, debouncedConditions]);
 
   // 后端分页模式：直接使用 results 作为 displayResults（每页数据由后端返回）
-  const displayResults = results;
+  // 收藏筛选模式下，额外按 row.id 过滤
+  const displayResults = favoritesFilter
+    ? results.filter(r => favorites.includes(r.row.id))
+    : results;
 
   const toggleFavorite = useCallback((id: string) => {
     setFavorites(prev =>
@@ -363,7 +423,7 @@ export default function Home() {
       return;
     }
 
-    const authToken = localStorage.getItem('auth_token');
+    const authToken = getAuthToken();
     if (!authToken) {
       toast('请先登录', 'error');
       return;
@@ -403,7 +463,7 @@ export default function Home() {
       return;
     }
 
-    const authToken = localStorage.getItem('auth_token');
+    const authToken = getAuthToken();
     if (!authToken) {
       toast('请先登录', 'error');
       return;
@@ -464,7 +524,7 @@ export default function Home() {
       return;
     }
 
-    const authToken = localStorage.getItem('auth_token');
+    const authToken = getAuthToken();
     const userId = localStorage.getItem('user_id');
     const row = rows.find(r => r.id === id);
 
@@ -481,8 +541,7 @@ export default function Home() {
           headers: { 'Authorization': `Bearer ${authToken}` },
         });
         if (res.ok) {
-          const next = rows.filter(r => r.id !== id);
-          setRows(next);
+          setRows(prev => prev.filter(r => r.id !== id));
         } else {
           const data = await res.json();
           toast(data.message || '删除失败', 'error');
@@ -491,17 +550,18 @@ export default function Home() {
         toast('网络错误', 'error');
       }
     } else {
-      const next = deleteRow(id);
-      setRows(next);
+      setRows(prev => prev.filter(r => r.id !== id));
     }
     setShowDelModal(false);
     setSelRowId(null);
   };
 
-  const deleteSelected = useCallback(() => {
-    selectedRows.forEach(id => handleDeleteRow(id));
+  const deleteSelected = useCallback(async () => {
+    for (const id of selectedRows) {
+      await handleDeleteRow(id);
+    }
     exitSelectMode();
-  }, [selectedRows, handleDeleteRow, exitSelectMode]);
+  }, [selectedRows, exitSelectMode]);
 
   const handleAddCol = () => {
     if (!newColKey || !newColLabel) return;
@@ -643,8 +703,9 @@ export default function Home() {
               onSwipeEnd={handleSwipeEnd}
               onAdd={() => navigate('/post')}
               onOpenFavorites={() => {
-                setConditions([{ column: 'id', value: favorites.join(',') }]);
-                setHasSearched(true);
+                setFavoritesFilter(true);
+                setHasSearched(false);
+                setConditions([{ column: '', value: '' }]);
               }}
               onOpenProfile={() => navigate(currentUserId ? '/profile' : '/login')}
               onEnterSelectMode={() => setShowSelectMode(true)}

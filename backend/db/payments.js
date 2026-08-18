@@ -59,21 +59,23 @@ function addContactUnlockRequest(viewerId, targetId, proofPath, method, amount) 
   const database = getDb();
   const now = Date.now();
   try {
-    const stmt = database.prepare(
-      'INSERT INTO contact_unlocks (viewer_id, target_id, proof_path, method, amount, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)'
-    );
-    stmt.run(viewerId, targetId, proofPath, method || 'manual', amount || 9.9, 'pending', now);
-    return { success: true, id: database.prepare('SELECT LASTVAL() as id').get().id };
+    // 修复：原代码用 SELECT LASTVAL() 取 id，并发下可能拿到别的 INSERT 的序列值
+    // 改用 INSERT ... ON CONFLICT DO UPDATE ... RETURNING id 原子拿到 id
+    const stmt = database.prepare(`
+      INSERT INTO contact_unlocks (viewer_id, target_id, proof_path, method, amount, status, created_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (viewer_id, target_id) DO UPDATE SET
+        proof_path = EXCLUDED.proof_path,
+        method = EXCLUDED.method,
+        amount = EXCLUDED.amount,
+        status = EXCLUDED.status,
+        created_at = EXCLUDED.created_at
+      RETURNING id
+    `);
+    const row = stmt.get(viewerId, targetId, proofPath, method || 'manual', amount || 9.9, 'pending', now);
+    return { success: true, id: row.id };
   } catch (e) {
-    try {
-      const stmt = database.prepare(
-        'UPDATE contact_unlocks SET proof_path = $1, method = $2, amount = $3, status = $4, created_at = $5 WHERE viewer_id = $6 AND target_id = $7'
-      );
-      stmt.run(proofPath, method || 'manual', amount || 9.9, 'pending', now, viewerId, targetId);
-      return { success: true, updated: true };
-    } catch(e2) {
-      return { success: false, error: e.message };
-    }
+    return { success: false, error: e.message };
   }
 }
 

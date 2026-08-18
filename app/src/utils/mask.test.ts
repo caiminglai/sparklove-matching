@@ -1,10 +1,10 @@
 /**
- * UserCard 工具函数单元测试
+ * 联系方式脱敏工具单元测试
  * 测试：maskContact 联系方式脱敏
  */
 
 import { describe, it, expect } from 'vitest';
-import { maskContact } from './UserCard';
+import { maskContact } from './mask';
 
 describe('maskContact', () => {
   it('空字符串返回空', () => {
@@ -23,7 +23,7 @@ describe('maskContact', () => {
     expect(maskContact('abc')).toBe('abc****bc');
   });
 
-  it('undefined/undefined 返回空（类型保护）', () => {
+  it('undefined/null 返回空（类型保护）', () => {
     // TypeScript 类型签名是 string，但运行时可能传入 undefined
     expect(maskContact(undefined as unknown as string)).toBe('');
     expect(maskContact(null as unknown as string)).toBe('');

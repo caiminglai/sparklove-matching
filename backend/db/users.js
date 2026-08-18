@@ -64,7 +64,10 @@ function jsonToDbRow(jsonRow) {
 function dbRowToJson(row) {
   if (!row) return null;
   const statusVal = typeof row.status !== 'undefined' ? row.status : 'approved';
-  const extraData = row.extra_data ? JSON.parse(row.extra_data) : {};
+  let extraData = {};
+  if (row.extra_data) {
+    try { extraData = JSON.parse(row.extra_data); } catch { extraData = {}; }
+  }
   return {
     id: row.id,
     user_id: row.user_id,

@@ -37,20 +37,19 @@ function initVectorTables() {
 function upsertUserVector(userId, profileVector, expectationVector, profileText, expectationText, model) {
   const db = getDb();
   const now = Date.now();
-  const existing = db.prepare('SELECT id FROM user_vectors WHERE user_id = $1').get(userId);
-
-  if (existing) {
-    db.prepare(`
-      UPDATE user_vectors
-      SET profile_vector = $1, expectation_vector = $2, profile_text = $3, expectation_text = $4, model = $5, updated_at = $6
-      WHERE user_id = $7
-    `).run(profileVector, expectationVector, profileText, expectationText, model, now, userId);
-  } else {
-    db.prepare(`
-      INSERT INTO user_vectors (user_id, profile_vector, expectation_vector, profile_text, expectation_text, model, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-    `).run(userId, profileVector, expectationVector, profileText, expectationText, model, now, now);
-  }
+  // 修复：原 SELECT-then-INSERT/UPDATE 在并发下两个 upsert 都查不到都会 INSERT，
+  // 第二个因 UNIQUE(user_id) 失败抛错。改用 ON CONFLICT DO UPDATE 原子完成。
+  db.prepare(`
+    INSERT INTO user_vectors (user_id, profile_vector, expectation_vector, profile_text, expectation_text, model, created_at, updated_at)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
+    ON CONFLICT (user_id) DO UPDATE SET
+      profile_vector = EXCLUDED.profile_vector,
+      expectation_vector = EXCLUDED.expectation_vector,
+      profile_text = EXCLUDED.profile_text,
+      expectation_text = EXCLUDED.expectation_text,
+      model = EXCLUDED.model,
+      updated_at = EXCLUDED.updated_at
+  `).run(userId, profileVector, expectationVector, profileText, expectationText, model, now);
 }
 
 function findSimilarUsersByProfile(vector, limit = 10, excludeUserId = null) {

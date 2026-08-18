@@ -5,10 +5,8 @@
 const dbIndex = require('../db/index.js');
 const userDb = require('../db/users.js');
 
-function sendJson(res, statusCode, obj) {
-  res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
-  res.end(JSON.stringify(obj));
-}
+// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
+const { sendJson } = require('../utils/sendJson');
 
 // 处理 /api/users/custom-fields 和 /api/users/custom-fields/:key
 function handleUserCustomFields(req, res, readBodyWithLimit, pathname) {
@@ -50,6 +48,9 @@ function handleUserCustomFields(req, res, readBodyWithLimit, pathname) {
     const deleted = userDb.deleteUserCustomField(userId, fieldKey);
     sendJson(res, 200, { success: deleted, message: deleted ? '删除成功' : '未找到' }); return;
   }
+
+  // 不支持的 HTTP 方法返回 405，避免请求挂起
+  sendJson(res, 405, { success: false, message: '不支持的请求方法' });
 }
 
 module.exports = { handleUserCustomFields };

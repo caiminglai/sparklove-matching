@@ -4,10 +4,8 @@
 
 const adminDb = require('../db/admin.js');
 
-function sendJson(res, statusCode, obj) {
-  res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
-  res.end(JSON.stringify(obj));
-}
+// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
+const { sendJson } = require('../utils/sendJson');
 
 // GET /api/custom-fields
 function getCustomFilters(req, res) {

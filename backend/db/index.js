@@ -5,7 +5,7 @@ const bcrypt = require('bcrypt');
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 10;
 
 const pgConfig = {
-  user: 'postgres',
+  user: process.env.PG_USER || 'postgres',
   password: process.env.PG_PASSWORD || 'your_admin_password',
   host: process.env.PG_HOST || 'localhost',
   port: parseInt(process.env.PG_PORT) || 5432,
@@ -112,43 +112,34 @@ function getDb() {
 
 function closeDb() {
   if (client) {
-    const endSync = deasync(client.end.bind(client));
-    endSync();
+    const c = client;
     client = null;
+    try {
+      // 修复：pg 的 client.end() 无 callback 时返回 Promise，deasync 等 callback 会永久自旋
+      // 改为显式传入 callback，让 deasync 能正常等待完成
+      const endSync = deasync((cb) => { c.end(() => cb(null, null)); });
+      endSync();
+    } catch (e) {
+      // 忽略关闭错误（连接已断开等情况）
+    }
   }
 }
 
 const _isProd = process.env.NODE_ENV === 'production';
+// 修复：dev 模式密钥固定，避免每次重启导致旧 token 失效、旧加密联系方式无法解密
+const DEV_TOKEN_SECRET_FALLBACK = 'dev-fixed-token-secret-do-not-use-in-prod-001';
+const DEV_ENCRYPTION_KEY_FALLBACK = 'a'.repeat(64); // 64 个十六进制字符 = 32 字节密钥
 const TOKEN_SECRET = process.env.TOKEN_SECRET || (
   _isProd
     ? (() => { throw new Error('生产环境必须设置 TOKEN_SECRET 环境变量'); })()
-    : crypto.createHash('sha256').update('dev-only-' + crypto.randomBytes(16).toString('hex')).digest('hex')
+    : DEV_TOKEN_SECRET_FALLBACK
 );
 const ENCRYPTION_KEY = process.env.ENCRYPTION_KEY || (
   _isProd
     ? (() => { throw new Error('生产环境必须设置 ENCRYPTION_KEY 环境变量'); })()
-    : crypto.createHash('sha256').update('dev-only-' + crypto.randomBytes(16).toString('hex')).digest()
+    : DEV_ENCRYPTION_KEY_FALLBACK
 );
 const IV_LENGTH = 16;
-
-async function hashPassword(password) {
-  return bcrypt.hash(password, BCRYPT_ROUNDS);
-}
-
-async function verifyPassword(password, hash) {
-  if (!hash) return false;
-  try {
-    if (hash.length === 64 && !hash.startsWith('$2b$') && !hash.startsWith('$2a$')) {
-      const computed = crypto.createHash('sha256').update(password).digest('hex');
-          const a = Buffer.from(computed, 'utf8');
-          const b = Buffer.from(hash, 'utf8');
-          return a.length === b.length && crypto.timingSafeEqual(a, b);
-    }
-    return await bcrypt.compare(password, hash);
-  } catch {
-    return false;
-  }
-}
 
 function hashPasswordSync(password) {
   return bcrypt.hashSync(password, BCRYPT_ROUNDS);
@@ -245,9 +236,7 @@ function verifyAdminToken(token) {
 module.exports = {
   getDb,
   initConnection,
-  hashPassword,
   hashPasswordSync,
-  verifyPassword,
   verifyPasswordSync,
   encrypt,
   decrypt,

@@ -6,29 +6,32 @@ const EMBEDDING_API_KEY = process.env.EMBEDDING_API_KEY || '';
 const EMBEDDING_MODEL = process.env.EMBEDDING_MODEL || 'text-embedding-ada-002';
 
 function buildProfileText(userData) {
+  // 支持 userData.data.xxx 和 userData.xxx 两种结构
+  const d = userData.data || userData;
   const parts = [];
-  if (userData.gender) parts.push(`性别：${userData.gender}`);
-  if (userData.age) parts.push(`年龄：${userData.age}岁`);
-  if (userData.height) parts.push(`身高：${userData.height}cm`);
-  if (userData.weight) parts.push(`体重：${userData.weight}kg`);
-  if (userData.skin_tone) parts.push(`肤色：${userData.skin_tone}`);
-  if (userData.zodiac) parts.push(`星座：${userData.zodiac}`);
-  if (userData.blood_type) parts.push(`血型：${userData.blood_type}`);
-  if (userData.city) parts.push(`所在城市：${userData.city}`);
-  if (userData.marriage) parts.push(`婚姻状况：${userData.marriage}`);
-  if (userData.education) parts.push(`学历：${userData.education}`);
-  if (userData.job) parts.push(`职业：${userData.job}`);
-  if (userData.income) parts.push(`收入：${userData.income}`);
-  if (userData.hobbies) parts.push(`兴趣爱好：${userData.hobbies}`);
-  if (userData.personality) parts.push(`性格特点：${userData.personality}`);
-  if (userData.purpose) parts.push(`交友目的：${userData.purpose}`);
+  if (d.gender) parts.push(`性别：${d.gender}`);
+  if (d.age) parts.push(`年龄：${d.age}岁`);
+  if (d.height) parts.push(`身高：${d.height}cm`);
+  if (d.weight) parts.push(`体重：${d.weight}kg`);
+  if (d.skinTone || d.skin_tone) parts.push(`肤色：${d.skinTone || d.skin_tone}`);
+  if (d.zodiac) parts.push(`星座：${d.zodiac}`);
+  if (d.bloodType || d.blood_type) parts.push(`血型：${d.bloodType || d.blood_type}`);
+  if (d.city) parts.push(`所在城市：${d.city}`);
+  if (d.marriage) parts.push(`婚姻状况：${d.marriage}`);
+  if (d.education) parts.push(`学历：${d.education}`);
+  if (d.job) parts.push(`职业：${d.job}`);
+  if (d.income) parts.push(`收入：${d.income}`);
+  if (d.hobbies) parts.push(`兴趣爱好：${d.hobbies}`);
+  if (d.personality) parts.push(`性格特点：${d.personality}`);
+  if (d.purpose) parts.push(`交友目的：${d.purpose}`);
   return parts.join('；');
 }
 
 function buildExpectationText(userData) {
+  const d = userData.data || userData;
   const parts = [];
-  if (userData.expectation) parts.push(userData.expectation);
-  if (userData.interest_tags) parts.push(`兴趣标签：${userData.interest_tags}`);
+  if (d.expectation) parts.push(d.expectation);
+  if (d.interestTags || d.interest_tags) parts.push(`兴趣标签：${d.interestTags || d.interest_tags}`);
   return parts.join('；');
 }
 
@@ -114,9 +117,14 @@ async function generateAndStoreUserVector(userId) {
 }
 
 async function findSimilarUsers(userId, type = 'profile', limit = 10) {
-  const userVector = vectorDb.getUserVector(userId);
+  let userVector = vectorDb.getUserVector(userId);
   if (!userVector) {
     await generateAndStoreUserVector(userId);
+    userVector = vectorDb.getUserVector(userId);
+  }
+
+  if (!userVector) {
+    return [];
   }
 
   const vector = type === 'profile'
@@ -141,9 +149,14 @@ async function findSimilarUsers(userId, type = 'profile', limit = 10) {
 }
 
 async function findMutualMatches(userId, limit = 10) {
-  const userVector = vectorDb.getUserVector(userId);
+  let userVector = vectorDb.getUserVector(userId);
   if (!userVector) {
     await generateAndStoreUserVector(userId);
+    userVector = vectorDb.getUserVector(userId);
+  }
+
+  if (!userVector) {
+    return [];
   }
 
   const results = vectorDb.findMutualMatchUsers(userId, limit);
@@ -159,10 +172,10 @@ async function findMutualMatches(userId, limit = 10) {
 }
 
 async function batchGenerateVectors(limit = 100) {
-  const users = userDb.getUserList(1, limit, {});
+  const users = userDb.getAllUsers(1, limit);
   const results = [];
 
-  for (const user of users.users) {
+  for (const user of users) {
     try {
       await generateAndStoreUserVector(user.id);
       results.push({ userId: user.id, success: true });

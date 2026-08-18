@@ -5,9 +5,29 @@
 
 const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
-// 开发环境: /jzxr/api（通过代理转发到 http://localhost:8080/api）
-// 生产环境: https://your_other_domain.com/api
-export const API_BASE_URL = ENV_BASE_URL || '/jzxr/api';
+// ======================================================
+// 【关键修复：开发模式直连后端，绕开 Vite proxy + SSE reset 连接池复用】
+// 根因：Vite 开发模式下 /@vite/client 建立 SSE 长连接，且该连接会因 HMR 触发
+//       反复「断开→重连」(RST)。Chrome 对同一 host 最多 6 条 HTTP/1.1 连接，
+//       发往 4000 /jzxr/api 的代理请求和 SSE 长连接共享同 6 条连接，若
+//       某条请求刚好排在 SSE 长连接即将 RST 的那条 TCP socket 上，就会被
+//       连带 abort → Chrome 控制台红字 net::ERR_ABORTED。
+//
+//       其他 3 个首屏接口靠运气抢到另外 5 条干净连接就成功，field-mappings
+//       因为首屏时序/头部因素经常排到那条倒霉连接上。
+//
+// 解法：开发模式把 API_BASE_URL 改为直连后端 http://localhost:8080/api，
+//       不同 origin → 不同连接池 → 与 Vite 的 SSE 连接完全物理隔离，
+//       100% 不会被 SSE reset 连带中止。
+//       后端已正确配置 CORS（允许 http://localhost:4000 + credentials），
+//       实测直连 fetch 200 成功（见 console 验证）。
+//
+// 生产构建：VITE_API_BASE_URL 环境变量会覆盖（或用默认相对路径 /jzxr/api），
+//         生产无 SSE 也无 proxy，不会有此问题。
+// ======================================================
+const DEFAULT_DEV_BASE_URL = 'http://localhost:8080/api';
+const DEFAULT_PROD_BASE_URL = '/jzxr/api';
+export const API_BASE_URL = ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL);
 
 // API 端点
 export const API_ENDPOINTS = {

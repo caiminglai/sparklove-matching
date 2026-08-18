@@ -1,6 +1,7 @@
-import { useState, useEffect, useRef } from 'react';
+import { ArrowLeft, Download, ExternalLink, Globe, Share2, Smartphone } from 'lucide-react';
+import QRCode from 'qrcode';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { ArrowLeft, Download, Share2, Smartphone, Globe, ExternalLink } from 'lucide-react';
 
 const SITE_URL = typeof window !== 'undefined' ? window.location.origin : '';
 
@@ -22,30 +23,30 @@ export default function QrPage() {
     canvas.height = h * 2;
     ctx.scale(2, 2);
 
-    // Background gradient
+    // Background gradient - 使用实际颜色值，Canvas 不支持 CSS 变量
     const grad = ctx.createLinearGradient(0, 0, w, h);
-    grad.addColorStop(0, 'var(--color-bg-card)');
-    grad.addColorStop(1, 'var(--color-bg-main)');
+    grad.addColorStop(0, '#FFFDF9');
+    grad.addColorStop(1, '#FAF6F1');
     ctx.fillStyle = grad;
     ctx.fillRect(0, 0, w, h);
 
     // Border
-    ctx.strokeStyle = 'var(--color-border)';
+    ctx.strokeStyle = '#E8DED0';
     ctx.lineWidth = 1;
     ctx.strokeRect(0.5, 0.5, w - 1, h - 1);
 
     // Header bar
-    ctx.fillStyle = 'var(--color-primary)';
+    ctx.fillStyle = '#E87A5D';
     ctx.fillRect(0, 0, w, 70);
 
     // Heart icon (circle)
     ctx.beginPath();
     ctx.arc(180, 50, 28, 0, Math.PI * 2);
-    ctx.fillStyle = 'var(--color-bg-card)';
+    ctx.fillStyle = '#FFFDF9';
     ctx.fill();
 
     // Heart
-    ctx.fillStyle = 'var(--color-primary)';
+    ctx.fillStyle = '#E87A5D';
     ctx.font = 'bold 24px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('\u2665', 180, 59);
@@ -57,13 +58,13 @@ export default function QrPage() {
     ctx.fillText('微光亦是永恒', 180, 30);
 
     // Subtitle
-    ctx.fillStyle = 'var(--color-text-muted)';
+    ctx.fillStyle = '#8B7B6B';
     ctx.font = '14px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('精准匹配 · 缘分从数据开始', 180, 105);
 
     // Divider
-    ctx.strokeStyle = 'var(--color-border-light)';
+    ctx.strokeStyle = '#F0E4D4';
     ctx.beginPath();
     ctx.moveTo(40, 125);
     ctx.lineTo(320, 125);
@@ -81,67 +82,69 @@ export default function QrPage() {
       // Number circle
       ctx.beginPath();
       ctx.arc(65, y, 12, 0, Math.PI * 2);
-      ctx.fillStyle = 'rgba(var(--color-primary-rgb), 0.1)';
+      ctx.fillStyle = 'rgba(232, 122, 93, 0.1)';
       ctx.fill();
       ctx.strokeStyle = '#F5B8A4';
       ctx.lineWidth = 1;
       ctx.stroke();
       // Number
-      ctx.fillStyle = 'var(--color-primary)';
+      ctx.fillStyle = '#E87A5D';
       ctx.font = 'bold 12px sans-serif';
       ctx.textAlign = 'center';
       ctx.fillText(num, 65, y + 4);
       // Text
-      ctx.fillStyle = 'var(--color-text-primary)';
+      ctx.fillStyle = '#3D2E20';
       ctx.font = '14px sans-serif';
       ctx.textAlign = 'left';
       ctx.fillText(text, 90, y + 4);
     });
 
-    // QR code area
-    ctx.fillStyle = 'var(--color-bg-input)';
+    // QR code area - 兼容旧浏览器的圆角矩形绘制
+    ctx.fillStyle = '#F5EDE3';
     ctx.beginPath();
-    ctx.roundRect(105, 310, 150, 150, 8);
+    if (typeof ctx.roundRect === 'function') {
+      ctx.roundRect(105, 310, 150, 150, 8);
+    } else {
+      // 手动绘制圆角矩形（兼容旧浏览器）
+      const r = 8, x = 105, y = 310, rw = 150, rh = 150;
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + rw, y, x + rw, y + rh, r);
+      ctx.arcTo(x + rw, y + rh, x, y + rh, r);
+      ctx.arcTo(x, y + rh, x, y, r);
+      ctx.arcTo(x, y, x + rw, y, r);
+      ctx.closePath();
+    }
     ctx.fill();
-    ctx.strokeStyle = 'var(--color-border)';
+    ctx.strokeStyle = '#E8DED0';
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // QR code placeholder (simplified pattern)
-    ctx.fillStyle = 'var(--color-text-primary)';
-    for (let r = 0; r < 15; r++) {
-      for (let c = 0; c < 15; c++) {
-        if (Math.random() > 0.45 || (r < 4 && c < 4) || (r < 4 && c > 10) || (r > 10 && c < 4)) {
-          const x = 115 + c * 9;
-          const y = 320 + r * 9;
-          if (r < 4 && c < 4) {
-            // Corner markers
-            if (r === 0 || r === 3 || c === 0 || c === 3) {
-              ctx.fillRect(x, y, 8, 8);
-            }
-          } else if (r < 4 && c > 10) {
-            if (r === 0 || r === 3 || c === 11 || c === 14) {
-              ctx.fillRect(x, y, 8, 8);
-            }
-          } else if (r > 10 && c < 4) {
-            if (r === 11 || r === 14 || c === 0 || c === 3) {
-              ctx.fillRect(x, y, 8, 8);
-            }
-          } else {
-            ctx.fillRect(x, y, 7, 7);
-          }
-        }
-      }
-    }
+    // 生成真实可扫的二维码并画到二维码区域(替换原来的随机方块假二维码)
+    QRCode.toDataURL(SITE_URL, {
+      width: 300,
+      margin: 1,
+      color: { dark: '#1a1a1a', light: '#ffffff' },
+    })
+      .then((dataUrl) => {
+        const img = new Image();
+        img.onload = () => {
+          // 二维码画到海报的二维码框内(留 5px 白边)
+          ctx.drawImage(img, 110, 315, 140, 140);
+        };
+        img.src = dataUrl;
+      })
+      .catch((err: unknown) => {
+        console.error('海报二维码生成失败:', err);
+      });
 
     // URL below QR
-    ctx.fillStyle = 'var(--color-text-secondary)';
+    ctx.fillStyle = '#B5A698';
     ctx.font = '11px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText(SITE_URL.replace('https://', '').replace('http://', ''), 180, 485);
 
     // Bottom tip
-    ctx.fillStyle = 'var(--color-success)';
+    ctx.fillStyle = '#6BAF7D';
     ctx.font = '12px sans-serif';
     ctx.textAlign = 'center';
     ctx.fillText('\u2713 保证金保障真实信息', 180, 515);
@@ -166,6 +169,22 @@ export default function QrPage() {
     navigator.clipboard.writeText(SITE_URL).then(() => {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+    }).catch(() => {
+      // 剪贴板 API 不可用时使用降级方案
+      const textarea = document.createElement('textarea');
+      textarea.value = SITE_URL;
+      textarea.style.position = 'fixed';
+      textarea.style.opacity = '0';
+      document.body.appendChild(textarea);
+      textarea.select();
+      try {
+        document.execCommand('copy');
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        // 忽略复制失败
+      }
+      document.body.removeChild(textarea);
     });
   };
 
@@ -198,12 +217,12 @@ export default function QrPage() {
           <button onClick={handleDownload}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium text-white"
             style={{ background: 'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))' }}>
-            <Download size={16} /> 下载海报（打印贴出去）
+            <Download size={16} /> 下载海报(打印贴出去)
           </button>
           <button onClick={handleCopy}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-medium"
             style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)', color: 'var(--color-text-muted)' }}>
-            <Share2 size={16} /> {copied ? '已复制链接！' : '复制链接到微信'}
+            <Share2 size={16} /> {copied ? '已复制链接!' : '复制链接到微信'}
           </button>
         </div>
 
@@ -214,9 +233,9 @@ export default function QrPage() {
             微信中使用
           </h3>
           <div className="space-y-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            <p>1. 把链接复制到微信聊天窗口，发送给朋友</p>
+            <p>1. 把链接复制到微信聊天窗口,发送给朋友</p>
             <p>2. 点击链接即可在微信内打开</p>
-            <p>3. 也可以转发到朋友圈，配上文字说明</p>
+            <p>3. 也可以转发到朋友圈,配上文字说明</p>
             <p>4. 长按识别海报中的二维码进入</p>
           </div>
         </div>
@@ -229,8 +248,8 @@ export default function QrPage() {
           </h3>
           <div className="space-y-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
             <p>1. 微信中点击右上角 → 在浏览器中打开</p>
-            <p>2. 浏览器不受微信限制，体验更流畅</p>
-            <p>3. 可以添加到主屏幕，像App一样使用</p>
+            <p>2. 浏览器不受微信限制,体验更流畅</p>
+            <p>3. 可以添加到主屏幕,像App一样使用</p>
           </div>
         </div>
 
@@ -238,12 +257,12 @@ export default function QrPage() {
         <div className="rounded-xl p-4 mb-8" style={{ background: 'rgba(var(--color-success-rgb), 0.04)', border: '1px solid #C4E0CC' }}>
           <h3 className="text-sm font-medium mb-3 flex items-center gap-2" style={{ color: 'var(--color-text-primary)' }}>
             <ExternalLink size={15} style={{ color: 'var(--color-success)' }} />
-            添加到主屏幕（免安装App）
+            添加到主屏幕(免安装App)
           </h3>
           <div className="space-y-2 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-            <p><strong>iPhone Safari</strong>：打开网页 → 点击底部分享按钮 → "添加到主屏幕"</p>
-            <p><strong>Android Chrome</strong>：打开网页 → 菜单 → "添加到主屏幕"</p>
-            <p>添加后桌面会出现图标，点击直接打开，和App一样用</p>
+            <p><strong>iPhone Safari</strong>:打开网页 → 点击底部分享按钮 → "添加到主屏幕"</p>
+            <p><strong>Android Chrome</strong>:打开网页 → 菜单 → "添加到主屏幕"</p>
+            <p>添加后桌面会出现图标,点击直接打开,和App一样用</p>
           </div>
         </div>
       </div>

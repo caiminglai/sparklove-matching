@@ -2,7 +2,7 @@ import { X, Star, Flag, MapPin, Shield } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { CATEGORIES, FIELD_LABELS } from '../data/constants';
 import { normalizeAvatarUrl } from '../api/config';
-import { maskContact } from './UserCard';
+import { maskContact } from '../utils/mask';
 import type { Row, Column, Rating } from '../data/types';
 
 interface UserDetailModalProps {

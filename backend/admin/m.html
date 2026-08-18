@@ -320,7 +320,18 @@
     if (!token) {
       window.location.href = API_BASE + '/admin/m-login';
     }
-    
+
+    // HTML 转义函数，防止 XSS
+    function escapeHtml(str) {
+      if (str == null) return '';
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
     // 解析头像路径为完整 URL
     function resolveAvatarUrl(avatar) {
       if (!avatar) return '';
@@ -343,29 +354,28 @@
 
     // 根据用户信息生成头像 HTML（小头像，用于举报/解锁记录）
     function buildMiniAvatarHtml(user, fallbackText) {
-      const fallback = (fallbackText || '?').toString().charAt(0).toUpperCase();
+      const fallback = escapeHtml((fallbackText || '?').toString().charAt(0).toUpperCase());
       if (!user || !user.data) {
         return `<div class="mini-avatar">${fallback}</div>`;
       }
       const avatar = user.data.avatar;
       if (avatar) {
         const url = resolveAvatarUrl(avatar);
-        return `<div class="mini-avatar"><img src="${url}" onerror="this.parentElement.innerHTML='${fallback}'"></div>`;
+        return `<div class="mini-avatar"><img src="${url}" onerror="this.parentElement.textContent='${fallback}'"></div>`;
       }
       return `<div class="mini-avatar">${fallback}</div>`;
     }
 
     // 根据用户信息生成头像 HTML（大头像，用于用户卡片）
     function buildAvatarHtml(user) {
-      const name = (user && user.data && user.data.name) || '';
-      const fallback = (name.charAt(0) || '?').toUpperCase();
+      const fallback = escapeHtml(((user && user.data && user.data.name) || '').charAt(0) || '?').toUpperCase();
       if (!user || !user.data) {
         return `<div class="avatar">${fallback}</div>`;
       }
       const avatar = user.data.avatar;
       if (avatar) {
         const url = resolveAvatarUrl(avatar);
-        return `<div class="avatar"><img src="${url}" onerror="this.parentElement.innerHTML='${fallback}'"></div>`;
+        return `<div class="avatar"><img src="${url}" onerror="this.parentElement.textContent='${fallback}'"></div>`;
       }
       return `<div class="avatar">${fallback}</div>`;
     }
@@ -512,21 +522,22 @@
       let html = paginatedUsers.map(user => {
         const contact = user.data?.contact || '未填写';
         const masked = contact.length > 4 ? contact.slice(0, 2) + '***' + contact.slice(-2) : '***';
-        const name = user.data?.name || '未知';
+        const name = escapeHtml(user.data?.name || '未知');
         const avatarHtml = buildAvatarHtml(user);
+        const userId = escapeHtml(user.id);
         return `
           <div class="user-card">
             <div class="flex">
               ${avatarHtml}
               <div class="info">
                 <div class="name-strong">${name}</div>
-                <div class="user-id-small">ID: ${user.id}</div>
-                <div class="desc">${user.data?.city || ''} · ${user.data?.age || ''}岁</div>
+                <div class="user-id-small">ID: ${userId}</div>
+                <div class="desc">${escapeHtml(user.data?.city || '')} · ${escapeHtml(user.data?.age || '')}岁</div>
               </div>
             </div>
-            <div class="contact">联系方式: <span>${masked}</span></div>
-            <button class="btn-unlock" onclick="showUnlockModal('${user.id}')">解锁联系方式</button>
-            <button class="btn-edit" onclick="showEditModal('${user.id}')">编辑资料</button>
+            <div class="contact">联系方式: <span>${escapeHtml(masked)}</span></div>
+            <button class="btn-unlock" onclick="showUnlockModal('${userId}')">解锁联系方式</button>
+            <button class="btn-edit" onclick="showEditModal('${userId}')">编辑资料</button>
           </div>
         `;
       }).join('');
@@ -593,7 +604,7 @@
     
     function showEditModal(userId) {
       currentEditId = userId;
-      const user = allUsers.find(u => u.id === userId);
+      const user = allUsers.find(u => String(u.id) === String(userId));
       if (!user) return;
       
       document.getElementById('editName').value = user.data?.name || '';
@@ -715,13 +726,13 @@
             const viewerUser = record.viewer_data || findUserById(record.viewer_user_id || record.viewer_id);
             const targetUser = record.target_data || findUserById(record.target_user_id || record.target_id);
             
-            const viewerName = record.viewer_name || (viewerUser && viewerUser.data && viewerUser.data.name) || (record.viewer_user_id || record.viewer_id ? '用户' + (record.viewer_user_id || record.viewer_id) : '全部');
+            const viewerName = escapeHtml(record.viewer_name || (viewerUser && viewerUser.data && viewerUser.data.name) || (record.viewer_user_id || record.viewer_id ? '用户' + (record.viewer_user_id || record.viewer_id) : '全部'));
             const viewerAvatar = record.viewer_avatar || (viewerUser && viewerUser.data && viewerUser.data.avatar);
-            const viewerId = record.viewer_user_id || record.viewer_id || (viewerUser && viewerUser.id) || '';
-            const targetName = record.target_name || (targetUser && targetUser.data && targetUser.data.name) || '用户' + (record.target_user_id || record.target_id || '');
+            const viewerId = escapeHtml(record.viewer_user_id || record.viewer_id || (viewerUser && viewerUser.id) || '');
+            const targetName = escapeHtml(record.target_name || (targetUser && targetUser.data && targetUser.data.name) || '用户' + (record.target_user_id || record.target_id || ''));
             const targetAvatar = record.target_avatar || (targetUser && targetUser.data && targetUser.data.avatar);
-            const targetId = record.target_user_id || record.target_id || (targetUser && targetUser.id) || '';
-            const targetContact = record.target_contact || (targetUser && targetUser.data && targetUser.data.contact);
+            const targetId = escapeHtml(record.target_user_id || record.target_id || (targetUser && targetUser.id) || '');
+            const targetContact = escapeHtml(record.target_contact || (targetUser && targetUser.data && targetUser.data.contact));
             
             const viewerAvatarHtml = viewerAvatar
               ? buildMiniAvatarHtml({ data: { avatar: viewerAvatar } }, viewerName)
@@ -845,12 +856,12 @@
                         ${reporterId ? `<span class="user-id-text">ID: ${reporterId}</span>` : ''}
                       </div>
                     </div>
-                    <div class="report-meta">类型: ${report.report_type || '未填写'}</div>
+                    <div class="report-meta">类型: ${escapeHtml(report.report_type || '未填写')}</div>
                   </div>
                   <span class="status ${report.status === 'pending' ? 'pending' : report.status === 'approved' ? 'approved' : 'rejected'}">${statusText}</span>
                 </div>
-                <div class="report-content">${report.description || '未填写描述'}</div>
-                ${report.admin_note ? `<div class="report-content" style="background:#E3F2FD;color:#1565C0;">管理员备注: ${report.admin_note}</div>` : ''}
+                <div class="report-content">${escapeHtml(report.description || '未填写描述')}</div>
+                ${report.admin_note ? `<div class="report-content" style="background:#E3F2FD;color:#1565C0;">管理员备注: ${escapeHtml(report.admin_note)}</div>` : ''}
                 ${proofBtn}
                 <div class="time">提交时间: ${new Date(report.created_at).toLocaleString('zh-CN')}</div>
                 ${report.status === 'pending' ? `
@@ -947,7 +958,7 @@
           list.innerHTML = data.data.map(deposit => {
             const statusText = deposit.status === 'pending' ? '待审核' : deposit.status === 'approved' ? '已通过' : deposit.status === 'rejected' ? '已驳回' : deposit.status || '未知';
             const userInfo = deposit.user_data || {};
-            const displayName = userInfo.name || deposit.user_id || '未知用户';
+            const displayName = escapeHtml(userInfo.name || deposit.user_id || '未知用户');
             const proofPath = deposit.proof_path || '';
             
             let proofHtml = '';
@@ -963,13 +974,13 @@
                 <div class="flex" style="justify-content: space-between;">
                   <div style="flex:1;">
                     <div class="report-user">用户: ${displayName}</div>
-                    <div class="report-meta">ID: ${deposit.user_id} · 金额: ¥${Number(deposit.amount || 0).toFixed(2)}</div>
+                    <div class="report-meta">ID: ${escapeHtml(deposit.user_id)} · 金额: ¥${Number(deposit.amount || 0).toFixed(2)}</div>
                   </div>
                   <span class="status ${deposit.status === 'pending' ? 'pending' : deposit.status === 'approved' ? 'approved' : 'rejected'}">${statusText}</span>
                 </div>
                 <div class="deposit-amount">¥${Number(deposit.amount || 0).toFixed(2)}</div>
                 ${proofHtml}
-                ${deposit.admin_note ? `<div class="report-content" style="background:#E3F2FD;color:#1565C0;">审核备注: ${deposit.admin_note}</div>` : ''}
+                ${deposit.admin_note ? `<div class="report-content" style="background:#E3F2FD;color:#1565C0;">审核备注: ${escapeHtml(deposit.admin_note)}</div>` : ''}
                 <div class="time">提交时间: ${new Date(deposit.created_at).toLocaleString('zh-CN')}</div>
                 ${deposit.status === 'pending' ? `
                   <div class="action-row">

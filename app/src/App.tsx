@@ -1,23 +1,25 @@
-import { Routes, Route, useLocation } from 'react-router'
-import { lazy, Suspense, type ReactElement } from 'react'
-import TabBar from './components/TabBar'
-import ErrorBoundary from './components/ErrorBoundary'
-import { ToastProvider } from './components/Toast'
+import { lazy, Suspense, type ReactElement } from 'react';
+import { Route, Routes, useLocation } from 'react-router';
+import ErrorBoundary from './components/ErrorBoundary';
+import RequireAuth from './components/RequireAuth';
+import ShareButton from './components/ShareButton';
+import TabBar from './components/TabBar';
+import { ToastProvider } from './components/Toast';
 
 // 懒加载页面组件
-const Home = lazy(() => import('./pages/Home'))
-const PostPage = lazy(() => import('./pages/PostPage'))
-const DepositPage = lazy(() => import('./pages/DepositPage'))
-const QrPage = lazy(() => import('./pages/QrPage'))
-const LoginPage = lazy(() => import('./pages/LoginPage'))
-const ProfilePage = lazy(() => import('./pages/ProfilePage'))
-const MyPostsPage = lazy(() => import('./pages/MyPostsPage'))
-const SettingsPage = lazy(() => import('./pages/SettingsPage'))
-const CirclesPage = lazy(() => import('./pages/CirclesPage'))
-const CircleDetailPage = lazy(() => import('./pages/CircleDetailPage'))
-const AntiFraudPage = lazy(() => import('./pages/AntiFraudPage'))
+const Home = lazy(() => import('./pages/Home'));
+const PostPage = lazy(() => import('./pages/PostPage'));
+const DepositPage = lazy(() => import('./pages/DepositPage'));
+const QrPage = lazy(() => import('./pages/QrPage'));
+const LoginPage = lazy(() => import('./pages/LoginPage'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage'));
+const MyPostsPage = lazy(() => import('./pages/MyPostsPage'));
+const SettingsPage = lazy(() => import('./pages/SettingsPage'));
+const CirclesPage = lazy(() => import('./pages/CirclesPage'));
+const CircleDetailPage = lazy(() => import('./pages/CircleDetailPage'));
+const AntiFraudPage = lazy(() => import('./pages/AntiFraudPage'));
 
-const HIDE_TAB_PATHS = ['/login', '/qr']
+const HIDE_TAB_PATHS = ['/login', '/qr'];
 
 // 加载占位符组件 - 骨架屏风格
 function LoadingFallback() {
@@ -55,35 +57,59 @@ function LoadingFallback() {
         ))}
       </div>
     </div>
-  )
+  );
 }
 
 export default function App(): ReactElement {
-  const location = useLocation()
-  const showTab = !HIDE_TAB_PATHS.some(p => location.pathname.startsWith(p))
+  const location = useLocation();
+  const showTab = !HIDE_TAB_PATHS.some(p => location.pathname.startsWith(p));
 
   return (
     <ToastProvider>
-    <div className="min-h-screen pb-20" style={{ background: 'var(--color-bg-main)' }}>
-      <ErrorBoundary>
-        <Suspense fallback={<LoadingFallback />}>
-          <Routes>
-            <Route path="/" element={<Home />} />
-            <Route path="/post" element={<PostPage />} />
-            <Route path="/deposit" element={<DepositPage />} />
-            <Route path="/qr" element={<QrPage />} />
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/my-posts" element={<MyPostsPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/circles" element={<CirclesPage />} />
-            <Route path="/circle/:circleKey/:tag" element={<CircleDetailPage />} />
-            <Route path="/anti-fraud" element={<AntiFraudPage />} />
-          </Routes>
-        </Suspense>
-      </ErrorBoundary>
-      {showTab && <TabBar />}
-    </div>
+      <div className="min-h-screen pb-20" style={{ background: 'var(--color-bg-main)' }}>
+        <ErrorBoundary>
+          <Suspense fallback={<LoadingFallback />}>
+            <Routes>
+              <Route path="/" element={<Home />} />
+              <Route path="/post" element={
+                <RequireAuth message="发布资料需要先登录" requireAuthToken>
+                  <PostPage />
+                </RequireAuth>
+              } />
+              <Route path="/deposit" element={<DepositPage />} />
+              <Route path="/qr" element={<QrPage />} />
+              <Route path="/login" element={<LoginPage />} />
+              <Route path="/profile" element={
+                <RequireAuth>
+                  <ProfilePage />
+                </RequireAuth>
+              } />
+              <Route path="/my-posts" element={
+                <RequireAuth>
+                  <MyPostsPage />
+                </RequireAuth>
+              } />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/circles" element={<CirclesPage />} />
+              <Route path="/circle/:circleKey/:tag" element={<CircleDetailPage />} />
+              <Route path="/anti-fraud" element={<AntiFraudPage />} />
+              {/* 404 兜底：访问未注册路径时显示提示，避免一直卡在 LoadingFallback */}
+              <Route path="*" element={
+                <div className="min-h-screen flex items-center justify-center" style={{ background: 'var(--color-bg-main)' }}>
+                  <div className="text-center px-4">
+                    <p className="text-5xl mb-3" style={{ color: 'var(--color-text-light)' }}>404</p>
+                    <p className="text-sm mb-4" style={{ color: 'var(--color-text-secondary)' }}>页面不存在</p>
+                    <a href="/" className="inline-block px-5 py-2 rounded-xl text-sm text-white" style={{ background: 'var(--color-primary)' }}>返回首页</a>
+                  </div>
+                </div>
+              } />
+            </Routes>
+          </Suspense>
+        </ErrorBoundary>
+        {showTab && <TabBar />}
+        {/* 全局扫码分享按钮:右下角悬浮,避开底部 TabBar */}
+        {showTab && <ShareButton />}
+      </div>
     </ToastProvider>
-  )
+  );
 }

@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { Heart, Users, Sparkles, Target, Music, Utensils, Dumbbell, BookOpen, MapPin, ChevronRight, Search } from 'lucide-react';
+import { Heart, Users, Sparkles, Music, Utensils, Dumbbell, MapPin, ChevronRight, Search } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import type { Row } from '../data/types';
+import { getAuthToken, getAuthHeaders } from '../utils/auth';
 
 const CIRCLE_CONFIGS = [
   { key: 'hobbies', label: '兴趣圈', icon: Sparkles, color: 'var(--color-primary)', desc: '因兴趣相聚' },
@@ -36,9 +37,7 @@ export default function CirclesPage() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const authToken = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const headers = getAuthHeaders();
 
     fetch(`${API_BASE_URL}/users?limit=200`, { headers })
       .then(res => res.json())

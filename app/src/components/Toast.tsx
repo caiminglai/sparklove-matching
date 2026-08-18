@@ -3,6 +3,7 @@
  * 替代 alert()，支持成功/错误/信息三种类型，3秒自动消失
  */
 import { useState, useEffect, useCallback, useRef, createContext, useContext, type ReactNode } from 'react';
+import { setToastFn } from '../utils/errorHandler';
 
 type ToastType = 'success' | 'error' | 'info';
 
@@ -27,6 +28,12 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     const id = nextIdRef.current++;
     setItems(prev => [...prev, { id, message, type }]);
   }, []);
+
+  // 注入到 errorHandler，使 showError 使用 toast 而非 alert
+  useEffect(() => {
+    setToastFn(add);
+    return () => setToastFn(null);
+  }, [add]);
 
   const remove = useCallback((id: number) => {
     setItems(prev => prev.filter(t => t.id !== id));

@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link } from 'react-router';
-import { User, Camera, Save, LogOut, ArrowLeft, Star, Edit2, ChevronRight, Settings, Trash2, Plus, X as XIcon } from 'lucide-react';
+import { User, Camera, LogOut, ArrowLeft, Star, Edit2, ChevronRight, Settings, Trash2, Plus, X as XIcon } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import type { CustomField } from '../data/types';
 import { handleApiError } from '../utils/errorHandler';
@@ -8,6 +8,7 @@ import { loadColumns } from '../services/user.service';
 import { fetchFieldMappings } from '../services/field-mapping.service';
 import { DEPOSIT_RULES } from '../data/constants';
 import type { Column, Row } from '../data/types';
+import { getAuthToken } from '../utils/auth';
 import { useToast } from '../components/Toast';
 
 export default function ProfilePage() {
@@ -38,14 +39,12 @@ export default function ProfilePage() {
 
   const userId = localStorage.getItem('user_id');
   const userNickname = localStorage.getItem('user_nickname');
-  const authToken = localStorage.getItem('auth_token');
+  const authToken = getAuthToken();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const customFieldOriginalRef = useRef<Record<string, string>>({});
 
+  // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处只负责加载数据
   useEffect(() => {
-    if (!userId) {
-      navigate('/login');
-      return;
-    }
     loadMyData();
   }, []);
 
@@ -210,6 +209,8 @@ export default function ProfilePage() {
       });
       if (res.ok) {
         setCustomFields(prev => prev.map(f => f.field_key === fieldKey ? { ...f, field_value: newValue } : f));
+      } else {
+        toast('保存失败', 'error');
       }
     } catch {
       toast('网络错误', 'error');
@@ -448,7 +449,7 @@ export default function ProfilePage() {
                       <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>{col.label}</label>
                       <input className="w-full px-3 py-2.5 rounded-lg text-sm"
                         style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
-                        type={col.type === 'number' ? 'number' : 'text'}
+                        type="text"
                         placeholder={`输入${col.label}`}
                         value={String(formData[col.key] || '')}
                         onChange={e => setVal(col.key, e.target.value)} />
@@ -477,8 +478,12 @@ export default function ProfilePage() {
                             onChange={e => {
                               setCustomFields(prev => prev.map(f => f.field_key === cf.field_key ? { ...f, field_value: e.target.value } : f));
                             }}
+                            onFocus={() => {
+                              customFieldOriginalRef.current[cf.field_key] = cf.field_value;
+                            }}
                             onBlur={e => {
-                              if (e.target.value !== cf.field_value) {
+                              const original = customFieldOriginalRef.current[cf.field_key];
+                              if (e.target.value !== original) {
                                 updateCustomFieldValue(cf.field_key, e.target.value);
                               }
                             }}

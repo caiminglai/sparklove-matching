@@ -1,27 +1,26 @@
 import { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { ArrowLeft, FileText, MapPin, Heart, Trash2, Clock, Plus } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import { loadColumns } from '../services/user.service';
 import type { Row } from '../data/types';
 import { useToast } from '../components/Toast';
+import { getAuthToken } from '../utils/auth';
 
 export default function MyPostsPage() {
   const { toast } = useToast();
-  const navigate = useNavigate();
-  const columns = loadColumns();
+  // 修复：原 const columns = loadColumns() 在函数体内直接调用，每次渲染都重读 localStorage + JSON.parse
+  // 改为 useState 初始化器，仅在首次挂载时执行一次
+  const [columns] = useState(loadColumns);
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
   const [showDelModal, setShowDelModal] = useState<string | null>(null);
 
   const userId = localStorage.getItem('user_id');
-  const authToken = localStorage.getItem('auth_token');
+  const authToken = getAuthToken();
 
+  // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处只负责加载数据
   useEffect(() => {
-    if (!userId) {
-      navigate('/login');
-      return;
-    }
     loadMyPosts();
   }, []);
 
@@ -39,13 +38,13 @@ export default function MyPostsPage() {
             data: data.user.data || {},
             deposit: data.user.deposit || 0,
             createdAt: data.user.createdAt,
-            userId: data.user.userId,
+            user_id: data.user.user_id,
           };
           setRows([myRow]);
         }
       }
     } catch (e) {
-      console.warn('删除帖子失败', e);
+      console.warn('加载帖子失败', e);
     } finally {
       setLoading(false);
     }

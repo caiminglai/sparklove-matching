@@ -1,11 +1,22 @@
-import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import {
-  Search, X, ChevronDown, Plus, Trash2, Heart,
-  Users, Sparkles, Target, Users2, User, MapPin, Check,
+  Check,
+  ChevronDown,
+  Heart,
+  MapPin,
+  Plus,
+  Search,
+  Sparkles, Target,
+  Trash2,
+  User,
+  Users,
+  Users2,
+  X,
 } from 'lucide-react';
-import { CATEGORIES, PURPOSE_OPTIONS } from '../data/constants';
-import type { Column, MatchCondition, CustomField, AdminCustomField } from '../data/types';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE_URL } from '../api/config';
+import { CATEGORIES, PURPOSE_OPTIONS } from '../data/constants';
+import type { AdminCustomField, Column, CustomField, MatchCondition } from '../data/types';
+import { waitForBootstrapSafeWindow, withInFlightDedup } from '../utils/bootstrap-guard';
 
 const QUICK_TAGS = [
   { label: '女', key: 'gender', value: '女' },
@@ -31,6 +42,59 @@ const QUICK_TAGS = [
   { label: '民谣', key: 'music', value: '民谣' },
   { label: '流行', key: 'music', value: '流行' },
 ];
+
+/**
+ * 将后端返回的 options 元素（可能是 {label, value} 对象、数字、null）统一规范化为 string。
+ * 修复：直接把对象作为 React children 渲染会触发 Minified React error #185。
+ */
+function normalizeOption(opt: unknown): string {
+  if (opt === null || opt === undefined || typeof opt === 'boolean') return '';
+  if (typeof opt === 'string') return opt;
+  if (typeof opt === 'number' || typeof opt === 'bigint') return String(opt);
+  if (typeof opt === 'object') {
+    const o = opt as Record<string, unknown>;
+    // 常见后端 options 对象格式：{label, value} / {name, key} / {text}
+    const v = o.label ?? o.value ?? o.name ?? o.key ?? o.text ?? o.title;
+    if (v !== undefined && v !== null) return String(v);
+    // 兜底：不要直接返回对象（会炸 #185），返回空串，React 渲染时就忽略
+    return '';
+  }
+  return String(opt);
+}
+
+/**
+ * 将可能是对象数组 / 非字符串元素的 options 数组，规范化为纯 string[]，
+ * 并过滤掉空串项，避免空 button 出现。
+ */
+function normalizeOptions(opts: unknown): string[] {
+  if (!opts) return [];
+  if (!Array.isArray(opts)) {
+    const s = normalizeOption(opts);
+    return s ? [s] : [];
+  }
+  const result: string[] = [];
+  for (const raw of opts) {
+    const s = normalizeOption(raw);
+    if (s) result.push(s);
+  }
+  return result;
+}
+
+/**
+ * 规范化字段 label（后端如果返回对象也能转字符串，避免炸 #185）。
+ */
+function normalizeLabel(label: unknown): string {
+  if (label === null || label === undefined) return '';
+  if (typeof label === 'string') return label;
+  if (typeof label === 'number' || typeof label === 'bigint') return String(label);
+  if (typeof label === 'object') {
+    const o = label as Record<string, unknown>;
+    const v = o.label ?? o.name ?? o.title ?? o.text ?? o.value;
+    if (v !== undefined && v !== null) return String(v);
+    return '';
+  }
+  return String(label);
+}
 
 const PURPOSE_ICONS: Record<string, typeof Users> = {
   '相亲交友': Heart,
@@ -106,21 +170,22 @@ export default function SearchPanel({
   const labelMap = useMemo(() => {
     const map: Record<string, string> = {};
     for (const col of columns) {
-      map[col.key] = col.label;
+      map[col.key] = normalizeLabel(col.label);
     }
     return map;
   }, [columns]);
 
-  // 从后端加载管理员定义的常用自定义字段
+  // 从后端加载管理员定义的常用自定义字段（首屏延迟 + in-flight 去重，避免与 Vite SSE 重置窗口冲突）
   useEffect(() => {
-    fetch(API_BASE_URL + '/custom-fields')
-      .then(r => r.json())
-      .then(data => {
-        if (data.success && Array.isArray(data.data)) {
-          setAdminCustomFields(data.data);
-        }
-      })
-      .catch(() => { console.warn('加载管理员自定义字段失败'); });
+    withInFlightDedup('admin:custom-fields', async () => {
+      await waitForBootstrapSafeWindow();
+      const res = await fetch(API_BASE_URL + '/custom-fields');
+      const data = await res.json();
+      if (data.success && Array.isArray(data.data)) {
+        setAdminCustomFields(data.data);
+      }
+      return data;
+    }).catch(() => { console.warn('加载管理员自定义字段失败'); });
   }, []);
 
   // conditions 持久化到 localStorage
@@ -140,26 +205,29 @@ export default function SearchPanel({
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  const findColumnInfo = useCallback((columnKey: string) => {
+  const findColumnInfo = useCallback((columnKey: string): (Column & { options: string[] }) | null => {
     const col = columns.find(c => c.key === columnKey);
-    if (col && col.options && col.options.length > 0) {
-      return col;
+    const safeColOpts = normalizeOptions(col?.options);
+    if (col && safeColOpts.length > 0) {
+      return { ...col, label: normalizeLabel(col.label), options: safeColOpts, category: col.category || '其他' };
     }
     const adminField = adminCustomFields.find((f: AdminCustomField) =>
       f.field_key === columnKey || f.field_label === columnKey);
     if (adminField) {
-      const opts = adminField.options && Array.isArray(adminField.options) && adminField.options.length > 0
-        ? adminField.options
-        : [];
+      const opts = normalizeOptions(adminField.options);
+      const label = normalizeLabel(adminField.field_label);
       return {
         key: adminField.field_key,
-        label: adminField.field_label,
+        label,
         type: opts.length > 0 ? 'tags' : 'text',
         options: opts,
         category: 'custom'
       };
     }
-    return col || null;
+    if (col) {
+      return { ...col, label: normalizeLabel(col.label), options: safeColOpts, category: col.category || '其他' };
+    }
+    return null;
   }, [columns, adminCustomFields]);
 
   const addCond = useCallback(() => onConditionsChange([...conditions, { column: '', value: '' }]), [conditions, onConditionsChange]);
@@ -194,10 +262,8 @@ export default function SearchPanel({
 
     if (adminField) {
       finalKey = adminField.field_key;
-      finalLabel = adminField.field_label;
-      const opts = adminField.options && Array.isArray(adminField.options) && adminField.options.length > 0
-        ? adminField.options
-        : [];
+      finalLabel = normalizeLabel(adminField.field_label);
+      const opts = normalizeOptions(adminField.options);
       finalType = opts.length > 0 ? 'tags' : 'text';
       finalOptions = opts;
     } else {
@@ -223,14 +289,13 @@ export default function SearchPanel({
   };
 
   const addAdminCustomField = (field: AdminCustomField) => {
-    const opts = field.options && Array.isArray(field.options) && field.options.length > 0
-      ? field.options
-      : [];
+    const opts = normalizeOptions(field.options);
+    const label = normalizeLabel(field.field_label);
     const colExists = columns.some((c: Column) => c.key === field.field_key);
     if (!colExists) {
       onColumnsChange([...columns, {
         key: field.field_key,
-        label: field.field_label,
+        label,
         type: opts.length > 0 ? 'tags' : 'text',
         options: opts,
         category: 'custom'
@@ -245,11 +310,10 @@ export default function SearchPanel({
       <div className="flex flex-wrap items-center gap-1.5 mb-4">
         <button
           onClick={() => onSelectedPurposeChange('')}
-          className={`flex-shrink-0 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-            !selectedPurpose
-              ? 'btn-primary text-white'
-              : 'tag-bubble'
-          }`}
+          className={`flex-shrink-0 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${!selectedPurpose
+            ? 'btn-primary text-white'
+            : 'tag-bubble'
+            }`}
         >
           全部
         </button>
@@ -259,11 +323,10 @@ export default function SearchPanel({
             <button
               key={purpose}
               onClick={() => onSelectedPurposeChange(purpose)}
-              className={`flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${
-                selectedPurpose === purpose
-                  ? 'btn-primary text-white'
-                  : 'tag-bubble'
-              }`}
+              className={`flex-shrink-0 flex items-center gap-1 px-3 py-2 rounded-xl text-sm font-medium whitespace-nowrap transition-all duration-200 ${selectedPurpose === purpose
+                ? 'btn-primary text-white'
+                : 'tag-bubble'
+                }`}
             >
               <Icon size={13} />
               {purpose}
@@ -389,157 +452,156 @@ export default function SearchPanel({
 
             return (
 
-            <div key={`${i}-${cond.column}`} className="space-y-1">
-              <div className="grid grid-cols-[130px_auto_1fr_auto] items-center gap-x-2 gap-y-1">
-                <div className="relative">
-                  <button onClick={() => setShowFieldDrop(showFieldDrop === i ? null : i)}
-                    className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm"
-                    style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
-                    <span>{labelMap[cond.column] || colInfo?.label || (cond.column || '选择字段')}</span>
-                    <ChevronDown size={13} style={{ color: 'var(--color-text-secondary)' }} />
-                  </button>
-                  {showFieldDrop === i && (
-                    <div className="absolute top-full left-0 right-0 mt-1 z-50 py-2 max-h-64 overflow-y-auto rounded-lg"
-                      style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', boxShadow: '0 8px 24px rgba(var(--color-text-dark-rgb), 0.12)' }}>
-                      {CATEGORIES.map(cat => (
-                        <div key={cat.key}>
-                          <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{cat.label}</div>
-                          {columns.filter(c => c.category === cat.key && c.key !== 'contact').map(col => (
-                            <button key={col.key}
-                              className="block w-full text-left px-3 py-1.5 text-sm hover:bg-orange-50 transition-colors"
-                              style={{ color: 'var(--color-text-primary)' }}
-                              onClick={() => { 
-                                onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c)); 
-                                setShowFieldDrop(null);
-                                setShowValueDrop(col.options && col.options.length > 0 ? i : null);
-                              }}>
-
-                              {labelMap[col.key] || col.label}
-                            </button>
-                          ))}
-                        </div>
-                      ))}
-                      {columns.filter((c: Column) => c.category === 'custom').length > 0 && (
-                        <div>
-                          <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-success)' }}>自定义字段</div>
-                          {columns.filter((c: Column) => c.category === 'custom').map((col: Column) => (
-                            <button key={col.key}
-                              className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50 transition-colors"
-                              style={{ color: 'var(--color-text-primary)' }}
-                              onClick={() => { 
-                                onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c)); 
-                                setShowFieldDrop(null);
-                                setShowValueDrop(col.options && col.options.length > 0 ? i : null);
-                              }}>
-                              {col.label}
-                            </button>
-                          ))}
-                        </div>
-                      )}
-                      {(() => {
-                        // 只显示在 field_mappings 中有定义、但不在前端固定列中的字段
-                        const fixedKeys = new Set(['purpose','name','gender','age','height','weight','city','skinTone','faceType','eyeType','mouthType','bodyType','zodiac','bloodType','marriage','children','education','job','income','house','car','personality','smoke','drink','religion','pet','hobbies','food','sport','music','interestTags','expectation','contact']);
-                        const customCols = columns.filter(c => !fixedKeys.has(c.key));
-                        return customCols.length > 0 ? (
-                          <div>
-                            <div className="px-3 py-1 text-xs font-medium" style={{ color: '#5BA4B5' }}>用户自定义标签</div>
-                            {customCols.map(col => (
+              <div key={`${i}-${cond.column}`} className="space-y-1">
+                <div className="grid grid-cols-[130px_auto_1fr_auto] items-center gap-x-2 gap-y-1">
+                  <div className="relative">
+                    <button onClick={() => setShowFieldDrop(showFieldDrop === i ? null : i)}
+                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm"
+                      style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}>
+                      <span>{labelMap[cond.column] || colInfo?.label || (cond.column || '选择字段')}</span>
+                      <ChevronDown size={13} style={{ color: 'var(--color-text-secondary)' }} />
+                    </button>
+                    {showFieldDrop === i && (
+                      <div className="absolute top-full left-0 right-0 mt-1 z-50 py-2 max-h-64 overflow-y-auto rounded-lg"
+                        style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)', boxShadow: '0 8px 24px rgba(var(--color-text-dark-rgb), 0.12)' }}>
+                        {CATEGORIES.map(cat => (
+                          <div key={cat.key}>
+                            <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{cat.label}</div>
+                            {columns.filter(c => c.category === cat.key && c.key !== 'contact').map(col => (
                               <button key={col.key}
-                                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-orange-50 transition-colors"
                                 style={{ color: 'var(--color-text-primary)' }}
                                 onClick={() => {
                                   onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c));
                                   setShowFieldDrop(null);
-                                  setShowValueDrop(col.options && col.options.length > 0 ? i : null);
+                                  setShowValueDrop(normalizeOptions(col.options).length > 0 ? i : null);
                                 }}>
-                                {col.label}
+
+                                {labelMap[col.key] || normalizeLabel(col.label) || col.key}
                               </button>
                             ))}
                           </div>
-                        ) : null;
-                      })()}
-                    </div>
-                  )}
-                </div>
-
-                <span className="text-sm" style={{ color: '#D4C8B8' }}>=</span>
-
-                <div className="relative">
-                  {cond.column && hasOptions ? (
-                    <button
-                      onClick={() => setShowValueDrop(showValueDrop === i ? null : i)}
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left"
-                      style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: cond.value ? 'var(--color-text-primary)' : 'var(--color-text-muted)', outline: 'none' }}>
-                      <span>{cond.value || `选择${labelMap[cond.column] || colInfo?.label || ''}`}</span>
-                      <ChevronDown size={13} style={{ color: 'var(--color-text-secondary)' }} />
-                    </button>
-                  ) : cond.column ? (
-                    <input
-                      className="w-full px-3 py-2 rounded-lg text-sm"
-                      style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
-                      placeholder={`输入${labelMap[cond.column] || colInfo?.label || '关键词'}`}
-                      value={cond.value}
-                      onFocus={e => (e.target.style.borderColor = '#F5B8A4')}
-                      onBlur={e => (e.target.style.borderColor = 'var(--color-border)')}
-                      onChange={e => updateCond(i, 'value', e.target.value)}
-                    />
-                  ) : (
-                    <button
-                      disabled
-                      className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left"
-                      style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', outline: 'none' }}>
-                      <span>输入关键词</span>
-                    </button>
-                  )}
-                </div>
-
-                <button onClick={() => removeCond(i)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: '#D4C8B8' }}>
-                  <X size={14} />
-                </button>
-
-                {showValueDrop === i && hasOptions && (
-                  <div className="col-span-4 grid grid-cols-subgrid">
-                  <div></div>
-                  <div></div>
-                  <div className="w-full py-2 px-2 rounded-lg"
-                    style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
-                    <div className="flex flex-wrap gap-1.5">
-                      {colInfo?.options?.map(opt => {
-                        const isSelected = isMultiple
-                          ? selectedValues.includes(opt)
-                          : cond.value === opt;
-                        return (
-                          <button
-                            key={opt}
-                            onClick={() => {
-                              if (isMultiple) {
-                                const newValues = isSelected
-                                  ? selectedValues.filter(v => v !== opt)
-                                  : [...selectedValues, opt];
-                                updateCond(i, 'value', newValues.join(','));
-                              } else {
-                                updateCond(i, 'value', opt);
-                                setShowValueDrop(null);
-                              }
-                            }}
-                            className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${
-                              isSelected
-                                ? 'bg-orange-500 text-white'
-                                : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
-                            }`}
-                          >
-                            {isSelected && <Check size={10} className="inline mr-1" />}
-                            {opt}
-                          </button>
-                        );
-                      })}
-                    </div>
+                        ))}
+                        {columns.filter((c: Column) => c.category === 'custom').length > 0 && (
+                          <div>
+                            <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-success)' }}>自定义字段</div>
+                            {columns.filter((c: Column) => c.category === 'custom').map((col: Column) => (
+                              <button key={col.key}
+                                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50 transition-colors"
+                                style={{ color: 'var(--color-text-primary)' }}
+                                onClick={() => {
+                                  onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c));
+                                  setShowFieldDrop(null);
+                                  setShowValueDrop(normalizeOptions(col.options).length > 0 ? i : null);
+                                }}>
+                                {normalizeLabel(col.label) || col.key}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {(() => {
+                          // 只显示在 field_mappings 中有定义、但不在前端固定列中的字段
+                          const fixedKeys = new Set(['purpose', 'name', 'gender', 'age', 'height', 'weight', 'city', 'skinTone', 'faceType', 'eyeType', 'mouthType', 'bodyType', 'zodiac', 'bloodType', 'marriage', 'children', 'education', 'job', 'income', 'house', 'car', 'personality', 'smoke', 'drink', 'religion', 'pet', 'hobbies', 'food', 'sport', 'music', 'interestTags', 'expectation', 'contact']);
+                          const customCols = columns.filter(c => !fixedKeys.has(c.key));
+                          return customCols.length > 0 ? (
+                            <div>
+                              <div className="px-3 py-1 text-xs font-medium" style={{ color: '#5BA4B5' }}>用户自定义标签</div>
+                              {customCols.map(col => (
+                                <button key={col.key}
+                                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                                  style={{ color: 'var(--color-text-primary)' }}
+                                  onClick={() => {
+                                    onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c));
+                                    setShowFieldDrop(null);
+                                    setShowValueDrop(normalizeOptions(col.options).length > 0 ? i : null);
+                                  }}>
+                                  {normalizeLabel(col.label) || col.key}
+                                </button>
+                              ))}
+                            </div>
+                          ) : null;
+                        })()}
+                      </div>
+                    )}
                   </div>
-                  <div></div>
+
+                  <span className="text-sm" style={{ color: '#D4C8B8' }}>=</span>
+
+                  <div className="relative">
+                    {cond.column && hasOptions ? (
+                      <button
+                        onClick={() => setShowValueDrop(showValueDrop === i ? null : i)}
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left"
+                        style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: cond.value ? 'var(--color-text-primary)' : 'var(--color-text-muted)', outline: 'none' }}>
+                        <span>{cond.value || `选择${labelMap[cond.column] || colInfo?.label || ''}`}</span>
+                        <ChevronDown size={13} style={{ color: 'var(--color-text-secondary)' }} />
+                      </button>
+                    ) : cond.column ? (
+                      <input
+                        className="w-full px-3 py-2 rounded-lg text-sm"
+                        style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
+                        placeholder={`输入${labelMap[cond.column] || colInfo?.label || '关键词'}`}
+                        value={cond.value}
+                        onFocus={e => (e.target.style.borderColor = '#F5B8A4')}
+                        onBlur={e => (e.target.style.borderColor = 'var(--color-border)')}
+                        onChange={e => updateCond(i, 'value', e.target.value)}
+                      />
+                    ) : (
+                      <button
+                        disabled
+                        className="w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm text-left"
+                        style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-muted)', outline: 'none' }}>
+                        <span>输入关键词</span>
+                      </button>
+                    )}
+                  </div>
+
+                  <button onClick={() => removeCond(i)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: '#D4C8B8' }}>
+                    <X size={14} />
+                  </button>
+
+                  {showValueDrop === i && hasOptions && (
+                    <div className="col-span-4 grid grid-cols-subgrid">
+                      <div></div>
+                      <div></div>
+                      <div className="w-full py-2 px-2 rounded-lg"
+                        style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border)' }}>
+                        <div className="flex flex-wrap gap-1.5">
+                          {colInfo?.options?.map(opt => {
+                            const isSelected = isMultiple
+                              ? selectedValues.includes(opt)
+                              : cond.value === opt;
+                            return (
+                              <button
+                                key={opt}
+                                onClick={() => {
+                                  if (isMultiple) {
+                                    const newValues = isSelected
+                                      ? selectedValues.filter(v => v !== opt)
+                                      : [...selectedValues, opt];
+                                    updateCond(i, 'value', newValues.join(','));
+                                  } else {
+                                    updateCond(i, 'value', opt);
+                                    setShowValueDrop(null);
+                                  }
+                                }}
+                                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${isSelected
+                                  ? 'bg-orange-500 text-white'
+                                  : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                  }`}
+                              >
+                                {isSelected && <Check size={10} className="inline mr-1" />}
+                                {opt}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                      <div></div>
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-            </div>
+              </div>
             );
           })}
 

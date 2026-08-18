@@ -3,7 +3,12 @@
  */
 
 /** 可被注入的 toast 函数，由 React 组件在初始化时设置 */
-export let toastFn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null = null;
+let toastFn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null = null;
+
+/** 注入 toast 函数（由 ToastProvider 在初始化时调用） */
+export function setToastFn(fn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null): void {
+  toastFn = fn;
+}
 
 /**
  * 显示友好的错误提示

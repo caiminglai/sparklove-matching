@@ -134,21 +134,16 @@ function normalizePath(pathname) {
   return pathname.replace(/^\/jzxr\//, '/');
 }
 
-// 从路径中提取ID，如 /api/users/abc123 -> abc123
-function extractId(pathname, prefix) {
-  const parts = pathname.split('/').filter(p => p);
-  const idx = parts.indexOf(prefix);
-  if (idx !== -1 && idx + 1 < parts.length) {
-    return parts[idx + 1];
-  }
-  return null;
-}
 
 // ========== 创建服务器 ==========
 const server = http.createServer(async (req, res) => {
   // ===== 中间件 =====
   applySecurity(req, res);
   requestLogger(req, res);
+
+  // 顶层 try/catch：防止 async handler 内同步抛错变成 unhandledRejection，
+  // 导致客户端挂起到超时（如 url.parse 在异常 URL 上返回 null 后续访问属性抛错）
+  try {
 
   // Cookie → Authorization 桥接（让所有路由自动支持 httpOnly cookie 认证）
   if (!req.headers.authorization) {
@@ -187,11 +182,13 @@ const server = http.createServer(async (req, res) => {
   // 头像图片
   if (req.method === 'GET' && pathname.startsWith('/avatars/')) {
     const fileName = pathname.replace('/avatars/', '');
-    // 防止路径穿越攻击
-    if (fileName.includes('..') || fileName.includes('\0') || fileName.includes('\\')) {
+    // 修复：原 fileName.includes('..') 会误伤合法文件名如 avatar..png
+    // 改用 path.resolve 规范化后校验是否仍在 avatars 目录内
+    const avatarsDir = path.resolve(__dirname, '..', 'uploads', 'avatars');
+    const filePath = path.resolve(avatarsDir, fileName);
+    if (!filePath.startsWith(avatarsDir + path.sep) || fileName.includes('\0')) {
       res.writeHead(400); res.end('Invalid path'); return;
     }
-    const filePath = path.join(__dirname, '..', 'uploads', 'avatars', fileName);
     const ext = path.extname(filePath).toLowerCase();
     const mimeTypes = { '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', '.gif': 'image/gif', '.webp': 'image/webp' };
     fs.readFile(filePath, (err, data) => {
@@ -480,6 +477,15 @@ const server = http.createServer(async (req, res) => {
   // 404
   res.writeHead(404, {'Content-Type': 'text/plain; charset=utf-8'});
   res.end('Not Found');
+
+  } catch (err) {
+    // 兜底错误处理：任何未捕获的同步异常或 await 抛错都到这里
+    console.error('[Server] uncaught error:', err);
+    if (!res.headersSent) {
+      res.writeHead(500, {'Content-Type': 'application/json; charset=utf-8'});
+      res.end(JSON.stringify({ success: false, message: '服务器内部错误' }));
+    }
+  }
 });
 
 const PORT = process.env.PORT || 8080;

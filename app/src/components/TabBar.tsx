@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router';
-import { Home, Users, Plus, User, Compass, Shield } from 'lucide-react';
+import { Home, Plus, User, Compass, Shield } from 'lucide-react';
 
 const tabs = [
   { path: '/', label: '首页', icon: Home },

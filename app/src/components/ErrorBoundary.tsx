@@ -22,7 +22,8 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
-    // errors are tracked via state; no console output in production
+    // 修复：原实现完全空，线上出错无任何线索。加 console.error 便于排查
+    console.error('[ErrorBoundary] 捕获到未处理错误:', error, errorInfo);
   }
 
   handleReload = () => {

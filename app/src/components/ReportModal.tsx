@@ -1,4 +1,5 @@
 import { X, Upload } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useToast } from './Toast';
 
 interface ReportModalProps {
@@ -16,6 +17,18 @@ const REPORT_TYPES = ['虚假信息', '骚扰他人', '不诚信行为', '其他
 
 export default function ReportModal({ onClose, reportType, setReportType, reportDescription, setReportDescription, onSubmit, proofImage, setProofImage }: ReportModalProps) {
   const { toast } = useToast();
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
+  // 创建/清理 blob URL，防止内存泄漏
+  useEffect(() => {
+    if (proofImage) {
+      const url = URL.createObjectURL(proofImage);
+      setPreviewUrl(url);
+      return () => URL.revokeObjectURL(url);
+    } else {
+      setPreviewUrl(null);
+    }
+  }, [proofImage]);
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
@@ -59,7 +72,7 @@ export default function ReportModal({ onClose, reportType, setReportType, report
             <label className="text-xs text-gray-500">凭证图片（可选）</label>
             {proofImage ? (
               <div className="flex items-center gap-2 flex-1">
-                <img src={URL.createObjectURL(proofImage)} alt="预览" className="w-8 h-8 rounded-lg object-cover border border-gray-200" />
+                <img src={previewUrl || ''} alt="预览" className="w-8 h-8 rounded-lg object-cover border border-gray-200" />
                 <span className="text-xs text-gray-600">已选择</span>
                 <button onClick={removeImage} className="p-1 rounded-lg" style={{ color: 'var(--color-primary)' }}>
                   <X size={14} />

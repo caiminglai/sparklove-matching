@@ -9,10 +9,8 @@ const smsService = require('../services/sms.service');
 const { generateAdminToken } = require('../db/index');
 const { setAuthCookie } = require('../utils/cookie工具');
 
-function sendJson(res, statusCode, obj) {
-  res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
-  res.end(JSON.stringify(obj));
-}
+// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
+const { sendJson } = require('../utils/sendJson');
 
 // ========== POST /api/auth/register
 function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp) {
@@ -33,7 +31,8 @@ function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp)
       sendJson(res, result.success ? 200 : 400, result);
     } catch (e) {
       console.error('[register error]', e.message || e);
-      if (e.message && e.message.includes('UNIQUE constraint failed')) {
+      // 兼容 PostgreSQL (duplicate key) 和 SQLite (UNIQUE constraint) 的唯一约束冲突错误
+      if (e.code === '23505' || (e.message && (e.message.includes('duplicate key') || e.message.includes('UNIQUE constraint failed')))) {
         sendJson(res, 400, { success: false, message: '该手机号已注册' });
       } else {
         sendJson(res, 500, { success: false, message: '注册失败' });

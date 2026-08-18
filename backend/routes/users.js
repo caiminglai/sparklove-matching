@@ -5,26 +5,14 @@
 // ============================================================
 
 const userService = require('../services/user.service');
-const { validateMagicBytes } = require('../utils/multipart');
+const { validateMagicBytes, collectBody } = require('../utils/multipart');
 const adminService = require('../services/admin.service');
 const { verifyToken } = require('../db/index');
 const { getAuthTokenFromCookie } = require('../utils/cookie工具');
+const { extractId } = require('../utils/extractId');
 
-// 统一的响应工具
-function sendJson(res, statusCode, obj) {
-  res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
-  res.end(JSON.stringify(obj));
-}
-
-// 从路径中提取 ID（如 /api/users/abc123）
-function extractUserId(pathname) {
-  const parts = pathname.split('/').filter(p => p);
-  const idx = parts.indexOf('users');
-  if (idx !== -1 && idx + 1 < parts.length) {
-    return parts[idx + 1];
-  }
-  return null;
-}
+// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
+const { sendJson } = require('../utils/sendJson');
 
 // 从请求头获取认证信息（优先 Authorization header，回退 httpOnly cookie）
 function getAuthInfo(req) {
@@ -207,7 +195,7 @@ function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
     return;
   }
 
-  const id = extractUserId(pathname);
+  const id = extractId(pathname, 'users');
   if (!id || !userService.validateIdFormat(id)) {
     sendJson(res, 400, { success: false, message: '无效的用户ID' });
     return;
@@ -222,7 +210,7 @@ function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
       sendJson(res, 400, { success: false, message: '无效的表单数据' });
       return;
     }
-    return readBodyWithLimit(req).then(body => {
+    return collectBody(req, 5 * 1024 * 1024).then(body => {
       try {
         const data = parseMultipart(body, boundary);
         const fields = {};
@@ -357,38 +345,8 @@ function searchUsers(req, res, parsedUrl) {
   sendJson(res, 200, { success: true, ...result });
 }
 
-// ========== multipart/form-data 解析工具（内部用）
-function parseMultipart(body, boundary) {
-  const result = { fields: {}, files: {} };
-  const boundaryBuffer = Buffer.from('--' + boundary);
-  const bodyBuffer = Buffer.isBuffer(body) ? body : Buffer.from(body);
-  const parts = [];
-  let start = 0;
-  while (true) {
-    const idx = bodyBuffer.indexOf(boundaryBuffer, start);
-    if (idx === -1) break;
-    if (start > 0) parts.push(bodyBuffer.slice(start, idx));
-    start = idx + boundaryBuffer.length;
-  }
-  for (const part of parts) {
-    const headerEnd = part.indexOf('\r\n\r\n');
-    if (headerEnd === -1) continue;
-    const header = part.slice(0, headerEnd).toString();
-    const content = part.slice(headerEnd + 4);
-    const data = content.slice(0, content.length - 2);
-    const nameMatch = header.match(/name="([^"]+)"/);
-    const filenameMatch = header.match(/filename="([^"]+)"/);
-    if (nameMatch) {
-      const name = nameMatch[1];
-      if (filenameMatch) {
-        result.files[name] = { filename: filenameMatch[1], data };
-      } else {
-        result.fields[name] = data.toString();
-      }
-    }
-  }
-  return result;
-}
+// 注：原 routes/users.js 内部 parseMultipart 实现已删除（死代码），
+// 所有 multipart 解析统一使用 utils/multipart.js 的 parseMultipart（Buffer 安全版）
 
 module.exports = {
   getUsers, addUser, batchSaveUsers, getMyUser, updateMyUser, deleteMyUser,

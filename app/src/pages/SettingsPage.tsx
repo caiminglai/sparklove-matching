@@ -3,6 +3,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowLeft, Lock, Eye, EyeOff, Shield, Info, ChevronRight, Moon, HelpCircle, MessageCircle } from 'lucide-react';
 import { API_BASE_URL } from '../api/config';
+import { getAuthToken } from '../utils/auth';
 
 export default function SettingsPage() {
   const navigate = useNavigate();
@@ -16,7 +17,7 @@ export default function SettingsPage() {
   const [message, setMessage] = useState('');
 
   const userId = localStorage.getItem('user_id');
-  const authToken = localStorage.getItem('auth_token');
+  const authToken = getAuthToken();
 
   const handleChangePassword = async () => {
     setMessage('');

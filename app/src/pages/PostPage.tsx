@@ -1,10 +1,11 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { loadColumns, loadRows, addRow } from '../services/user.service';
 import type { Row } from '../data/types';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import { useToast } from '../components/Toast';
+import { getAuthToken } from '../utils/auth';
 
 export default function PostPage() {
   const { toast } = useToast();
@@ -14,15 +15,8 @@ export default function PostPage() {
   const [selectedTags, setSelectedTags] = useState<Record<string, string[]>>({});
 
   const userId = localStorage.getItem('user_id');
-  const authToken = localStorage.getItem('auth_token');
-
-  useEffect(() => {
-    if (!userId || !authToken) {
-      toast('发布资料需要先登录', 'error');
-      navigate('/login');
-      return;
-    }
-  }, []);
+  const authToken = getAuthToken();
+  // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处不再重复
 
   const setVal = (key: string, val: string) => setData(p => ({ ...p, [key]: val }));
 
@@ -110,6 +104,16 @@ export default function PostPage() {
                 onChange={(e) => {
                   const file = e.target.files?.[0];
                   if (file) {
+                    if (!file.type.startsWith('image/')) {
+                      toast('请选择图片文件', 'error');
+                      e.target.value = '';
+                      return;
+                    }
+                    if (file.size > 3 * 1024 * 1024) {
+                      toast('图片不能超过 3MB', 'error');
+                      e.target.value = '';
+                      return;
+                    }
                     const reader = new FileReader();
                     reader.onload = (ev) => {
                       setVal('avatar', ev.target?.result as string);
@@ -175,7 +179,7 @@ export default function PostPage() {
                 <label className="text-xs mb-1.5 block" style={{ color: 'var(--color-text-muted)' }}>{col.label} {col.key === 'name' ? '*' : ''}</label>
                 <input className="w-full px-3 py-2.5 rounded-lg text-sm transition-all"
                   style={{ background: 'var(--color-bg-input)', border: '1px solid var(--color-border)', color: 'var(--color-text-primary)', outline: 'none' }}
-                  type={col.type === 'number' ? 'number' : 'text'}
+                  type="text"
                   placeholder={`输入${col.label}`}
                   value={String(data[col.key] || '')}
                   onFocus={e => (e.target.style.borderColor = '#F5B8A4')}

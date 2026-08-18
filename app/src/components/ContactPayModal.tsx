@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { ArrowLeft, Zap, Upload, CheckCircle } from 'lucide-react';
 import { API_BASE_URL, getBasePath } from '../api/config';
+import { getAuthToken } from '../utils/auth';
 
 interface ContactPayModalProps {
   targetUserId: string;
@@ -21,7 +22,7 @@ export default function ContactPayModal({ targetUserId, amount = DEFAULT_AMOUNT,
   const handleAutoPay = async () => {
     setStatus('正在创建支付订单...');
     try {
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       const res = await fetch(`${API_BASE_URL}/payments/view-contact`, {
         method: 'POST',
         headers: {
@@ -64,7 +65,7 @@ export default function ContactPayModal({ targetUserId, amount = DEFAULT_AMOUNT,
       formData.append('amount', String(amount));
       formData.append('method', method);
 
-      const token = localStorage.getItem('auth_token');
+      const token = getAuthToken();
       const res = await fetch(`${API_BASE_URL}/unlock-contact/submit`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},

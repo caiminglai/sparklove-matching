@@ -7,6 +7,7 @@
 import { API_BASE_URL, API_ENDPOINTS } from '../api/config';
 import type { Row, Column, FlatRow } from '../data/types';
 import { DEFAULT_COLUMNS } from '../data/constants';
+import { getAuthToken, getAuthHeaders } from '../utils/auth';
 
 const LS_ROWS = 'match_rows';
 const LS_COLUMNS = 'match_columns';
@@ -85,9 +86,7 @@ export function loadRows(): Row[] {
 export function saveRows(rows: Row[]) {
   localStorage.setItem(LS_ROWS, JSON.stringify(rows));
   try {
-    const authToken = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const headers = { 'Content-Type': 'application/json', ...getAuthHeaders() };
     fetch(`${API_BASE_URL}/users/batch`, {
       method: 'POST',
       headers,
@@ -99,9 +98,7 @@ export function saveRows(rows: Row[]) {
 
 export async function syncRowsFromServer(): Promise<Row[]> {
   try {
-    const authToken = localStorage.getItem('auth_token');
-    const headers: Record<string, string> = {};
-    if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+    const headers = getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}${API_ENDPOINTS.users}`, {
       headers,
       credentials: 'include',

@@ -6,20 +6,10 @@ const reportsService = require('../services/reports.service');
 const fs = require('fs');
 const path = require('path');
 const { parseMultipart, collectBody, validateMagicBytes, validateExtension } = require('../utils/multipart');
+const { extractId } = require('../utils/extractId');
 
-function sendJson(res, statusCode, obj) {
-  res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
-  res.end(JSON.stringify(obj));
-}
-
-function extractReportId(pathname) {
-  const parts = pathname.split('/').filter(p => p);
-  const idx = parts.indexOf('reports');
-  if (idx !== -1 && idx + 1 < parts.length) {
-    return parseInt(parts[idx + 1]);
-  }
-  return null;
-}
+// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
+const { sendJson } = require('../utils/sendJson');
 
 // ========== POST /api/reports（含 multipart 文件上传）
 function addReport(req, res, readBodyWithLimit) {
@@ -107,15 +97,15 @@ function updateReportStatus(req, res, checkAdminAuth, pathname) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
-  const reportId = extractReportId(pathname);
-  let body = '';
-  req.on('data', chunk => { body += chunk.toString(); });
-  req.on('end', () => {
+  const reportId = parseInt(extractId(pathname, 'reports'));
+  collectBody(req, 1024 * 1024).then(buf => {
     try {
-      const data = JSON.parse(body || '{}');
+      const data = JSON.parse(buf.toString() || '{}');
       const result = reportsService.updateStatus(reportId, data.status, data.adminNote);
       sendJson(res, 200, result);
     } catch (e) { sendJson(res, 500, { success: false, message: '更新失败' }); }
+  }).catch(e => {
+    sendJson(res, 413, { success: false, message: e.message || '请求体过大' });
   });
 }
 
@@ -125,7 +115,7 @@ function deleteReport(req, res, checkAdminAuth, pathname) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
-  const reportId = extractReportId(pathname);
+  const reportId = parseInt(extractId(pathname, 'reports'));
   const result = reportsService.removeReport(reportId);
   sendJson(res, 200, result);
 }
