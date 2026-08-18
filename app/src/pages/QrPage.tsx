@@ -193,7 +193,7 @@ export default function QrPage() {
       <div className="max-w-lg mx-auto px-4 pt-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
+          <Link to="/" className="p-2 rounded-lg hover-warm" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>分享到微信</h1>

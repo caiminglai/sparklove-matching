@@ -4,6 +4,7 @@ import { Heart, Users, Sparkles, Music, Utensils, Dumbbell, MapPin, ChevronRight
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import type { Row } from '../data/types';
 import { getAuthToken, getAuthHeaders } from '../utils/auth';
+import { hexToRgba } from '../utils/color';
 
 const CIRCLE_CONFIGS = [
   { key: 'hobbies', label: '兴趣圈', icon: Sparkles, color: '#E87A5D', desc: '因兴趣相聚' },
@@ -86,7 +87,7 @@ export default function CirclesPage() {
         <div className="text-center mb-6">
           <div className="inline-flex items-center gap-2.5 mb-3">
             <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-              style={{ background: `linear-gradient(135deg, ${activeConfig.color}, ${activeConfig.color}cc)`, boxShadow: `0 2px 8px ${activeConfig.color}40` }}>
+              style={{ background: `linear-gradient(135deg, ${activeConfig.color}, ${hexToRgba(activeConfig.color, 0.8)})`, boxShadow: `0 2px 8px ${hexToRgba(activeConfig.color, 0.25)}` }}>
               <ActiveIcon size={18} color="white" />
             </div>
             <h1 className="text-2xl font-semibold" style={{ color: 'var(--color-text-primary)', letterSpacing: '0.02em' }}>
@@ -114,10 +115,10 @@ export default function CirclesPage() {
                 onClick={() => { setActiveCircle(config.key); setSearchTag(''); }}
                 className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{
-                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : 'var(--color-bg-card)',
+                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${hexToRgba(config.color, 0.8)})` : 'var(--color-bg-card)',
                   color: isActive ? 'white' : 'var(--color-text-muted)',
                   border: isActive ? 'none' : '1px solid var(--color-border-light)',
-                  boxShadow: isActive ? `0 2px 8px ${config.color}30` : 'none',
+                  boxShadow: isActive ? `0 2px 8px ${hexToRgba(config.color, 0.2)}` : 'none',
                 }}
               >
                 <Icon size={14} />
@@ -141,7 +142,7 @@ export default function CirclesPage() {
 
         {/* Circle Description */}
         <div className="rounded-xl p-3 mb-4 flex items-center gap-2"
-          style={{ background: `${activeConfig.color}08`, border: `1px solid ${activeConfig.color}20` }}>
+          style={{ background: hexToRgba(activeConfig.color, 0.03), border: `1px solid ${hexToRgba(activeConfig.color, 0.12)}` }}>
           <ActiveIcon size={14} style={{ color: activeConfig.color }} />
           <span className="text-xs" style={{ color: activeConfig.color }}>{activeConfig.desc}</span>
           <span className="text-xs ml-auto" style={{ color: 'var(--color-text-secondary)' }}>点击圈子查看圈友</span>
@@ -165,20 +166,20 @@ export default function CirclesPage() {
                   border: '1px solid var(--color-border-light)',
                 }}
                 onClick={() => navigate(`/circle/${activeCircle}/${encodeURIComponent(group.tag)}`)}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = `${activeConfig.color}40`; e.currentTarget.style.boxShadow = `0 2px 12px ${activeConfig.color}10`; }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = hexToRgba(activeConfig.color, 0.25); e.currentTarget.style.boxShadow = `0 2px 12px ${hexToRgba(activeConfig.color, 0.06)}`; }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-light)'; e.currentTarget.style.boxShadow = 'none'; }}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="w-8 h-8 rounded-lg flex items-center justify-center text-sm font-semibold"
-                      style={{ background: `${activeConfig.color}12`, color: activeConfig.color, border: `1px solid ${activeConfig.color}25` }}>
+                      style={{ background: hexToRgba(activeConfig.color, 0.07), color: activeConfig.color, border: `1px solid ${hexToRgba(activeConfig.color, 0.15)}` }}>
                       {group.tag[0]}
                     </span>
                     <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>{group.tag}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-xs px-2 py-0.5 rounded-full"
-                      style={{ background: `${activeConfig.color}08`, color: activeConfig.color, border: `1px solid ${activeConfig.color}18` }}>
+                      style={{ background: hexToRgba(activeConfig.color, 0.03), color: activeConfig.color, border: `1px solid ${hexToRgba(activeConfig.color, 0.1)}` }}>
                       {group.count}人
                     </span>
                     <ChevronRight size={14} style={{ color: 'var(--color-text-muted)' }} />
@@ -189,7 +190,7 @@ export default function CirclesPage() {
                 <div className="flex items-center gap-1">
                   {group.users.slice(0, 8).map(user => (
                     <div key={user.id} className="w-6 h-6 rounded-full flex items-center justify-center text-xs overflow-hidden relative"
-                      style={{ background: `${activeConfig.color}08`, color: activeConfig.color, border: `1px solid ${activeConfig.color}18`, fontSize: '10px' }}>
+                      style={{ background: hexToRgba(activeConfig.color, 0.03), color: activeConfig.color, border: `1px solid ${hexToRgba(activeConfig.color, 0.1)}`, fontSize: '10px' }}>
                       {/* 总是显示名字首字母作为背景 */}
                       <span className="absolute inset-0 flex items-center justify-center">{String(user.data?.name || '?')[0]}</span>
                       
@@ -222,7 +223,7 @@ export default function CirclesPage() {
                   {searchTag ? '没有找到匹配的圈子' : '暂无圈子数据'}
                 </p>
                 <Link to="/post" className="inline-block mt-3 text-sm px-4 py-2 rounded-lg text-white"
-                  style={{ background: `linear-gradient(135deg, ${activeConfig.color}, ${activeConfig.color}cc)` }}>
+                  style={{ background: `linear-gradient(135deg, ${activeConfig.color}, ${hexToRgba(activeConfig.color, 0.8)})` }}>
                   发布资料加入圈子
                 </Link>
               </div>

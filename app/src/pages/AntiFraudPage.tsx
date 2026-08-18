@@ -131,7 +131,7 @@ export default function AntiFraudPage() {
     <div className="min-h-screen" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6 pb-8">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
+          <Link to="/" className="p-2 rounded-lg hover-warm" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
           <Shield size={16} style={{ color: 'var(--color-success)' }} />

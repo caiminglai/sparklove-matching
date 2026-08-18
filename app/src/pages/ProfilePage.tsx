@@ -298,7 +298,7 @@ export default function ProfilePage() {
     <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
+          <Link to="/" className="p-2 rounded-lg hover-warm" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>个人中心</h1>
@@ -488,7 +488,7 @@ export default function ProfilePage() {
                               }
                             }}
                           />
-                          <button onClick={() => deleteCustomField(cf.field_key)} className="p-1 rounded" style={{ color: '#D4856A' }}>
+                          <button onClick={() => deleteCustomField(cf.field_key)} className="p-1 rounded" style={{ color: 'var(--color-primary-dark)' }}>
                             <XIcon size={12} />
                           </button>
                         </div>
@@ -582,9 +582,9 @@ export default function ProfilePage() {
           <button onClick={handleLogout} className="w-full flex items-center justify-between p-4 rounded-xl" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(212,133,106,0.08)' }}>
-                <LogOut size={14} style={{ color: '#D4856A' }} />
+                <LogOut size={14} style={{ color: 'var(--color-primary-dark)' }} />
               </div>
-              <span className="text-sm" style={{ color: '#D4856A' }}>退出登录</span>
+              <span className="text-sm" style={{ color: 'var(--color-primary-dark)' }}>退出登录</span>
             </div>
           </button>
 

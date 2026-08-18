@@ -90,7 +90,7 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-md mx-auto w-full px-4 pt-6">
         <div className="flex items-center gap-3 mb-8">
-          <Link to="/" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
+          <Link to="/" className="p-2 rounded-lg hover-warm" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
         </div>

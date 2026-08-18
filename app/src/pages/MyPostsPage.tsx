@@ -92,7 +92,7 @@ export default function MyPostsPage() {
     <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/profile" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
+          <Link to="/profile" className="p-2 rounded-lg hover-warm" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>我的发布</h1>
@@ -141,7 +141,7 @@ export default function MyPostsPage() {
                     </div>
                     <button
                       onClick={() => setShowDelModal(row.id)}
-                      className="p-2 rounded-lg hover:bg-red-50 transition-colors"
+                      className="p-2 rounded-lg hover-warm transition-colors"
                       style={{ color: 'var(--color-text-muted)' }}
                       title="删除"
                     >

@@ -349,7 +349,7 @@ export default function SearchPanel({
             <h2 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>筛选条件</h2>
           </div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(167,139,250,0.08)', color: '#A78BFA', border: '1px solid rgba(167,139,250,0.2)' }}>
+            <span className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-lg" style={{ background: 'rgba(var(--color-accent-purple-rgb), 0.08)', color: 'var(--color-accent-purple)', border: '1px solid rgba(var(--color-accent-purple-rgb), 0.2)' }}>
               <Sparkles size={11} /> 向量搜索
             </span>
             <button onClick={addCond} className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg" style={{ color: 'var(--color-primary)', border: '1px solid var(--color-bg-warm)' }}>
@@ -469,7 +469,7 @@ export default function SearchPanel({
                             <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-text-secondary)' }}>{cat.label}</div>
                             {columns.filter(c => c.category === cat.key && c.key !== 'contact').map(col => (
                               <button key={col.key}
-                                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-orange-50 transition-colors"
+                                className="block w-full text-left px-3 py-1.5 text-sm hover-warm transition-colors"
                                 style={{ color: 'var(--color-text-primary)' }}
                                 onClick={() => {
                                   onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c));
@@ -487,7 +487,7 @@ export default function SearchPanel({
                             <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-success)' }}>自定义字段</div>
                             {columns.filter((c: Column) => c.category === 'custom').map((col: Column) => (
                               <button key={col.key}
-                                className="block w-full text-left px-3 py-1.5 text-sm hover:bg-green-50 transition-colors"
+                                className="block w-full text-left px-3 py-1.5 text-sm hover-warm transition-colors"
                                 style={{ color: 'var(--color-text-primary)' }}
                                 onClick={() => {
                                   onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c));
@@ -505,10 +505,10 @@ export default function SearchPanel({
                           const customCols = columns.filter(c => !fixedKeys.has(c.key));
                           return customCols.length > 0 ? (
                             <div>
-                              <div className="px-3 py-1 text-xs font-medium" style={{ color: '#5BA4B5' }}>用户自定义标签</div>
+                              <div className="px-3 py-1 text-xs font-medium" style={{ color: 'var(--color-accent-teal)' }}>用户自定义标签</div>
                               {customCols.map(col => (
                                 <button key={col.key}
-                                  className="block w-full text-left px-3 py-1.5 text-sm hover:bg-blue-50 transition-colors"
+                                  className="block w-full text-left px-3 py-1.5 text-sm hover-warm transition-colors"
                                   style={{ color: 'var(--color-text-primary)' }}
                                   onClick={() => {
                                     onConditionsChange(conditions.map((c, idx) => idx === i ? { ...c, column: col.key, value: '' } : c));
@@ -556,7 +556,7 @@ export default function SearchPanel({
                     )}
                   </div>
 
-                  <button onClick={() => removeCond(i)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: 'var(--color-text-muted)' }}>
+                  <button onClick={() => removeCond(i)} className="p-1.5 rounded-md hover-warm" style={{ color: 'var(--color-text-muted)' }}>
                     <X size={14} />
                   </button>
 
@@ -586,9 +586,10 @@ export default function SearchPanel({
                                   }
                                 }}
                                 className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all ${isSelected
-                                  ? 'bg-orange-500 text-white'
-                                  : 'bg-orange-50 text-orange-700 hover:bg-orange-100'
+                                  ? 'btn-primary text-white'
+                                  : 'hover-warm'
                                   }`}
+                                style={!isSelected ? { color: 'var(--color-text-primary)' } : {}}
                               >
                                 {isSelected && <Check size={10} className="inline mr-1" />}
                                 {opt}

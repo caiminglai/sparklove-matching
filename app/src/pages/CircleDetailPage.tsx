@@ -5,6 +5,7 @@ import { API_BASE_URL, normalizeAvatarUrl, getBasePath } from '../api/config';
 import type { Row } from '../data/types';
 import ImagePreview from '../components/ImagePreview';
 import { maskContact } from '../utils/mask';
+import { hexToRgba } from '../utils/color';
 import { useToast } from '../components/Toast';
 import { getAuthToken, getAuthHeaders } from '../utils/auth';
 
@@ -63,11 +64,11 @@ export default function CircleDetailPage() {
       <div className="max-w-3xl mx-auto px-4 pt-6">
         {/* Header */}
         <div className="flex items-center gap-3 mb-6">
-          <button onClick={() => navigate('/circles')} className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
+          <button onClick={() => navigate('/circles')} className="p-2 rounded-lg hover-warm" style={{ color: 'var(--color-text-secondary)' }}>
             <ChevronLeft size={20} />
           </button>
           <div className="w-9 h-9 rounded-xl flex items-center justify-center"
-            style={{ background: `linear-gradient(135deg, ${config.color}, ${config.color}cc)`, boxShadow: `0 2px 8px ${config.color}40` }}>
+            style={{ background: `linear-gradient(135deg, ${config.color}, ${hexToRgba(config.color, 0.8)})`, boxShadow: `0 2px 8px ${hexToRgba(config.color, 0.25)}` }}>
             <Icon size={18} color="white" />
           </div>
           <div>
@@ -78,7 +79,7 @@ export default function CircleDetailPage() {
 
         {/* Banner */}
         <div className="rounded-2xl p-5 mb-5"
-          style={{ background: `linear-gradient(135deg, ${config.color}10, ${config.color}05)`, border: `1px solid ${config.color}20` }}>
+          style={{ background: `linear-gradient(135deg, ${hexToRgba(config.color, 0.06)}, ${hexToRgba(config.color, 0.02)})`, border: `1px solid ${hexToRgba(config.color, 0.12)}` }}>
           <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
             <span style={{ color: config.color, fontWeight: 600 }}>{decodedTag}</span> 圈的圈友们
           </p>
@@ -102,12 +103,12 @@ export default function CircleDetailPage() {
                 className="rounded-xl p-4 cursor-pointer transition-all"
                 style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}
                 onClick={() => setShowDetail(user.id)}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = `${config.color}40`; }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = hexToRgba(config.color, 0.25); }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--color-border-light)'; }}
               >
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-semibold flex-shrink-0 overflow-hidden cursor-pointer relative"
-                    style={{ background: `${config.color}10`, color: config.color, border: `1px solid ${config.color}25` }}
+                    style={{ background: hexToRgba(config.color, 0.06), color: config.color, border: `1px solid ${hexToRgba(config.color, 0.15)}` }}
                     onClick={e => {
                       e.stopPropagation();
                       if (user.data?.avatar) setPreviewImage(normalizeAvatarUrl(user.data.avatar) || '');
@@ -139,7 +140,7 @@ export default function CircleDetailPage() {
                       {user.data?.city && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{user.data.city}</span>}
                       {user.data?.purpose && (
                         <span className="text-xs px-2 py-0.5 rounded-full"
-                          style={{ background: `${config.color}08`, color: config.color, border: `1px solid ${config.color}18` }}>
+                          style={{ background: hexToRgba(config.color, 0.03), color: config.color, border: `1px solid ${hexToRgba(config.color, 0.1)}` }}>
                           {user.data.purpose}
                         </span>
                       )}
@@ -166,7 +167,7 @@ export default function CircleDetailPage() {
                 <Users size={28} style={{ color: 'var(--color-border-light)', margin: '0 auto' }} />
                 <p className="mt-2 text-sm" style={{ color: 'var(--color-text-muted)' }}>这个圈子还没有人</p>
                 <Link to="/post" className="inline-block mt-3 text-sm px-4 py-2 rounded-lg text-white"
-                  style={{ background: `linear-gradient(135deg, ${config.color}, ${config.color}cc)` }}>
+                  style={{ background: `linear-gradient(135deg, ${config.color}, ${hexToRgba(config.color, 0.8)})` }}>
                   成为第一个圈友
                 </Link>
               </div>
@@ -183,13 +184,13 @@ export default function CircleDetailPage() {
             onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-base font-medium" style={{ color: 'var(--color-text-primary)' }}>详细资料</h3>
-              <button onClick={() => setShowDetail(null)} className="p-1.5 rounded-md hover:bg-orange-50" style={{ color: 'var(--color-text-muted)' }}>✕</button>
+              <button onClick={() => setShowDetail(null)} className="p-1.5 rounded-md hover-warm" style={{ color: 'var(--color-text-muted)' }}>✕</button>
             </div>
 
             <div className="space-y-4">
               <div className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold overflow-hidden cursor-pointer relative"
-                  style={{ background: `${config.color}10`, color: config.color, border: `1px solid ${config.color}25` }}
+                  style={{ background: hexToRgba(config.color, 0.06), color: config.color, border: `1px solid ${hexToRgba(config.color, 0.15)}` }}
                   onClick={() => {
                     if (detailData.avatar) setPreviewImage(normalizeAvatarUrl(detailData.avatar) || '');
                   }}>
@@ -220,7 +221,7 @@ export default function CircleDetailPage() {
                     {detailData.city && <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>{detailData.city}</span>}
                     {detailData.purpose && (
                       <span className="text-xs px-2 py-0.5 rounded-full"
-                        style={{ background: `${config.color}08`, color: config.color, border: `1px solid ${config.color}18` }}>
+                        style={{ background: hexToRgba(config.color, 0.03), color: config.color, border: `1px solid ${hexToRgba(config.color, 0.1)}` }}>
                           {detailData.purpose}
                         </span>
                       )}
@@ -241,7 +242,7 @@ export default function CircleDetailPage() {
               </div>
 
               {/* Circles this person belongs to */}
-              <div className="mt-4 p-3 rounded-xl" style={{ background: `${config.color}06`, border: `1px solid ${config.color}15` }}>
+              <div className="mt-4 p-3 rounded-xl" style={{ background: hexToRgba(config.color, 0.02), border: `1px solid ${hexToRgba(config.color, 0.08)}` }}>
                 <div className="text-xs font-medium mb-2" style={{ color: config.color }}>TA的圈子</div>
                 <div className="flex flex-wrap gap-1.5">
                   {Object.entries(CIRCLE_CONFIGS).map(([key, cfg]) => {

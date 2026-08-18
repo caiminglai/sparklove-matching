@@ -32,11 +32,11 @@
   --color-bg-main: #FAF6F1;
   --color-bg-card: #FFFDF9;
   --color-bg-input: #F5EDE3;
-  /* 文字色 */
+  /* 文字色（对比度均满足 WCAG AA ≥ 4.5:1，层次：primary > muted > secondary > light） */
   --color-text-primary: #3D2E20;
-  --color-text-secondary: #B5A698;
+  --color-text-secondary: #8B7B6B;
   --color-text-muted: #8B7B6B;
-  --color-text-light: #9B8B7B;
+  --color-text-light: #8B7B6B;
   --color-text-dark-rgb: 61, 46, 32;
   /* 边框色 */
   --color-border: #E8DED0;
@@ -56,6 +56,10 @@
   --color-wechat-dark: #06AD56;
   /* 评分星色 */
   --color-star: #F5A623;
+  /* 分类强调色（SearchPanel 自定义标签等） */
+  --color-accent-purple: #A78BFA;
+  --color-accent-purple-rgb: 167, 139, 250;
+  --color-accent-teal: #5BA4B5;
   /* 其他 */
   --color-bg-warm: #F5D0C4;
   --color-bg-pink: #F0D0D4;
@@ -102,6 +106,13 @@
   .btn-primary:hover {
     box-shadow: 0 6px 24px rgba(var(--color-primary-rgb), 0.4);
     transform: translateY(-1px);
+  }
+  /* 暖色 hover 背景（替代 Tailwind bg-orange-50，与项目主题色统一） */
+  .hover-warm {
+    transition: background-color 0.2s;
+  }
+  .hover-warm:hover {
+    background-color: rgba(var(--color-primary-rgb), 0.06);
   }
   .btn-primary:active {
     transform: translateY(0);

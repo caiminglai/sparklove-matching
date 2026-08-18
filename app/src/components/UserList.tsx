@@ -148,13 +148,13 @@ const UserListItem = React.memo(function UserListItem({
           <div className="flex items-center gap-1">
             <button
               onClick={(e) => { e.stopPropagation(); onToggleFavorite(row.id); }}
-              className={`p-2 rounded-xl transition-colors ${isFavorite ? 'bg-red-50/50' : 'hover:bg-red-50/50'}`}
+              className={`p-2 rounded-xl transition-colors hover-warm`}
               style={{ color: isFavorite ? 'var(--color-primary)' : 'var(--color-text-muted)' }}
               title={isFavorite ? '取消收藏' : '收藏'}>
               <Heart size={14} fill={isFavorite ? 'currentColor' : 'none'} />
             </button>
             <button onClick={(e) => { e.stopPropagation(); onDelete(row.id); }}
-              className="p-2 rounded-xl hover:bg-red-50/50 transition-colors" style={{ color: 'var(--color-text-muted)' }} title="删除">
+              className="p-2 rounded-xl hover-warm transition-colors" style={{ color: 'var(--color-text-muted)' }} title="删除">
               <Trash2 size={14} />
             </button>
           </div>

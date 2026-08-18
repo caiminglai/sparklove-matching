@@ -52,7 +52,7 @@ export default function UserDetailModal({
         <div className="sticky top-0 z-10 px-5 py-4" style={{ background: 'rgba(255,253,249,0.9)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderBottom: '1px solid rgba(var(--color-border-warm-rgb), 0.4)' }}>
           <div className="flex items-center justify-between">
             <h3 className="text-base font-semibold" style={{ color: 'var(--color-text-primary)' }}>详细资料</h3>
-            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover:bg-orange-50/50 transition-colors" style={{ color: 'var(--color-text-secondary)', background: 'rgba(var(--color-border-warm-rgb), 0.2)' }}>
+            <button onClick={onClose} className="w-8 h-8 rounded-full flex items-center justify-center hover-warm transition-colors" style={{ color: 'var(--color-text-secondary)', background: 'rgba(var(--color-border-warm-rgb), 0.2)' }}>
               <X size={16} />
             </button>
           </div>

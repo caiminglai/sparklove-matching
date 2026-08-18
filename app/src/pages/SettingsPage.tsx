@@ -148,7 +148,7 @@ export default function SettingsPage() {
     <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6">
         <div className="flex items-center gap-3 mb-6">
-          <Link to="/profile" className="p-2 rounded-lg hover:bg-orange-50" style={{ color: 'var(--color-text-secondary)' }}>
+          <Link to="/profile" className="p-2 rounded-lg hover-warm" style={{ color: 'var(--color-text-secondary)' }}>
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>设置</h1>
@@ -189,7 +189,7 @@ export default function SettingsPage() {
                     <button
                       key={item.label}
                       onClick={item.action}
-                      className="w-full flex items-center gap-3 p-4 text-left transition-colors hover:bg-orange-50/30"
+                      className="w-full flex items-center gap-3 p-4 text-left transition-colors hover-warm"
                       style={idx < group.items.length - 1 ? { borderBottom: '1px solid var(--color-border-light)' } : {}}
                     >
                       {content}
