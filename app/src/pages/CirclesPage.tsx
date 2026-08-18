@@ -114,9 +114,9 @@ export default function CirclesPage() {
                 onClick={() => { setActiveCircle(config.key); setSearchTag(''); }}
                 className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-medium transition-all"
                 style={{
-                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : 'var(--color-bg-card)',
-                  color: isActive ? 'white' : 'var(--color-text-primary)',
-                  border: isActive ? 'none' : '1px solid var(--color-border-light)',
+                  background: isActive ? `linear-gradient(135deg, ${config.color}, ${config.color}cc)` : `${config.color}15`,
+                  color: isActive ? 'white' : config.color,
+                  border: isActive ? 'none' : `1px solid ${config.color}30`,
                   boxShadow: isActive ? `0 2px 8px ${config.color}30` : 'none',
                 }}
               >
