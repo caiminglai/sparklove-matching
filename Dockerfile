@@ -2,7 +2,7 @@ FROM node:24-slim
 
 WORKDIR /app
 COPY backend/package*.json ./
-RUN npm install --registry=https://registry.npmmirror.com
+RUN npm ci --omit=dev --registry=https://registry.npmmirror.com
 COPY backend/ ./
 
 ENV NODE_ENV=production
