@@ -4,9 +4,14 @@ const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 10;
 
+// 生产环境必须显式设置 PG_PASSWORD，dev 兜底仅用于本地
+const _isProd = process.env.NODE_ENV === 'production';
+if (_isProd && !process.env.PG_PASSWORD) {
+  throw new Error('生产环境必须设置 PG_PASSWORD 环境变量');
+}
 const pgConfig = {
   user: process.env.PG_USER || 'postgres',
-  password: process.env.PG_PASSWORD || 'your_admin_password',
+  password: process.env.PG_PASSWORD || 'dev-pg-password-do-not-use-in-prod',
   host: process.env.PG_HOST || 'localhost',
   port: parseInt(process.env.PG_PORT) || 5432,
   database: process.env.PG_DATABASE || 'match_db'
@@ -125,7 +130,6 @@ function closeDb() {
   }
 }
 
-const _isProd = process.env.NODE_ENV === 'production';
 // 修复：dev 模式密钥固定，避免每次重启导致旧 token 失效、旧加密联系方式无法解密
 const DEV_TOKEN_SECRET_FALLBACK = 'dev-fixed-token-secret-do-not-use-in-prod-001';
 const DEV_ENCRYPTION_KEY_FALLBACK = 'a'.repeat(64); // 64 个十六进制字符 = 32 字节密钥

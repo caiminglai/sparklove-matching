@@ -71,28 +71,6 @@ function authenticateUser(token) {
   return userId; // 返回 auth_users 的 id
 }
 
-function registerUser(phone, password, nickname) {
-  if (!phone || !password) {
-    return { success: false, message: '缺少手机号或密码' };
-  }
-  const userId = authDb.createAuthUser(phone, password, nickname);
-  const token = generateToken(userId);
-  return {
-    success: true,
-    token,
-    user: { id: userId, phone, nickname }
-  };
-}
-
-function loginUser(phone, password) {
-  const user = authDb.verifyAuthUser(phone, password);
-  if (!user) {
-    return { success: false, message: '手机号或密码错误' };
-  }
-  const token = generateToken(user.id);
-  return { success: true, token, user };
-}
-
 // ========== 用户列表（带分页和脱敏） ==========
 
 function getUserList(page = 1, limit = 20, isAdmin = false) {
@@ -109,12 +87,6 @@ function getPendingUsers() {
 }
 
 // ========== 用户详情（按权限返回不同内容） ==========
-
-function getUserDetail(id, isAdmin = false) {
-  const user = userDb.getUserById(id);
-  if (!user) return null;
-  return isAdmin ? user : maskUserData(user);
-}
 
 function getMyUser(userId) {
   if (!userId) return null;
@@ -247,38 +219,11 @@ function getAdminLogs(limit = 50) {
   return adminDb.getAdminLogs(limit);
 }
 
-function getAllCustomFilters() {
-  const fields = adminDb.getAllCustomFilters();
-  return fields.map(f => ({
-    ...f,
-    options: f.field_options ? f.field_options.split(',').filter(o => o.trim()) : []
-  }));
-}
-
-function addCustomFilter(fieldKey, fieldLabel, fieldType, description, fieldOptions) {
-  if (!fieldKey || !fieldLabel) {
-    return { success: false, message: '字段名和显示名必填' };
-  }
-  let opts = '';
-  if (Array.isArray(fieldOptions)) opts = fieldOptions.join(',');
-  else if (typeof fieldOptions === 'string') opts = fieldOptions;
-  const field = adminDb.addCustomFilter(fieldKey.trim(), fieldLabel.trim(), fieldType || 'text', description || '', opts);
-  return { success: true, data: field };
-}
-
-function removeCustomFilter(id) {
-  const deleted = adminDb.deleteCustomFilter(id);
-  return { success: deleted, message: deleted ? '删除成功' : '未找到' };
-}
-
 module.exports = {
   // 认证
   authenticateUser,
-  registerUser,
-  loginUser,
   // 查询
   getUserList,
-  getUserDetail,
   getMyUser,
   getUserStats,
   getPendingUsers,
@@ -295,13 +240,8 @@ module.exports = {
   rejectUser,
   // 管理
   getAdminLogs,
-  getAllCustomFilters,
-  addCustomFilter,
-  removeCustomFilter,
   // 工具
   maskContact,
-  maskUserData,
-  maskUsers,
   sanitizeString,
   validateIdFormat
 };

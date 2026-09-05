@@ -9,8 +9,8 @@ import { hexToRgba } from '../utils/color';
 import { useToast } from '../components/Toast';
 import { getAuthToken, getAuthHeaders } from '../utils/auth';
 
-// 客服微信号配置（原硬编码在 JSX 中，现抽到顶部便于统一管理）
-const CUSTOMER_SERVICE_WECHAT = 'chanmiao0430';
+// 客服微信号配置（从环境变量读取，避免硬编码在前端代码）
+const CUSTOMER_SERVICE_WECHAT = import.meta.env.VITE_CUSTOMER_SERVICE_WECHAT || 'chanmiao0430';
 
 const CIRCLE_CONFIGS: Record<string, { label: string; icon: typeof Heart; color: string }> = {
   hobbies: { label: '兴趣圈', icon: Sparkles, color: 'var(--color-primary)' },

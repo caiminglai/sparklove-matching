@@ -8,6 +8,7 @@ const dbIndex = require('../db/index.js');
 const paymentsDb = require('../db/payments.js');
 const adminDb = require('../db/admin.js');
 const { parseMultipart, collectBody, validateMagicBytes, validateExtension } = require('../utils/multipart');
+const { MAX_BODY_SIZE } = require('../utils/config');
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
@@ -29,7 +30,7 @@ function submitUnlockRequest(req, res) {
     sendJson(res, 400, { success: false, message: '无效的上传格式' }); return;
   }
 
-  const MAX_SIZE = 5 * 1024 * 1024;
+  const MAX_SIZE = MAX_BODY_SIZE;
   collectBody(req, MAX_SIZE).then(body => {
     try {
       const parsed = parseMultipart(body, boundary);

@@ -5,7 +5,12 @@
 
 const crypto = require('crypto');
 
-const CAPTCHA_SECRET = process.env.CAPTCHA_SECRET || 'captcha-secret-' + Date.now();
+// 生产环境必须显式设置 CAPTCHA_SECRET，dev 兜底固定避免重启轮换
+const _isProd = process.env.NODE_ENV === 'production';
+if (_isProd && !process.env.CAPTCHA_SECRET) {
+  throw new Error('生产环境必须设置 CAPTCHA_SECRET 环境变量');
+}
+const CAPTCHA_SECRET = process.env.CAPTCHA_SECRET || 'dev-fixed-captcha-secret-do-not-use-in-prod-001';
 const CAPTCHA_TTL_MS = 5 * 60 * 1000; // 5 分钟有效
 const TOLERANCE_PX = 8; // 允许误差 8 像素
 

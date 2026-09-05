@@ -1,9 +1,7 @@
 const vectorService = require('../services/vector.service');
 const dbIndex = require('../db/index.js');
 const { collectBody } = require('../utils/multipart');
-
-// 批量接口请求体上限（10MB，向量批量任务较大）
-const MAX_VECTOR_BODY = 10 * 1024 * 1024;
+const { MAX_VECTOR_BODY } = require('../utils/config');
 
 /**
  * 验证用户身份，返回 userId 或 null

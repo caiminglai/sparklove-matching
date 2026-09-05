@@ -43,17 +43,3 @@ export function handleApiError(error: unknown, fallbackMessage: string = '操作
   }
 }
 
-/**
- * 安全的异步操作包装器
- */
-export async function safeAsync<T>(
-  asyncFn: () => Promise<T>,
-  errorMessage: string = '操作失败'
-): Promise<T | null> {
-  try {
-    return await asyncFn();
-  } catch (error) {
-    handleApiError(error, errorMessage);
-    return null;
-  }
-}

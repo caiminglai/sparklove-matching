@@ -288,4 +288,4 @@ function queryPaymentStatus(req, res, parsedUrl) {
   res.end(JSON.stringify({ success: true, status: order.status }));
 }
 
-module.exports = { initConfig, isPaymentConfigured, createPayment, mockPay, wechatNotify, alipayNotify, queryPaymentStatus };
+module.exports = { initConfig, createPayment, mockPay, wechatNotify, alipayNotify, queryPaymentStatus };

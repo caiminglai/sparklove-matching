@@ -75,13 +75,7 @@ function verifyRegisterCode(phone, code) {
   return { success: true, message: '验证码校验通过' };
 }
 
-// 注册完成后清理该手机号验证码
-function clearRegisterCode(phone) {
-  smsCodeStore.delete(`register:${phone}`);
-}
-
 module.exports = {
   sendRegisterCode,
   verifyRegisterCode,
-  clearRegisterCode,
 };

@@ -1,6 +1,6 @@
 /**
  * 日志中间件 - 适用于原生 http 模块
- * 提供请求日志记录和错误日志功能
+ * 提供请求日志记录功能
  */
 
 /**
@@ -62,24 +62,6 @@ function requestLogger(req, res) {
   });
 }
 
-/**
- * 错误日志记录
- * @param {Error} err
- * @param {import('http').IncomingMessage} req
- */
-function errorLogger(err, req) {
-  const reqId = req.requestId || 'no-request-id';
-  const isDev = process.env.NODE_ENV !== 'production';
-
-  console.error(`[Error] [${reqId}] ${req.method} ${req.url}`);
-  console.error(`[Error] Message: ${err.message}`);
-
-  if (isDev && err.stack) {
-    console.error(`[Error] Stack: ${err.stack}`);
-  }
-}
-
 module.exports = {
-  requestLogger,
-  errorLogger
+  requestLogger
 };

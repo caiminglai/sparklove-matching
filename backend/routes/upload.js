@@ -6,6 +6,7 @@ const fs = require('fs');
 const path = require('path');
 // 统一使用 utils/multipart.js 的常量与解析器，避免重复定义
 const { ALLOWED_IMAGE_EXTENSIONS, MAGIC_NUMBERS } = require('../utils/multipart');
+const { MAX_UPLOAD_SIZE } = require('../utils/config');
 
 // 修复：原 try { require('../data/table') } catch 永远 MODULE_NOT_FOUND，假装可配置实际恒为默认
 // 改为从环境变量读取（默认 29.9）
@@ -35,14 +36,13 @@ function uploadAvatar(req, res) {
   const boundary = req.headers['content-type']?.split('boundary=')[1];
   if (!boundary) { sendJson(res, 400, { success: false, message: '无效的上传格式' }); return; }
 
-  const MAX_UPLOAD_SIZE = 2 * 1024 * 1024;
   const chunks = [];
   let uploadSize = 0;
   let tooLarge = false;
   req.on('data', c => { uploadSize += c.length; if (uploadSize > MAX_UPLOAD_SIZE) tooLarge = true; chunks.push(c); });
   req.on('end', () => {
     try {
-      if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许2MB' }); return; }
+      if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' }); return; }
       const buffer = Buffer.concat(chunks);
       const boundaryStr = '--' + boundary;
       const parts = [];
@@ -107,14 +107,13 @@ function uploadDepositProof(req, res) {
   const boundary = req.headers['content-type']?.split('boundary=')[1];
   if (!boundary) { sendJson(res, 400, { success: false, message: '无效的上传格式' }); return; }
 
-  const MAX_UPLOAD_SIZE = 2 * 1024 * 1024;
   const chunks = [];
   let uploadSize = 0;
   let tooLarge = false;
   req.on('data', c => { uploadSize += c.length; if (uploadSize > MAX_UPLOAD_SIZE) tooLarge = true; chunks.push(c); });
   req.on('end', () => {
     try {
-      if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许2MB' }); return; }
+      if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' }); return; }
       const buffer = Buffer.concat(chunks);
       const boundaryStr = '--' + boundary;
       const parts = [];

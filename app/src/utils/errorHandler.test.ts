@@ -52,26 +52,3 @@ describe('handleApiError', () => {
     expect(alertMock).toHaveBeenCalledWith('操作失败，请稍后重试');
   });
 });
-
-describe('safeAsync', () => {
-  it('成功时返回结果', async () => {
-    const { safeAsync } = await import('./errorHandler');
-    const result = await safeAsync(async () => 42);
-    expect(result).toBe(42);
-  });
-
-  it('失败时返回 null，Error 类型显示 error.message', async () => {
-    const { safeAsync } = await import('./errorHandler');
-    const result = await safeAsync(async () => { throw new Error('boom'); }, '出错了');
-    expect(result).toBeNull();
-    // Error 实例走 error.message 而非 fallbackMessage
-    expect(alertMock).toHaveBeenCalledWith('boom');
-  });
-
-  it('非 Error 类型使用 fallback', async () => {
-    const { safeAsync } = await import('./errorHandler');
-    const result = await safeAsync(async () => { throw 'string error'; }, '操作失败');
-    expect(result).toBeNull();
-    expect(alertMock).toHaveBeenCalledWith('操作失败');
-  });
-});

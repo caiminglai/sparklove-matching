@@ -19,26 +19,6 @@ function getAllFieldMappings() {
   }));
 }
 
-function getFieldMappingsByCategory(category) {
-  const db = getDb();
-  const rows = db.prepare(
-    `SELECT field_key, field_label, field_category, field_type, field_options, field_order, is_filterable, description
-     FROM field_mappings
-     WHERE field_category = $1
-     ORDER BY field_order ASC`
-  ).all(category);
-  return rows.map(row => ({
-    field_key: row.field_key,
-    field_label: row.field_label,
-    field_category: row.field_category,
-    field_type: row.field_type,
-    options: row.field_options ? row.field_options.split(',').filter(o => o.trim()) : [],
-    field_order: row.field_order,
-    is_filterable: row.is_filterable === 1,
-    description: row.description || ''
-  }));
-}
-
 function getFieldLabelMap() {
   const db = getDb();
   const rows = db.prepare('SELECT field_key, field_label FROM field_mappings').all();
@@ -57,7 +37,6 @@ function getCacheVersion() {
 
 module.exports = {
   getAllFieldMappings,
-  getFieldMappingsByCategory,
   getFieldLabelMap,
   getCacheVersion
 };

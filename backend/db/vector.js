@@ -111,11 +111,6 @@ function getUserVector(userId) {
   return db.prepare('SELECT * FROM user_vectors WHERE user_id = $1').get(userId);
 }
 
-function deleteUserVector(userId) {
-  const db = getDb();
-  db.prepare('DELETE FROM user_vectors WHERE user_id = $1').run(userId);
-}
-
 function getVectorStats() {
   const db = getDb();
   const result = db.prepare(`
@@ -142,6 +137,5 @@ module.exports = {
   findSimilarUsersByExpectation,
   findMutualMatchUsers,
   getUserVector,
-  deleteUserVector,
   getVectorStats
 };

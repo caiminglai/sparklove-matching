@@ -29,6 +29,5 @@ function applySecurity(req, res) {
 }
 
 module.exports = {
-  securityHeaders,
   applySecurity
 };

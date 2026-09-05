@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 const { parseMultipart, collectBody, validateMagicBytes, validateExtension } = require('../utils/multipart');
 const { extractId } = require('../utils/extractId');
+const { MAX_BODY_SIZE } = require('../utils/config');
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
@@ -29,7 +30,7 @@ function addReport(req, res, readBodyWithLimit) {
   if (contentType.includes('multipart/form-data')) {
     const boundary = contentType.split('boundary=')[1];
     if (!boundary) { sendJson(res, 400, { success: false, message: '无效的表单数据' }); return; }
-    const MAX_SIZE = 5 * 1024 * 1024;
+    const MAX_SIZE = MAX_BODY_SIZE;
     collectBody(req, MAX_SIZE).then(body => {
       try {
         const parsed = parseMultipart(body, boundary);

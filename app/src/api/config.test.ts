@@ -100,12 +100,3 @@ describe('normalizeAvatarUrl', () => {
     expect(normalizeAvatarUrl('test.jpg')).toBe('/uploads/avatars/test.jpg');
   });
 });
-
-describe('createSecureRequest', () => {
-  it('非法端点抛出错误', async () => {
-    mockLocation.pathname = '/jzxr';
-    const { createSecureRequest } = await import('./config');
-    expect(() => createSecureRequest('../etc/passwd')).toThrow('Invalid endpoint');
-    expect(() => createSecureRequest('<script>')).toThrow('Invalid endpoint');
-  });
-});

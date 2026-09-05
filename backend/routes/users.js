@@ -5,7 +5,7 @@
 // ============================================================
 
 const userService = require('../services/user.service');
-const { validateMagicBytes, collectBody } = require('../utils/multipart');
+const { parseMultipart, validateMagicBytes, collectBody } = require('../utils/multipart');
 const adminService = require('../services/admin.service');
 const { verifyToken } = require('../db/index');
 const { getAuthTokenFromCookie } = require('../utils/cookie工具');

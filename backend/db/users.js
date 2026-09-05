@@ -123,11 +123,6 @@ function getAllUsers(page = 1, limit = 20) {
   return stmt.all(limit, offset).map(dbRowToJson);
 }
 
-function getUserCount() {
-  const database = getDb();
-  return parseInt(database.prepare('SELECT COUNT(*) as count FROM users').get().count) || 0;
-}
-
 function getUserById(id) {
   const database = getDb();
   const stmt = database.prepare(
@@ -407,11 +402,6 @@ function deleteUserCustomField(userId, fieldKey) {
   return result.changes > 0;
 }
 
-function deleteUserCustomFields(userId) {
-  const database = getDb();
-  database.prepare('DELETE FROM user_custom_fields WHERE user_id = $1').run(userId);
-}
-
 function searchUsersByCustomField(fieldKey, fieldValue, isExact) {
   const database = getDb();
   if (isExact) {
@@ -434,7 +424,6 @@ function getAllCustomFields() {
 module.exports = {
   getAllUsers,
   getUserById,
-  getUserCount,
   getUsersByUserId,
   addUser,
   updateUser,
@@ -445,13 +434,9 @@ module.exports = {
   rejectUser,
   getPendingUsers,
   getUserStats,
-  jsonToDbRow,
-  dbRowToJson,
-  ALL_FIELDS,
   getUserCustomFields,
   setUserCustomField,
   deleteUserCustomField,
-  deleteUserCustomFields,
   searchUsersByCustomField,
   getAllCustomFields
 };

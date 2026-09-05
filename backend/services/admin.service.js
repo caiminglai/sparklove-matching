@@ -83,8 +83,6 @@ function isAdminToken(token) {
 }
 
 module.exports = {
-  getAdminWhitelist,
-  isAdminUsername,
   verifyAdminAccount,
   isAdminToken
 };

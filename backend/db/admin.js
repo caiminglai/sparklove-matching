@@ -22,12 +22,6 @@ function setAdminPassword(password) {
   return true;
 }
 
-function addAdminLog(action, targetId, details, ipAddress) {
-  const database = getDb();
-  const stmt = database.prepare('INSERT INTO admin_logs (action, target_id, details, ip_address, created_at) VALUES ($1, $2, $3, $4, $5)');
-  stmt.run(action, targetId || null, details ? JSON.stringify(details) : null, ipAddress || null, Date.now());
-}
-
 function getAdminLogs(limit = 50) {
   const database = getDb();
   const stmt = database.prepare('SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT $1');
@@ -56,30 +50,11 @@ function getAdminWhitelist() {
   return [];
 }
 
-function setAdminWhitelist(usernames) {
-  const database = getDb();
-  const value = Array.isArray(usernames) ? usernames.join(',') : String(usernames);
-  const stmt = database.prepare(
-    'INSERT INTO admin_settings ("key", "value", updated_at) VALUES ($1, $2, $3) ON CONFLICT("key") DO UPDATE SET "value" = EXCLUDED."value", updated_at = EXCLUDED.updated_at'
-  );
-  stmt.run('admin_whitelist', value, Date.now());
-  return true;
-}
-
 function getAdminAccountPassword(username) {
   const database = getDb();
   const stmt = database.prepare('SELECT "value" FROM admin_settings WHERE "key" = $1');
   const row = stmt.get('admin_password_' + username);
   return row ? row.value : null;
-}
-
-function setAdminAccountPassword(username, password) {
-  const database = getDb();
-  const stmt = database.prepare(
-    'INSERT INTO admin_settings ("key", "value", updated_at) VALUES ($1, $2, $3) ON CONFLICT("key") DO UPDATE SET "value" = EXCLUDED."value", updated_at = EXCLUDED.updated_at'
-  );
-  stmt.run('admin_password_' + username, password, Date.now());
-  return true;
 }
 
 // ========== 自定义筛选字段 ==========
@@ -111,24 +86,14 @@ function deleteCustomFilter(id) {
   return info.changes > 0;
 }
 
-function incrementCustomFilterUse(fieldKey) {
-  const database = getDb();
-  const stmt = database.prepare('UPDATE custom_filters SET use_count = use_count + 1 WHERE field_key = $1');
-  stmt.run(fieldKey);
-}
-
 module.exports = {
   getAdminPassword,
   setAdminPassword,
-  addAdminLog,
   getAdminLogs,
   logAdminAction,
   getAdminWhitelist,
-  setAdminWhitelist,
   getAdminAccountPassword,
-  setAdminAccountPassword,
   getAllCustomFilters,
   addCustomFilter,
-  deleteCustomFilter,
-  incrementCustomFilterUse
+  deleteCustomFilter
 };

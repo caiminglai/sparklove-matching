@@ -109,7 +109,7 @@ function checkRegisterRateLimit(ip, limit = 5, windowMs = 3600000) {
 }
 
 // ========== 请求体读取 ==========
-const MAX_BODY_SIZE = 5 * 1024 * 1024;
+const { MAX_BODY_SIZE } = require('./utils/config');
 function readBodyWithLimit(req) {
   return new Promise((resolve, reject) => {
     let body = '';
@@ -492,7 +492,10 @@ const PORT = process.env.PORT || 8080;
 
 // 异步初始化数据库连接后再启动服务器
 const { initConnection } = require('./db/index.js');
+const { initVectorTables } = require('./db/vector.js');
 initConnection().then(() => {
+  // 自动建向量表 + HNSW 索引（若已存在则跳过）
+  try { initVectorTables(); } catch(e) { console.warn('向量表初始化失败（可忽略）：', e.message); }
   server.listen(PORT, () => {
     console.log('');
     console.log('╔══════════════════════════════════════════╗');
