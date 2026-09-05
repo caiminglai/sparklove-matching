@@ -90,6 +90,8 @@ ehthumbs.db
 *.tmp
 *.bak
 *.old
+# 回归验证用的临时请求体目录(内含明文测试口令,阶段 8 的 git add -A 会误提交)
+tmp_test/
 
 # ===== AI工具配置 =====
 CLAUDE.md
