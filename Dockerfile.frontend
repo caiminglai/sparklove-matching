@@ -1,0 +1,27 @@
+# ========== 站2 前端镜像：多阶段构建 ==========
+# 阶段1 用 node 编译 React/Vite 前端；阶段2 用同一 node:24-slim 跑零依赖的
+#       「静态服务 + 反向代理」。全程只复用本地已有的 node:24-slim，不拉新镜像。
+
+# ---- 构建阶段 ----
+FROM node:24-slim AS build
+WORKDIR /app
+COPY app/package.json app/package-lock.json ./
+RUN npm ci --registry=https://registry.npmmirror.com
+COPY app/ ./
+# 以根路径部署：base=/，API 走同源相对路径 /api（运行时由前端服务反代到后端）
+ENV VITE_BASE_PATH=/ \
+    VITE_API_BASE_URL=/api
+RUN npm run build
+
+# ---- 运行阶段 ----
+FROM node:24-slim
+WORKDIR /app
+ENV NODE_ENV=production \
+    DIST_DIR=/app/dist \
+    BACKEND_URL=http://jzxr:8080 \
+    PORT=80 \
+    HOST=0.0.0.0
+COPY --from=build /app/dist ./dist
+COPY frontend-server.mjs ./frontend-server.mjs
+EXPOSE 80
+CMD ["node", "frontend-server.mjs"]
