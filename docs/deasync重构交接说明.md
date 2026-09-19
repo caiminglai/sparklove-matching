@@ -91,11 +91,16 @@ Docker 里有 5 个容器（站1、站2、站3 混在一起跑），**由 `E:\we
 
 | compose 服务名<br>（用于 `docker compose up/logs` 等） | 真实容器名<br>（用于 `docker exec` / `docker logs <容器>`） | 作用 | 端口映射 |
 |---|---|---|---|
-| `jzxr` | **`jzxr-local`** | 站2 后端（本次改造对象） | `8080:8080` → 宿主机 `http://localhost:8080` |
-| `jzxr-web` | **`jzxr-web-local`** | 站2 前端（Nginx） | `4000:80` → 宿主机 `http://localhost:4000` |
-| `postgres` | **`postgres-local`** | PostgreSQL（镜像 `pgvector/pgvector:pg18`，带向量扩展） | `5433:5432` |
+| `jzxr` | **`jzxr-local`** | 站2 后端（本次改造对象） | `127.0.0.1:8080:8080` → 宿主机 `http://localhost:8080` |
+| `jzxr-web` | **`jzxr-web-local`** | 站2 前端（Nginx） | `127.0.0.1:4000:80` → 宿主机 `http://localhost:4000` |
+| `postgres` | **`postgres-local`** | PostgreSQL（镜像 `pgvector/pgvector:pg18`，带向量扩展） | `127.0.0.1:5433:5432` |
 | `twym` | `twym-local` | 站1（本次无关） | — |
 | `style-ai` | `style-ai-local` | 站3（本次无关） | — |
+
+> **2026-09-20 变更**：站2 三个端口已加 `127.0.0.1:` 前缀，只监听宿主机回环。
+> 原因是 `5433`（带密码的 PostgreSQL）和 `8080`（裸 API）绑在 `0.0.0.0` 上，等于在 Caddy/HTTPS 之外另开无 TLS 入口。
+> **这不影响线上访问**：Caddy 是容器，按 `docker-compose.yml` 里的服务名走容器网回源（`reverse_proxy jzxr-web:80`），根本不经过宿主机端口。
+> 例外：若要用手机等**局域网其它设备**访问 `http://<本机IP>:4000`，得临时去掉 `127.0.0.1:` 前缀并 `docker compose up -d` 重建该服务。
 
 所以：
 - `docker compose ...` 命令要先 `cd /d E:\website`，用**服务名** `jzxr`

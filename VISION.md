@@ -83,7 +83,7 @@ Phase 2 要做的是：
 |------|------|
 | 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS |
 | 后端 | Node.js 原生 HTTP 服务器（非 Express，轻量高效） |
-| 数据库 | PostgreSQL + pg + deasync 同步 API + **pgvector**（向量搜索扩展） |
+| 数据库 | PostgreSQL + **pg 连接池（全异步）** + **pgvector**（向量搜索扩展） |
 | 安全 | AES-256-CBC 加密、自定义 HMAC Token、bcrypt |
 | 部署 | 阿里云 + Nginx + PM2 |
 
