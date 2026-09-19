@@ -6,83 +6,83 @@ const { getDb } = require('./index');
 
 // ========== 管理员设置 ==========
 
-function getAdminPassword() {
+async function getAdminPassword() {
   const database = getDb();
   const stmt = database.prepare('SELECT "value" FROM admin_settings WHERE "key" = $1');
-  const row = stmt.get('admin_password');
+  const row = await stmt.get('admin_password');
   return row ? row.value : null;
 }
 
-function setAdminPassword(password) {
+async function setAdminPassword(password) {
   const database = getDb();
   const stmt = database.prepare(
     'INSERT INTO admin_settings ("key", "value", updated_at) VALUES ($1, $2, $3) ON CONFLICT("key") DO UPDATE SET "value" = EXCLUDED."value", updated_at = EXCLUDED.updated_at'
   );
-  stmt.run('admin_password', password, Date.now());
+  await stmt.run('admin_password', password, Date.now());
   return true;
 }
 
-function getAdminLogs(limit = 50) {
+async function getAdminLogs(limit = 50) {
   const database = getDb();
   const stmt = database.prepare('SELECT * FROM admin_logs ORDER BY created_at DESC LIMIT $1');
-  return stmt.all(limit);
+  return await stmt.all(limit);
 }
 
-function logAdminAction(action, targetId, details) {
+async function logAdminAction(action, targetId, details) {
   const database = getDb();
   const stmt = database.prepare('INSERT INTO admin_logs (action, target_id, details, created_at) VALUES ($1, $2, $3, $4)');
-  stmt.run(action, targetId || null, details ? JSON.stringify(details) : null, Date.now());
+  await stmt.run(action, targetId || null, details ? JSON.stringify(details) : null, Date.now());
 }
 
 // ========== 管理员账号白名单 ==========
 
-function getAdminWhitelist() {
+async function getAdminWhitelist() {
   const envWhitelist = process.env.ADMIN_WHITELIST || process.env.ADMIN_USERNAME || '';
   if (envWhitelist) {
     return envWhitelist.split(',').map(s => s.trim()).filter(Boolean);
   }
   const database = getDb();
   const stmt = database.prepare('SELECT "value" FROM admin_settings WHERE "key" = $1');
-  const row = stmt.get('admin_whitelist');
+  const row = await stmt.get('admin_whitelist');
   if (row && row.value) {
     return row.value.split(',').map(s => s.trim()).filter(Boolean);
   }
   return [];
 }
 
-function getAdminAccountPassword(username) {
+async function getAdminAccountPassword(username) {
   const database = getDb();
   const stmt = database.prepare('SELECT "value" FROM admin_settings WHERE "key" = $1');
-  const row = stmt.get('admin_password_' + username);
+  const row = await stmt.get('admin_password_' + username);
   return row ? row.value : null;
 }
 
 // ========== 自定义筛选字段 ==========
 
-function getAllCustomFilters() {
+async function getAllCustomFilters() {
   const database = getDb();
   const stmt = database.prepare('SELECT * FROM custom_filters ORDER BY use_count DESC, created_at DESC');
-  return stmt.all();
+  return await stmt.all();
 }
 
-function addCustomFilter(fieldKey, fieldLabel, fieldType = 'text', description = '', fieldOptions = '') {
+async function addCustomFilter(fieldKey, fieldLabel, fieldType = 'text', description = '', fieldOptions = '') {
   const database = getDb();
   const now = Date.now();
-  const existing = database.prepare('SELECT * FROM custom_filters WHERE field_key = $1').get(fieldKey);
+  const existing = await database.prepare('SELECT * FROM custom_filters WHERE field_key = $1').get(fieldKey);
   if (existing) {
     const stmt = database.prepare('UPDATE custom_filters SET field_label = $1, field_type = $2, field_options = $3, description = $4, updated_at = $5 WHERE field_key = $6');
-    stmt.run(fieldLabel, fieldType, fieldOptions, description, now, fieldKey);
-    return database.prepare('SELECT * FROM custom_filters WHERE field_key = $1').get(fieldKey);
+    await stmt.run(fieldLabel, fieldType, fieldOptions, description, now, fieldKey);
+    return await database.prepare('SELECT * FROM custom_filters WHERE field_key = $1').get(fieldKey);
   }
   const stmt = database.prepare('INSERT INTO custom_filters (field_key, field_label, field_type, field_options, description, use_count, created_at) VALUES ($1, $2, $3, $4, $5, 0, $6) RETURNING id');
-  const info = stmt.run(fieldKey, fieldLabel, fieldType, fieldOptions, description, now);
-  return database.prepare('SELECT * FROM custom_filters WHERE id = $1').get(info.lastInsertRowid);
+  const info = await stmt.run(fieldKey, fieldLabel, fieldType, fieldOptions, description, now);
+  return await database.prepare('SELECT * FROM custom_filters WHERE id = $1').get(info.lastInsertRowid);
 }
 
-function deleteCustomFilter(id) {
+async function deleteCustomFilter(id) {
   const database = getDb();
   const stmt = database.prepare('DELETE FROM custom_filters WHERE id = $1');
-  const info = stmt.run(id);
+  const info = await stmt.run(id);
   return info.changes > 0;
 }
 
