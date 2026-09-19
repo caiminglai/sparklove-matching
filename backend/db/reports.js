@@ -1,16 +1,16 @@
 const { getDb } = require('./index');
 
-function addReport(reporterId, reportedId, reportType, description, proofPath) {
+async function addReport(reporterId, reportedId, reportType, description, proofPath) {
   const database = getDb();
   const createdAt = Date.now();
   const stmt = database.prepare(
     'INSERT INTO user_reports (reporter_id, reported_id, report_type, description, proof_path, status, created_at) VALUES ($1, $2, $3, $4, $5, $6, $7)'
   );
-  stmt.run(reporterId, reportedId, reportType, description || '', proofPath || null, 'pending', createdAt);
+  await stmt.run(reporterId, reportedId, reportType, description || '', proofPath || null, 'pending', createdAt);
   return true;
 }
 
-function getAllReports(status = null) {
+async function getAllReports(status = null) {
   const database = getDb();
   let sql = 'SELECT r.*, u1.name as reporter_name, u1.avatar as reporter_avatar, u2.name as reported_name, u2.avatar as reported_avatar, u2.contact as reported_contact FROM user_reports r LEFT JOIN users u1 ON r.reporter_id = u1.id LEFT JOIN users u2 ON r.reported_id = u2.id';
   const params = [];
@@ -20,22 +20,22 @@ function getAllReports(status = null) {
   }
   sql += ' ORDER BY r.created_at DESC';
   const stmt = database.prepare(sql);
-  return stmt.all(...params);
+  return await stmt.all(...params);
 }
 
-function updateReportStatus(reportId, status, adminNote) {
+async function updateReportStatus(reportId, status, adminNote) {
   const database = getDb();
   const stmt = database.prepare(
     'UPDATE user_reports SET status = $1, admin_note = $2, updated_at = $3 WHERE id = $4'
   );
-  stmt.run(status, adminNote || '', Date.now(), reportId);
+  await stmt.run(status, adminNote || '', Date.now(), reportId);
   return true;
 }
 
-function deleteReport(reportId) {
+async function deleteReport(reportId) {
   const database = getDb();
   const stmt = database.prepare('DELETE FROM user_reports WHERE id = $1');
-  stmt.run(reportId);
+  await stmt.run(reportId);
   return true;
 }
 
