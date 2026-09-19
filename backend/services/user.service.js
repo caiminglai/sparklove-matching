@@ -73,33 +73,33 @@ function authenticateUser(token) {
 
 // ========== 用户列表（带分页和脱敏） ==========
 
-function getUserList(page = 1, limit = 20, isAdmin = false) {
-  const users = userDb.getAllUsers(page, limit);
+async function getUserList(page = 1, limit = 20, isAdmin = false) {
+  const users = await userDb.getAllUsers(page, limit);
   return isAdmin ? users : maskUsers(users);
 }
 
-function getUserStats() {
-  return userDb.getUserStats();
+async function getUserStats() {
+  return await userDb.getUserStats();
 }
 
-function getPendingUsers() {
-  return userDb.getPendingUsers();
+async function getPendingUsers() {
+  return await userDb.getPendingUsers();
 }
 
 // ========== 用户详情（按权限返回不同内容） ==========
 
-function getMyUser(userId) {
+async function getMyUser(userId) {
   if (!userId) return null;
-  const users = userDb.getUsersByUserId(userId);
+  const users = await userDb.getUsersByUserId(userId);
   if (users.length === 0) return null;
   const user = users[0];
-  user.custom_fields = userDb.getUserCustomFields(userId);
+  user.custom_fields = await userDb.getUserCustomFields(userId);
   return user;
 }
 
 // ========== 用户创建 / 更新 ==========
 
-function createUser(userData, ownerUserId) {
+async function createUser(userData, ownerUserId) {
   const errors = validateUserData(userData);
   if (errors.length > 0) {
     return { success: false, message: errors.join(', ') };
@@ -125,15 +125,15 @@ function createUser(userData, ownerUserId) {
     },
     status: userData.status || 'approved'
   };
-  userDb.addUser(newUser);
+  await userDb.addUser(newUser);
   return { success: true, user: newUser };
 }
 
-function updateMyUser(userId, userData) {
+async function updateMyUser(userId, userData) {
   if (!userId) return { success: false, message: '未登录' };
-  const existing = userDb.getUsersByUserId(userId);
+  const existing = await userDb.getUsersByUserId(userId);
   if (existing.length === 0) {
-    return createUser(userData, userId);
+    return await createUser(userData, userId);
   }
   const current = existing[0];
   const updated = {
@@ -143,12 +143,12 @@ function updateMyUser(userId, userData) {
       ...userData.data
     }
   };
-  userDb.updateUser(current.id, updated);
+  await userDb.updateUser(current.id, updated);
   return { success: true, user: updated };
 }
 
-function editUserById(id, userData) {
-  const existing = userDb.getUserById(id);
+async function editUserById(id, userData) {
+  const existing = await userDb.getUserById(id);
   if (!existing) return { success: false, message: '用户不存在' };
   const updated = {
     ...existing,
@@ -158,44 +158,44 @@ function editUserById(id, userData) {
       ...(userData.data || {})
     }
   };
-  userDb.updateUser(id, updated);
+  await userDb.updateUser(id, updated);
   return { success: true, user: updated };
 }
 
 // ========== 用户删除 ==========
 
-function removeUser(id, ownerUserId, isAdmin = false) {
-  const success = userDb.deleteUser(id, ownerUserId, isAdmin);
+async function removeUser(id, ownerUserId, isAdmin = false) {
+  const success = await userDb.deleteUser(id, ownerUserId, isAdmin);
   return { success, message: success ? '删除成功' : '无权限或用户不存在' };
 }
 
-function removeMyUser(userId) {
+async function removeMyUser(userId) {
   if (!userId) return { success: false, message: '未登录' };
-  const users = userDb.getUsersByUserId(userId);
+  const users = await userDb.getUsersByUserId(userId);
   if (users.length === 0) return { success: false, message: '未找到关联用户' };
   const target = users[0];
-  userDb.deleteUser(target.id, userId, false);
+  await userDb.deleteUser(target.id, userId, false);
   return { success: true, message: '已删除' };
 }
 
 // ========== 审核 ==========
 
-function approveUser(id) {
-  userDb.approveUser(id);
-  adminDb.logAdminAction('approve_user', id, {});
+async function approveUser(id) {
+  await userDb.approveUser(id);
+  await adminDb.logAdminAction('approve_user', id, {});
   return { success: true, message: '已通过审核' };
 }
 
-function rejectUser(id) {
-  userDb.rejectUser(id);
-  adminDb.logAdminAction('reject_user', id, {});
+async function rejectUser(id) {
+  await userDb.rejectUser(id);
+  await adminDb.logAdminAction('reject_user', id, {});
   return { success: true, message: '已拒绝' };
 }
 
 // ========== 搜索 ==========
 
-function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
-  const result = userDb.searchUsers(criteria, page, limit);
+async function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
+  const result = await userDb.searchUsers(criteria, page, limit);
   return {
     data: isAdmin ? result.data : maskUsers(result.data),
     count: result.count
@@ -204,19 +204,19 @@ function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
 
 // ========== 批量保存 ==========
 
-function batchSave(users, isAdmin = false) {
+async function batchSave(users, isAdmin = false) {
   if (!isAdmin) return { success: false, message: '需要管理员权限' };
   if (!Array.isArray(users) || users.length === 0) {
     return { success: false, message: '数据为空' };
   }
-  userDb.batchSaveUsers(users);
+  await userDb.batchSaveUsers(users);
   return { success: true, message: `已保存 ${users.length} 条` };
 }
 
 // ========== 管理员功能 ==========
 
-function getAdminLogs(limit = 50) {
-  return adminDb.getAdminLogs(limit);
+async function getAdminLogs(limit = 50) {
+  return await adminDb.getAdminLogs(limit);
 }
 
 module.exports = {
