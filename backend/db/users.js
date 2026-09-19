@@ -233,6 +233,7 @@ async function searchUsers(criteria, page = 1, limit = 20) {
   const conditions = [];
   const params = [];
   const isExact = criteria.exact === 'true' || criteria.exact === true;
+  const offset = (page - 1) * limit;
 
   const addLikeOrExact = (field, value) => {
     if (!value) return;
@@ -325,7 +326,6 @@ async function searchUsers(criteria, page = 1, limit = 20) {
     }).map(dbRowToJson);
 
     const count = filtered.length;
-    const offset = (page - 1) * limit;
     const data = filtered.slice(offset, offset + limit);
     return { data, count };
   }
