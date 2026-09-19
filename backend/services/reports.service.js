@@ -6,19 +6,19 @@ const reportsDb = require('../db/reports');
 const userDb = require('../db/users');
 const { verifyToken } = require('../db/index');
 
-function submitReport(token, reportedId, reportType, description, proofPath) {
+async function submitReport(token, reportedId, reportType, description, proofPath) {
   const userId = verifyToken(token);
   if (!userId) {
     return { success: false, message: 'token无效' };
   }
-  const users = userDb.getUsersByUserId(userId);
+  const users = await userDb.getUsersByUserId(userId);
   if (users.length === 0) {
     return { success: false, message: '请先创建个人资料' };
   }
   if (!reportedId || !reportType) {
     return { success: false, message: '缺少参数' };
   }
-  const targetUser = userDb.getUserById(reportedId);
+  const targetUser = await userDb.getUserById(reportedId);
   if (!targetUser) {
     return { success: false, message: '被举报用户不存在' };
   }
@@ -26,15 +26,15 @@ function submitReport(token, reportedId, reportType, description, proofPath) {
     return { success: false, message: '不能举报自己' };
   }
   try {
-    reportsDb.addReport(users[0].id, reportedId, reportType, description, proofPath);
+    await reportsDb.addReport(users[0].id, reportedId, reportType, description, proofPath);
     return { success: true, message: '举报成功' };
   } catch (e) {
     return { success: false, message: '举报失败：' + (e.message || '数据库错误') };
   }
 }
 
-function getAllReportsForAdmin(status) {
-  const reports = reportsDb.getAllReports(status);
+async function getAllReportsForAdmin(status) {
+  const reports = await reportsDb.getAllReports(status);
   const mappedReports = reports.map(r => ({
     id: r.id,
     reporterId: r.reporter_id,
@@ -52,13 +52,13 @@ function getAllReportsForAdmin(status) {
   return mappedReports;
 }
 
-function updateStatus(reportId, status, adminNote) {
-  reportsDb.updateReportStatus(reportId, status, adminNote);
+async function updateStatus(reportId, status, adminNote) {
+  await reportsDb.updateReportStatus(reportId, status, adminNote);
   return { success: true };
 }
 
-function removeReport(reportId) {
-  reportsDb.deleteReport(reportId);
+async function removeReport(reportId) {
+  await reportsDb.deleteReport(reportId);
   return { success: true };
 }
 
