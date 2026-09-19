@@ -1,5 +1,6 @@
 const vectorDb = require('../db/vector');
 const userDb = require('../db/users');
+const { maskUsers } = require('./user.service');
 
 const EMBEDDING_PROVIDER = process.env.EMBEDDING_PROVIDER || 'openai';
 const EMBEDDING_API_KEY = process.env.EMBEDDING_API_KEY || '';
@@ -148,7 +149,7 @@ async function findSimilarUsers(userId, type = 'profile', limit = 10) {
     };
     if (merged.id) users.push(merged);
   }
-  return users;
+  return maskUsers(users);
 }
 
 async function findMutualMatches(userId, limit = 10) {
@@ -174,7 +175,7 @@ async function findMutualMatches(userId, limit = 10) {
     };
     if (merged.id) users.push(merged);
   }
-  return users;
+  return maskUsers(users);
 }
 
 async function batchGenerateVectors(limit = 100) {

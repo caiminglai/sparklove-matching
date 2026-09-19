@@ -246,6 +246,7 @@ module.exports = {
   // 管理
   getAdminLogs,
   // 工具
+  maskUsers,
   maskContact,
   sanitizeString,
   validateIdFormat
