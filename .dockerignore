@@ -1,7 +1,9 @@
 # 排除 Windows 下安装的依赖，避免覆盖容器内 npm install 的 Linux 原生模块
-# （deasync 的 build/Release/*.node 是 win32 格式，进 Linux 容器会加载失败）
+# （bcrypt 的 build/Release/*.node 是 win32 格式，进 Linux 容器会加载失败）
 backend/node_modules
 backend/npm-debug.log
+# 密钥不进镜像层：运行时由 compose 的只读 bind mount 提供 /app/.env
+backend/.env
 backend/.env.production
 
 # 前端：宿主机依赖与构建产物不进镜像（前端在 Docker 内用 npm ci 重新构建）
