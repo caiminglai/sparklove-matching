@@ -9,7 +9,7 @@ const userDb = require('../db/users.js');
 const { sendJson } = require('../utils/sendJson');
 
 // 处理 /api/users/custom-fields 和 /api/users/custom-fields/:key
-function handleUserCustomFields(req, res, readBodyWithLimit, pathname) {
+async function handleUserCustomFields(req, res, readBodyWithLimit, pathname) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     sendJson(res, 401, { success: false, message: '请先登录' }); return;
@@ -21,18 +21,18 @@ function handleUserCustomFields(req, res, readBodyWithLimit, pathname) {
   }
 
   if (req.method === 'GET' && pathname === '/api/users/custom-fields') {
-    const fields = userDb.getUserCustomFields(userId);
+    const fields = await userDb.getUserCustomFields(userId);
     sendJson(res, 200, { success: true, data: fields }); return;
   }
 
   if (req.method === 'POST' && pathname === '/api/users/custom-fields') {
-    readBodyWithLimit(req).then(body => {
+    readBodyWithLimit(req).then(async body => {
       try {
         const data = JSON.parse(body);
         if (!data.field_key || data.field_value === undefined || data.field_value === null) {
           sendJson(res, 400, { success: false, message: '字段名和字段值必填' }); return;
         }
-        const result = userDb.setUserCustomField(userId, data.field_key, data.field_value);
+        const result = await userDb.setUserCustomField(userId, data.field_key, data.field_value);
         sendJson(res, 200, { success: true, data: result });
       } catch (err) {
         sendJson(res, 500, { success: false, message: err.message });
@@ -45,7 +45,7 @@ function handleUserCustomFields(req, res, readBodyWithLimit, pathname) {
 
   if (req.method === 'DELETE' && /^\/api\/users\/custom-fields\/[^\/]+$/.test(pathname)) {
     const fieldKey = decodeURIComponent(pathname.split('/').pop());
-    const deleted = userDb.deleteUserCustomField(userId, fieldKey);
+    const deleted = await userDb.deleteUserCustomField(userId, fieldKey);
     sendJson(res, 200, { success: deleted, message: deleted ? '删除成功' : '未找到' }); return;
   }
 

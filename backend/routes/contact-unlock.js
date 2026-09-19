@@ -31,7 +31,7 @@ function submitUnlockRequest(req, res) {
   }
 
   const MAX_SIZE = MAX_BODY_SIZE;
-  collectBody(req, MAX_SIZE).then(body => {
+  collectBody(req, MAX_SIZE).then(async body => {
     try {
       const parsed = parseMultipart(body, boundary);
       let proofPath = null;
@@ -56,7 +56,7 @@ function submitUnlockRequest(req, res) {
         sendJson(res, 400, { success: false, message: '凭证和目标用户信息必填' }); return;
       }
 
-      const result = paymentsDb.addContactUnlockRequest(String(viewerId), targetId, proofPath, method, parseFloat(amount));
+      const result = await paymentsDb.addContactUnlockRequest(String(viewerId), targetId, proofPath, method, parseFloat(amount));
       if (result.success) {
         sendJson(res, 200, { success: true, message: '凭证提交成功，等待管理员审核', proof_path: proofPath });
       } else {
@@ -71,28 +71,28 @@ function submitUnlockRequest(req, res) {
 }
 
 // ========== GET /api/admin/unlock-contact-requests（管理员查看列表）==========
-function getUnlockRequests(req, res, checkAdminAuth) {
-  if (!checkAdminAuth(req)) {
+async function getUnlockRequests(req, res, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
-  const records = paymentsDb.getAllContactUnlockRequests();
+  const records = await paymentsDb.getAllContactUnlockRequests();
   sendJson(res, 200, { success: true, data: records });
 }
 
 // ========== PUT /api/admin/unlock-contact-requests/:id/approve ==========
-function approveUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname) {
-  if (!checkAdminAuth(req)) {
+async function approveUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
   const idMatch = pathname.match(/\/(\d+)\/approve/);
   // 防御：server.js 路由预过滤理论上保证匹配，但极端 URL 仍可能为 null
   if (!idMatch) { sendJson(res, 400, { success: false, message: '无效的请求路径' }); return; }
   const id = parseInt(idMatch[1]);
-  readBodyWithLimit(req).then(body => {
+  readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      paymentsDb.approveContactUnlockRequest(id, data.admin_note || '');
-      adminDb.logAdminAction('approve_contact_unlock', String(id), { note: data.admin_note || '' });
+      await paymentsDb.approveContactUnlockRequest(id, data.admin_note || '');
+      await adminDb.logAdminAction('approve_contact_unlock', String(id), { note: data.admin_note || '' });
       sendJson(res, 200, { success: true, message: '已通过审核' });
     } catch (e) { sendJson(res, 500, { success: false, message: e.message }); }
   }).catch(e => {
@@ -101,18 +101,18 @@ function approveUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathn
 }
 
 // ========== PUT /api/admin/unlock-contact-requests/:id/reject ==========
-function rejectUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname) {
-  if (!checkAdminAuth(req)) {
+async function rejectUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
   const idMatch = pathname.match(/\/(\d+)\/reject/);
   if (!idMatch) { sendJson(res, 400, { success: false, message: '无效的请求路径' }); return; }
   const id = parseInt(idMatch[1]);
-  readBodyWithLimit(req).then(body => {
+  readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      paymentsDb.rejectContactUnlockRequest(id, data.admin_note || '');
-      adminDb.logAdminAction('reject_contact_unlock', String(id), { note: data.admin_note || '' });
+      await paymentsDb.rejectContactUnlockRequest(id, data.admin_note || '');
+      await adminDb.logAdminAction('reject_contact_unlock', String(id), { note: data.admin_note || '' });
       sendJson(res, 200, { success: true, message: '已拒绝' });
     } catch (e) { sendJson(res, 500, { success: false, message: e.message }); }
   }).catch(e => {
@@ -121,21 +121,21 @@ function rejectUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathna
 }
 
 // ========== DELETE /api/admin/unlock-contact-requests/:id ==========
-function deleteUnlockRequest(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) {
+async function deleteUnlockRequest(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
   const idMatch = pathname.match(/\/(\d+)$/);
   if (!idMatch) { sendJson(res, 400, { success: false, message: '无效的请求路径' }); return; }
   const id = parseInt(idMatch[1]);
-  paymentsDb.deleteContactUnlockRequest(id);
-  adminDb.logAdminAction('delete_contact_unlock', String(id), {});
+  await paymentsDb.deleteContactUnlockRequest(id);
+  await adminDb.logAdminAction('delete_contact_unlock', String(id), {});
   sendJson(res, 200, { success: true, message: '已删除' });
 }
 
 // ========== POST /api/users/:id/unlock-contact（管理员手动解锁）==========
-function adminUnlockContact(req, res, checkAdminAuth, readBodyWithLimit, pathname) {
-  if (!checkAdminAuth(req)) {
+async function adminUnlockContact(req, res, checkAdminAuth, readBodyWithLimit, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
   const parts = pathname.split('/').filter(p => p);
@@ -144,12 +144,12 @@ function adminUnlockContact(req, res, checkAdminAuth, readBodyWithLimit, pathnam
   if (!targetId) {
     sendJson(res, 400, { success: false, message: '缺少目标用户ID' }); return;
   }
-  readBodyWithLimit(req).then(body => {
+  readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
       const viewerId = data.viewer_id || '';
-      if (viewerId) paymentsDb.unlockContact(viewerId, targetId, '手动解锁');
-      adminDb.logAdminAction('unlock_contact', targetId, { viewerId, action: 'admin_unlock' });
+      if (viewerId) await paymentsDb.unlockContact(viewerId, targetId, '手动解锁');
+      await adminDb.logAdminAction('unlock_contact', targetId, { viewerId, action: 'admin_unlock' });
       sendJson(res, 200, { success: true, message: '解锁成功' });
     } catch (e) {
       sendJson(res, 400, { success: false, message: '请求格式错误' });
@@ -161,7 +161,7 @@ function adminUnlockContact(req, res, checkAdminAuth, readBodyWithLimit, pathnam
 
 // ========== GET /api/users/:id/check-unlock ==========
 // 检查用户是否已解锁目标用户的联系方式
-function checkUnlock(req, res, pathname, query) {
+async function checkUnlock(req, res, pathname, query) {
   const parts = pathname.split('/').filter(p => p);
   const userIdx = parts.indexOf('users');
   const targetId = userIdx !== -1 && userIdx + 1 < parts.length ? parts[userIdx + 1] : null;
@@ -181,14 +181,14 @@ function checkUnlock(req, res, pathname, query) {
   if (String(viewerId) === String(targetId)) {
     const database = dbIndex.getDb();
     const stmt = database.prepare('SELECT contact FROM users WHERE user_id = $1 OR id = $2 LIMIT 1');
-    const row = stmt.get(targetId, targetId);
+    const row = await stmt.get(targetId, targetId);
     const targetContact = (row && row.contact) ? dbIndex.decrypt(row.contact) : null;
     sendJson(res, 200, { success: true, unlocked: true, contact: targetContact });
     return;
   }
 
   // 检查是否已解锁
-  const isUnlocked = paymentsDb.checkContactUnlocked(viewerId, targetId);
+  const isUnlocked = await paymentsDb.checkContactUnlocked(viewerId, targetId);
   if (!isUnlocked) {
     sendJson(res, 200, { success: true, unlocked: false, contact: null, message: '请先解锁联系方式' });
     return;
@@ -197,17 +197,17 @@ function checkUnlock(req, res, pathname, query) {
   // 已解锁，返回解密后的联系方式
   const database = dbIndex.getDb();
   const stmt = database.prepare('SELECT contact FROM users WHERE user_id = $1 OR id = $2 LIMIT 1');
-  const row = stmt.get(targetId, targetId);
+  const row = await stmt.get(targetId, targetId);
   const targetContact = (row && row.contact) ? dbIndex.decrypt(row.contact) : null;
   sendJson(res, 200, { success: true, unlocked: true, contact: targetContact });
 }
 
 // ========== GET /api/admin/unlock-records ==========
-function getUnlockRecords(req, res, checkAdminAuth) {
-  if (!checkAdminAuth(req)) {
+async function getUnlockRecords(req, res, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
-  const records = paymentsDb.getAllUnlockRecords();
+  const records = await paymentsDb.getAllUnlockRecords();
   sendJson(res, 200, { success: true, data: records });
 }
 

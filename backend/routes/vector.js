@@ -42,7 +42,7 @@ async function handleVectorRequest(req, res) {
   // GET /api/vector/stats - 获取向量统计
   if (method === 'GET' && pathname === '/api/vector/stats') {
     try {
-      const stats = vectorService.getStats();
+      const stats = await vectorService.getStats();
       sendJson(res, 200, { success: true, data: stats });
     } catch (e) {
       sendJson(res, 500, { success: false, message: e.message });

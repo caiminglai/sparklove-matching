@@ -8,9 +8,9 @@ const adminDb = require('../db/admin.js');
 const { sendJson } = require('../utils/sendJson');
 
 // GET /api/custom-fields
-function getCustomFilters(req, res) {
+async function getCustomFilters(req, res) {
   try {
-    const fields = adminDb.getAllCustomFilters();
+    const fields = await adminDb.getAllCustomFilters();
     const parsed = fields.map(f => ({
       ...f,
       options: f.field_options ? f.field_options.split(',').filter(o => o.trim()) : []
@@ -22,11 +22,11 @@ function getCustomFilters(req, res) {
 }
 
 // POST /api/admin/custom-fields
-function addCustomFilter(req, res, readBodyWithLimit, checkAdminAuth) {
-  if (!checkAdminAuth(req)) {
+async function addCustomFilter(req, res, readBodyWithLimit, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
-  readBodyWithLimit(req).then(body => {
+  readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
       if (!data.field_key || !data.field_label) {
@@ -35,7 +35,7 @@ function addCustomFilter(req, res, readBodyWithLimit, checkAdminAuth) {
       let fieldOptions = '';
       if (Array.isArray(data.field_options)) fieldOptions = data.field_options.join(',');
       else if (typeof data.field_options === 'string') fieldOptions = data.field_options;
-      const field = adminDb.addCustomFilter(
+      const field = await adminDb.addCustomFilter(
         data.field_key.trim(), data.field_label.trim(),
         data.field_type || 'text', data.description || '', fieldOptions
       );
@@ -49,8 +49,8 @@ function addCustomFilter(req, res, readBodyWithLimit, checkAdminAuth) {
 }
 
 // DELETE /api/admin/custom-fields/:id
-function deleteCustomFilter(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) {
+async function deleteCustomFilter(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
   }
   const parts = pathname.split('/');
@@ -58,7 +58,7 @@ function deleteCustomFilter(req, res, checkAdminAuth, pathname) {
   if (!id) {
     sendJson(res, 400, { success: false, message: '无效的 ID' }); return;
   }
-  const deleted = adminDb.deleteCustomFilter(id);
+  const deleted = await adminDb.deleteCustomFilter(id);
   sendJson(res, 200, { success: deleted, message: deleted ? '删除成功' : '未找到' });
 }
 

@@ -15,10 +15,10 @@ function addRating(req, res, readBodyWithLimit) {
     return;
   }
   const token = authHeader.slice(7);
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      const result = ratingsService.addRating(token, data.ratedId, data.rating, data.comment);
+      const result = await ratingsService.addRating(token, data.ratedId, data.rating, data.comment);
       sendJson(res, result.success ? 200 : 400, result);
     } catch (e) {
       sendJson(res, 500, { success: false, message: '评价失败' });
@@ -29,10 +29,10 @@ function addRating(req, res, readBodyWithLimit) {
 }
 
 // ========== GET /api/users/:id/ratings
-function getRatings(req, res, pathname) {
+async function getRatings(req, res, pathname) {
   const parts = pathname.split('/').filter(Boolean);
   const id = parts[parts.indexOf('users') + 1];
-  const result = ratingsService.getUserRatings(id);
+  const result = await ratingsService.getUserRatings(id);
   sendJson(res, 200, { success: true, ratings: result.ratings, average: result.average });
 }
 

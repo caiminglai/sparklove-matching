@@ -31,7 +31,7 @@ function addReport(req, res, readBodyWithLimit) {
     const boundary = contentType.split('boundary=')[1];
     if (!boundary) { sendJson(res, 400, { success: false, message: '无效的表单数据' }); return; }
     const MAX_SIZE = MAX_BODY_SIZE;
-    collectBody(req, MAX_SIZE).then(body => {
+    collectBody(req, MAX_SIZE).then(async body => {
       try {
         const parsed = parseMultipart(body, boundary);
         let reportedId = null, reportType = null, description = null, proofPath = null;
@@ -55,7 +55,7 @@ function addReport(req, res, readBodyWithLimit) {
           proofPath = '/uploads/reports/' + fileName;
         }
 
-        const result = reportsService.submitReport(token, reportedId, reportType, description, proofPath);
+        const result = await reportsService.submitReport(token, reportedId, reportType, description, proofPath);
         sendJson(res, result.success ? 200 : 400, result);
       } catch(e) { sendJson(res, 500, { success: false, message: '举报失败' }); }
     }).catch(() => { sendJson(res, 500, { success: false, message: '读取请求体失败' }); });
@@ -71,10 +71,10 @@ function addReport(req, res, readBodyWithLimit) {
         req.on('end', () => resolve(body));
         req.on('error', reject);
       });
-  readBody.then(body => {
+  readBody.then(async body => {
     try {
       const data = JSON.parse(body || '{}');
-      const result = reportsService.submitReport(token, data.reportedId, data.reportType, data.description, null);
+      const result = await reportsService.submitReport(token, data.reportedId, data.reportType, data.description, null);
       sendJson(res, result.success ? 200 : 400, result);
     } catch (e) { sendJson(res, 500, { success: false, message: '举报失败' }); }
   }).catch(() => {
@@ -83,26 +83,26 @@ function addReport(req, res, readBodyWithLimit) {
 }
 
 // ========== GET /api/admin/reports
-function getAllReports(req, res, checkAdminAuth) {
-  if (!checkAdminAuth(req)) {
+async function getAllReports(req, res, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
-  const reports = reportsService.getAllReportsForAdmin();
+  const reports = await reportsService.getAllReportsForAdmin();
   sendJson(res, 200, reports);
 }
 
 // ========== PUT /api/admin/reports/:id
-function updateReportStatus(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) {
+async function updateReportStatus(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
   const reportId = parseInt(extractId(pathname, 'reports'));
-  collectBody(req, 1024 * 1024).then(buf => {
+  collectBody(req, 1024 * 1024).then(async buf => {
     try {
       const data = JSON.parse(buf.toString() || '{}');
-      const result = reportsService.updateStatus(reportId, data.status, data.adminNote);
+      const result = await reportsService.updateStatus(reportId, data.status, data.adminNote);
       sendJson(res, 200, result);
     } catch (e) { sendJson(res, 500, { success: false, message: '更新失败' }); }
   }).catch(e => {
@@ -111,13 +111,13 @@ function updateReportStatus(req, res, checkAdminAuth, pathname) {
 }
 
 // ========== DELETE /api/admin/reports/:id
-function deleteReport(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) {
+async function deleteReport(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
   const reportId = parseInt(extractId(pathname, 'reports'));
-  const result = reportsService.removeReport(reportId);
+  const result = await reportsService.removeReport(reportId);
   sendJson(res, 200, result);
 }
 

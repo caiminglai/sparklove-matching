@@ -18,7 +18,7 @@ function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp)
     sendJson(res, 429, { success: false, message: '注册过于频繁，请稍后再试' });
     return;
   }
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
       // 最低路径：跳过验证码校验
@@ -26,7 +26,7 @@ function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp)
       //   sendJson(res, 400, { success: false, message: '滑动验证无效或已过期，请重新验证' });
       //   return;
       // }
-      const result = authService.register(data.phone, data.password, data.nickname);
+      const result = await authService.register(data.phone, data.password, data.nickname);
       if (result.success) setAuthCookie(res, result.token);
       sendJson(res, result.success ? 200 : 400, result);
     } catch (e) {
@@ -50,10 +50,10 @@ function login(req, res, readBodyWithLimit, checkLoginRateLimit) {
     sendJson(res, 429, { success: false, message: '登录尝试过多，请5分钟后再试' });
     return;
   }
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      const result = authService.login(data.phone, data.password);
+      const result = await authService.login(data.phone, data.password);
       if (result.success) setAuthCookie(res, result.token);
       sendJson(res, result.success ? 200 : 401, result);
     } catch (e) {
@@ -65,22 +65,22 @@ function login(req, res, readBodyWithLimit, checkLoginRateLimit) {
 }
 
 // ========== POST /api/auth/change-password
-function changePassword(req, res, readBodyWithLimit) {
+async function changePassword(req, res, readBodyWithLimit) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     sendJson(res, 401, { success: false, message: '未登录' });
     return;
   }
   const token = authHeader.slice(7);
-  const userId = authService.getCurrentUser(token)?.id;
+  const userId = (await authService.getCurrentUser(token))?.id;
   if (!userId) {
     sendJson(res, 401, { success: false, message: 'token无效' });
     return;
   }
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      const result = authService.changePassword(userId, data.oldPassword, data.newPassword);
+      const result = await authService.changePassword(userId, data.oldPassword, data.newPassword);
       sendJson(res, result.success ? 200 : 400, result);
     } catch (e) {
       sendJson(res, 500, { success: false, message: '修改密码失败' });
@@ -127,13 +127,13 @@ function adminLogin(req, res, readBodyWithLimit, checkLoginRateLimit) {
     sendJson(res, 429, { success: false, message: '登录尝试过多，请5分钟后再试' });
     return;
   }
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
       // 兼容旧版仅传 password 的调用：未传 username 时使用默认管理员账号
       const username = data.username || process.env.ADMIN_USERNAME || 'admin';
       const password = data.password;
-      const result = adminService.verifyAdminAccount(username, password);
+      const result = await adminService.verifyAdminAccount(username, password);
       if (result.success) {
         const token = generateAdminToken(result.username);
         sendJson(res, 200, { success: true, token, username: result.username });

@@ -18,13 +18,13 @@ const ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS;
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
 
-function uploadAvatar(req, res) {
+async function uploadAvatar(req, res) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     sendJson(res, 401, { success: false, message: '未登录' }); return;
   }
   const token = authHeader.slice(7);
-  const isAdmin = adminService.isAdminToken(token);
+  const isAdmin = await adminService.isAdminToken(token);
   const userId = isAdmin ? null : dbIndex.verifyToken(token);
   if (!userId && !isAdmin) {
     sendJson(res, 401, { success: false, message: 'token无效' }); return;
@@ -40,7 +40,7 @@ function uploadAvatar(req, res) {
   let uploadSize = 0;
   let tooLarge = false;
   req.on('data', c => { uploadSize += c.length; if (uploadSize > MAX_UPLOAD_SIZE) tooLarge = true; chunks.push(c); });
-  req.on('end', () => {
+  req.on('end', async () => {
     try {
       if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' }); return; }
       const buffer = Buffer.concat(chunks);
@@ -80,12 +80,12 @@ function uploadAvatar(req, res) {
       const avatarUrl = '/uploads/avatars/' + savedName;
       const targetUserId = userId || null;
       if (targetUserId) {
-        const users = userDb.getUsersByUserId(targetUserId);
+        const users = await userDb.getUsersByUserId(targetUserId);
         if (users.length > 0) {
           const existing = users[0];
           existing.data = existing.data || {};
           existing.data.avatar = avatarUrl;
-          userDb.updateUser(existing.id, existing);
+          await userDb.updateUser(existing.id, existing);
         }
       }
       sendJson(res, 200, { success: true, avatar: avatarUrl });
@@ -111,7 +111,7 @@ function uploadDepositProof(req, res) {
   let uploadSize = 0;
   let tooLarge = false;
   req.on('data', c => { uploadSize += c.length; if (uploadSize > MAX_UPLOAD_SIZE) tooLarge = true; chunks.push(c); });
-  req.on('end', () => {
+  req.on('end', async () => {
     try {
       if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' }); return; }
       const buffer = Buffer.concat(chunks);
@@ -156,7 +156,7 @@ function uploadDepositProof(req, res) {
       fs.writeFileSync(filepath, proofData);
       const proofPath = '/uploads/deposits/' + safeFilename;
       const depositRecord = { user_id: userId, amount: amount, proof_path: proofPath, status: 'pending', created_at: timestamp };
-      paymentsDb.addDeposit(userId, amount, proofPath);
+      await paymentsDb.addDeposit(userId, amount, proofPath);
       sendJson(res, 200, { success: true, message: '凭证已提交，等待审核', data: depositRecord });
     } catch (err) { sendJson(res, 500, { success: false, message: '上传失败: ' + err.message }); }
   });
@@ -180,26 +180,26 @@ function serveUploadedFile(req, res, pathname) {
   }
 }
 
-function getDeposits(req, res, checkAdminAuth) {
-  if (!checkAdminAuth(req)) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
+async function getDeposits(req, res, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
   const parsedUrl = require('url').parse(req.url, true);
   const status = parsedUrl.query.status || '';
   try {
-    const records = paymentsDb.getAllDeposits(status);
+    const records = await paymentsDb.getAllDeposits(status);
     sendJson(res, 200, { success: true, data: records });
   } catch (err) { sendJson(res, 500, { success: false, message: '服务器错误' }); }
 }
 
-function approveDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
+async function approveDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
   const match = pathname.match(/\/api\/admin\/deposits\/(\d+)\/approve/);
   if (!match) { sendJson(res, 400, { success: false, message: '无效的请求' }); return; }
   const id = match[1];
-  readBodyWithLimit(req).then(body => {
+  readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body || '{}');
       const adminNote = data.admin_note || '审核通过';
-      const success = paymentsDb.updateDepositStatus(id, 'approved', adminNote);
+      const success = await paymentsDb.updateDepositStatus(id, 'approved', adminNote);
       if (success) {
         sendJson(res, 200, { success: true, message: '审核通过' });
       } else {
@@ -209,16 +209,16 @@ function approveDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
   }).catch(err => { sendJson(res, 400, { success: false, message: err.message }); });
 }
 
-function rejectDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
+async function rejectDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
   const match = pathname.match(/\/api\/admin\/deposits\/(\d+)\/reject/);
   if (!match) { sendJson(res, 400, { success: false, message: '无效的请求' }); return; }
   const id = match[1];
-  readBodyWithLimit(req).then(body => {
+  readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body || '{}');
       const adminNote = data.admin_note || '审核未通过';
-      const success = paymentsDb.updateDepositStatus(id, 'rejected', adminNote);
+      const success = await paymentsDb.updateDepositStatus(id, 'rejected', adminNote);
       if (success) {
         sendJson(res, 200, { success: true, message: '已拒绝' });
       } else {
@@ -228,20 +228,20 @@ function rejectDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
   }).catch(err => { sendJson(res, 400, { success: false, message: err.message }); });
 }
 
-function getMyDeposit(req, res) {
+async function getMyDeposit(req, res) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) { sendJson(res, 401, { success: false, message: '未登录' }); return; }
   const token = authHeader.slice(7);
   const userId = dbIndex.verifyToken(token);
   if (!userId) { sendJson(res, 401, { success: false, message: 'token无效' }); return; }
   try {
-    const record = paymentsDb.getMyDeposit(userId);
+    const record = await paymentsDb.getMyDeposit(userId);
     sendJson(res, 200, { success: true, data: record || null });
   } catch (err) { sendJson(res, 500, { success: false, message: '服务器错误' }); }
 }
 
-function getDepositProofById(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
+async function getDepositProofById(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
   const id = parseInt(pathname.split('/').pop());
   if (!id || isNaN(id)) { sendJson(res, 400, { success: false, message: '无效的 ID' }); return; }
   try {
@@ -262,8 +262,8 @@ function getDepositProofById(req, res, checkAdminAuth, pathname) {
   } catch (err) { sendJson(res, 500, { success: false, message: '服务器错误' }); }
 }
 
-function deleteDeposit(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
+async function deleteDeposit(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
   const id = parseInt(pathname.split('/').pop());
   if (!id || isNaN(id)) { sendJson(res, 400, { success: false, message: '无效的 ID' }); return; }
   try {

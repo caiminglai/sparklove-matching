@@ -15,7 +15,7 @@ const { extractId } = require('../utils/extractId');
 const { sendJson } = require('../utils/sendJson');
 
 // 从请求头获取认证信息（优先 Authorization header，回退 httpOnly cookie）
-function getAuthInfo(req) {
+async function getAuthInfo(req) {
   const authHeader = req.headers.authorization;
   let token = null;
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -24,14 +24,14 @@ function getAuthInfo(req) {
     token = getAuthTokenFromCookie(req);
   }
   if (!token) return { isAdmin: false, userId: null, token: null };
-  const isAdmin = adminService.isAdminToken(token);
+  const isAdmin = await adminService.isAdminToken(token);
   return {
     isAdmin, userId: isAdmin ? null : verifyToken(token), token };
 }
 
 // ========== GET /api/users（用户列表 + keyword 搜索）
-function getUsers(req, res, _, parsedUrl) {
-  const authInfo = getAuthInfo(req);
+async function getUsers(req, res, _, parsedUrl) {
+  const authInfo = await getAuthInfo(req);
   const isLoggedIn = !!(authInfo.userId || authInfo.isAdmin);
 
   const page = parseInt(parsedUrl.query.page) || 1;
@@ -43,7 +43,7 @@ function getUsers(req, res, _, parsedUrl) {
 
   if (keyword) {
     const criteria = { keyword, exact };
-    const searchResult = userService.searchUsers(criteria, page, limit, authInfo.isAdmin);
+    const searchResult = await userService.searchUsers(criteria, page, limit, authInfo.isAdmin);
     result = searchResult.data;
     total = searchResult.count;
   } else {
@@ -54,8 +54,8 @@ function getUsers(req, res, _, parsedUrl) {
     } else if (limit > 50) {
       limit = 50;
     }
-    result = userService.getUserList(page, limit, authInfo.isAdmin);
-    total = userService.getUserStats().total;
+    result = await userService.getUserList(page, limit, authInfo.isAdmin);
+    total = (await userService.getUserStats()).total;
   }
 
   sendJson(res, 200, { success: true, data: result, total });
@@ -63,13 +63,13 @@ function getUsers(req, res, _, parsedUrl) {
 
 // ========== POST /api/users（创建用户）
 function addUser(req, res, readBodyWithLimit) {
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      const authInfo = getAuthInfo(req);
+      const authInfo = await getAuthInfo(req);
 
       if (authInfo.isAdmin) {
-        const result = userService.createUser(data, null);
+        const result = await userService.createUser(data, null);
         if (result.success) {
           sendJson(res, 200, result);
         } else {
@@ -78,7 +78,7 @@ function addUser(req, res, readBodyWithLimit) {
         return;
       }
       if (authInfo.userId) {
-        const result = userService.createUser(data, authInfo.userId);
+        const result = await userService.createUser(data, authInfo.userId);
         if (result.success) {
           sendJson(res, 200, result);
         } else {
@@ -96,19 +96,19 @@ function addUser(req, res, readBodyWithLimit) {
 }
 
 // ========== POST /api/users/batch（批量保存用户）
-function batchSaveUsers(req, res, readBodyWithLimit, checkAdminAuth) {
-  if (!checkAdminAuth(req)) {
+async function batchSaveUsers(req, res, readBodyWithLimit, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
       if (!Array.isArray(data)) {
         sendJson(res, 400, { success: false, message: '数据格式错误' });
         return;
       }
-      const result = userService.batchSave(data, true);
+      const result = await userService.batchSave(data, true);
       if (result.success) {
         sendJson(res, 200, { success: true, count: data.length });
       } else {
@@ -123,8 +123,8 @@ function batchSaveUsers(req, res, readBodyWithLimit, checkAdminAuth) {
 }
 
 // ========== GET /api/users/my（获取当前登录用户）
-function getMyUser(req, res) {
-  const authInfo = getAuthInfo(req);
+async function getMyUser(req, res) {
+  const authInfo = await getAuthInfo(req);
   if (!authInfo.token) {
     sendJson(res, 401, { success: false, message: '未登录' });
     return;
@@ -133,7 +133,7 @@ function getMyUser(req, res) {
     sendJson(res, 401, { success: false, message: 'token无效' });
     return;
   }
-  const user = userService.getMyUser(authInfo.userId);
+  const user = await userService.getMyUser(authInfo.userId);
   sendJson(res, 200, { success: true, user });
 }
 
@@ -150,10 +150,10 @@ function updateMyUser(req, res, readBodyWithLimit) {
     sendJson(res, 401, { success: false, message: 'token无效' });
     return;
   }
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      const result = userService.updateMyUser(userId, data);
+      const result = await userService.updateMyUser(userId, data);
       if (result.success) {
         sendJson(res, 200, result);
       } else {
@@ -168,7 +168,7 @@ function updateMyUser(req, res, readBodyWithLimit) {
 }
 
 // ========== DELETE /api/users/my（删除当前用户）
-function deleteMyUser(req, res) {
+async function deleteMyUser(req, res) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
     sendJson(res, 401, { success: false, message: '未登录' });
@@ -180,7 +180,7 @@ function deleteMyUser(req, res) {
     sendJson(res, 401, { success: false, message: 'token无效' });
     return;
   }
-  const result = userService.removeMyUser(userId);
+  const result = await userService.removeMyUser(userId);
   if (result.success) {
     sendJson(res, 200, result);
   } else {
@@ -189,8 +189,8 @@ function deleteMyUser(req, res) {
 }
 
 // ========== PUT /api/users/:id（管理员编辑用户）
-function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) {
+async function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
@@ -210,7 +210,7 @@ function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
       sendJson(res, 400, { success: false, message: '无效的表单数据' });
       return;
     }
-    return collectBody(req, 5 * 1024 * 1024).then(body => {
+    return collectBody(req, 5 * 1024 * 1024).then(async body => {
       try {
         const data = parseMultipart(body, boundary);
         const fields = {};
@@ -245,7 +245,7 @@ function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
           fields.avatar = `/uploads/avatars/${avatarName}`;
         }
 
-        const result = userService.editUserById(id, { data: fields });
+        const result = await userService.editUserById(id, { data: fields });
         sendJson(res, 200, result);
       } catch (e) {
         sendJson(res, 500, { success: false, message: '编辑失败: ' + e.message });
@@ -256,10 +256,10 @@ function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
   }
 
   // 处理 JSON
-  return readBodyWithLimit(req).then(body => {
+  return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
-      const result = userService.editUserById(id, data);
+      const result = await userService.editUserById(id, data);
       sendJson(res, 200, result);
     } catch (e) {
       sendJson(res, 500, { success: false, message: '编辑失败' });
@@ -270,8 +270,8 @@ function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
 }
 
 // ========== DELETE /api/users/:id（删除用户）
-function deleteUser(req, res, checkAdminAuth, pathname) {
-  const authInfo = getAuthInfo(req);
+async function deleteUser(req, res, checkAdminAuth, pathname) {
+  const authInfo = await getAuthInfo(req);
   const id = pathname.split('/')[3];
   if (!id || !userService.validateIdFormat(id)) {
     sendJson(res, 400, { success: false, message: '无效的用户ID' });
@@ -282,23 +282,23 @@ function deleteUser(req, res, checkAdminAuth, pathname) {
     sendJson(res, 401, { success: false, message: '需要登录' });
     return;
   }
-  const result = userService.removeUser(id, authInfo.userId, authInfo.isAdmin);
+  const result = await userService.removeUser(id, authInfo.userId, authInfo.isAdmin);
   sendJson(res, result.success ? 200 : 403, result);
 }
 
 // ========== GET /api/users/pending（待审核用户列表）
-function getPendingUsers(req, res, checkAdminAuth) {
-  if (!checkAdminAuth(req)) {
+async function getPendingUsers(req, res, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
-  const users = userService.getPendingUsers();
+  const users = await userService.getPendingUsers();
   sendJson(res, 200, { success: true, data: users });
 }
 
 // ========== POST /api/users/:id/approve（通过审核）
-function approveUser(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) {
+async function approveUser(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
@@ -307,13 +307,13 @@ function approveUser(req, res, checkAdminAuth, pathname) {
     sendJson(res, 400, { success: false, message: '无效的用户ID' });
     return;
   }
-  const result = userService.approveUser(id);
+  const result = await userService.approveUser(id);
   sendJson(res, 200, result);
 }
 
 // ========== POST /api/users/:id/reject（拒绝审核）
-function rejectUser(req, res, checkAdminAuth, pathname) {
-  if (!checkAdminAuth(req)) {
+async function rejectUser(req, res, checkAdminAuth, pathname) {
+  if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
@@ -322,12 +322,12 @@ function rejectUser(req, res, checkAdminAuth, pathname) {
     sendJson(res, 400, { success: false, message: '无效的用户ID' });
     return;
   }
-  const result = userService.rejectUser(id);
+  const result = await userService.rejectUser(id);
   sendJson(res, 200, result);
 }
 
 // ========== GET /api/users/search（搜索用户）
-function searchUsers(req, res, parsedUrl) {
+async function searchUsers(req, res, parsedUrl) {
   const criteria = { ...parsedUrl.query };
   for (const [key, value] of Object.entries(criteria)) {
     if (typeof value === 'string') {
@@ -341,7 +341,7 @@ function searchUsers(req, res, parsedUrl) {
   }
   const page = parseInt(criteria.page) || 1;
   const limit = Math.min(parseInt(criteria.limit) || 20, 100);
-  const result = userService.searchUsers(criteria, page, limit, false);
+  const result = await userService.searchUsers(criteria, page, limit, false);
   sendJson(res, 200, { success: true, ...result });
 }
 

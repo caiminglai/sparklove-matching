@@ -68,11 +68,11 @@ async function createWechatOrder(userId, amount, clientIp) {
     const req = https.request({ hostname: 'api.mch.weixin.qq.com', port: 443, path: '/pay/unifiedorder', method: 'POST', timeout: 10000 }, (res) => {
       let data = '';
       res.on('data', chunk => data += chunk);
-      res.on('end', () => {
+      res.on('end', async () => {
         try {
           const result = parseXml(data);
           if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
-            paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'wechat', status: 'pending' });
+            await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'wechat', status: 'pending' });
             resolve({ success: true, orderId: orderId, payUrl: result.mweb_url });
           } else { reject(new Error(result.return_msg || '创建订单失败')); }
         } catch (e) { reject(e); }
@@ -85,7 +85,7 @@ async function createWechatOrder(userId, amount, clientIp) {
   });
 }
 
-function handleWechatNotify(xmlData) {
+async function handleWechatNotify(xmlData) {
   const result = parseXml(xmlData);
   const sign = result.sign;
   delete result.sign;
@@ -93,10 +93,10 @@ function handleWechatNotify(xmlData) {
   if (sign !== calculatedSign) return { success: false, message: '签名验证失败' };
   if (result.return_code === 'SUCCESS' && result.result_code === 'SUCCESS') {
     const orderId = result.out_trade_no;
-    const order = paymentsDb.getPaymentOrder(orderId);
+    const order = await paymentsDb.getPaymentOrder(orderId);
     if (order && order.status === 'pending') {
-      paymentsDb.updatePaymentOrder(orderId, 'paid');
-      paymentsDb.approveDepositByUserId(order.user_id, order.amount);
+      await paymentsDb.updatePaymentOrder(orderId, 'paid');
+      await paymentsDb.approveDepositByUserId(order.user_id, order.amount);
       return { success: true, orderId: orderId };
     }
   }
@@ -128,11 +128,11 @@ async function createAlipayOrder(userId, amount) {
   params.sign = alipaySign(params, alipayConfig.privateKey);
   const queryString = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
   const payUrl = 'https://openapi.alipay.com/gateway.do?' + queryString;
-  paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'alipay', status: 'pending' });
+  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'alipay', status: 'pending' });
   return { success: true, orderId: orderId, payUrl: payUrl };
 }
 
-function handleAlipayNotify(params) {
+async function handleAlipayNotify(params) {
   const sign = params.sign;
   delete params.sign;
   delete params.sign_type;
@@ -142,10 +142,10 @@ function handleAlipayNotify(params) {
   if (!verify.verify(alipayConfig.alipayPublicKey, sign, 'base64')) return { success: false, message: '签名验证失败' };
   if (params.trade_status === 'TRADE_SUCCESS') {
     const orderId = params.out_trade_no;
-    const order = paymentsDb.getPaymentOrder(orderId);
+    const order = await paymentsDb.getPaymentOrder(orderId);
     if (order && order.status === 'pending') {
-      paymentsDb.updatePaymentOrder(orderId, 'paid');
-      paymentsDb.approveDepositByUserId(order.user_id, order.amount);
+      await paymentsDb.updatePaymentOrder(orderId, 'paid');
+      await paymentsDb.approveDepositByUserId(order.user_id, order.amount);
       return { success: true, orderId: orderId };
     }
   }
@@ -171,9 +171,9 @@ function parseXml(xml) {
   return result;
 }
 
-function createMockOrder(userId, amount, channel) {
+async function createMockOrder(userId, amount, channel) {
   const orderId = generateOrderId();
-  paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: channel || 'mock', status: 'pending' });
+  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: channel || 'mock', status: 'pending' });
   return {
     success: true,
     orderId: orderId,
@@ -207,7 +207,7 @@ async function mockPay(req, res, parsedUrl) {
     res.end('<h1>缺少订单号</h1>');
     return;
   }
-  const order = paymentsDb.getPaymentOrder(orderId);
+  const order = await paymentsDb.getPaymentOrder(orderId);
   if (!order) {
     res.writeHead(404, {'Content-Type': 'text/html; charset=utf-8'});
     res.end('<h1>订单不存在</h1>');
@@ -220,8 +220,8 @@ async function mockPay(req, res, parsedUrl) {
     return;
   }
   if (order.status === 'pending') {
-    paymentsDb.updatePaymentOrder(orderId, 'paid');
-    paymentsDb.approveDepositByUserId(order.user_id, order.amount);
+    await paymentsDb.updatePaymentOrder(orderId, 'paid');
+    await paymentsDb.approveDepositByUserId(order.user_id, order.amount);
   }
   res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
   res.end('<html><head><meta charset="utf-8"><title>支付成功</title></head><body style="text-align:center;padding-top:50px;font-family:sans-serif;"><h1>✅ 模拟支付成功</h1><p>订单号：' + orderId + '</p><p><a href="/deposit">返回保证金页面</a></p></body></html>');
@@ -243,10 +243,10 @@ async function createPayment(req, res, readBodyWithLimit) {
     const isProd = process.env.NODE_ENV === 'production';
     const clientIp = req.headers['x-forwarded-for'] || req.socket.remoteAddress || '127.0.0.1';
     if (channel === 'wechat') {
-      if (!config.wechat && !isProd) result = createMockOrder(userId, amount, 'wechat');
+      if (!config.wechat && !isProd) result = await createMockOrder(userId, amount, 'wechat');
       else result = await createWechatOrder(userId, amount, clientIp);
     } else if (channel === 'alipay') {
-      if (!config.alipay && !isProd) result = createMockOrder(userId, amount, 'alipay');
+      if (!config.alipay && !isProd) result = await createMockOrder(userId, amount, 'alipay');
       else result = await createAlipayOrder(userId, amount);
     } else { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '不支持的支付渠道' })); return; }
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
@@ -257,7 +257,7 @@ async function createPayment(req, res, readBodyWithLimit) {
 async function wechatNotify(req, res, readBodyWithLimit) {
   try {
     const body = await readBodyWithLimit(req);
-    const result = handleWechatNotify(body);
+    const result = await handleWechatNotify(body);
     if (result.success) { res.writeHead(200, {'Content-Type': 'text/xml'}); res.end('<xml><return_code><![CDATA[SUCCESS]]></return_code><return_msg><![CDATA[OK]]></return_msg></xml>'); }
     else { res.writeHead(200, {'Content-Type': 'text/xml'}); res.end('<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[FAIL]]></return_msg></xml>'); }
   } catch (e) { res.writeHead(200, {'Content-Type': 'text/xml'}); res.end('<xml><return_code><![CDATA[FAIL]]></return_code><return_msg><![CDATA[FAIL]]></return_msg></xml>'); }
@@ -268,13 +268,13 @@ async function alipayNotify(req, res, readBodyWithLimit) {
     const body = await readBodyWithLimit(req);
     const params = {};
     body.split('&').forEach(pair => { const idx = pair.indexOf('='); const key = pair.substring(0, idx); const value = pair.substring(idx + 1); params[key] = decodeURIComponent(value || ''); });
-    const result = handleAlipayNotify(params);
+    const result = await handleAlipayNotify(params);
     if (result.success) { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('success'); }
     else { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('fail'); }
   } catch (e) { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('fail'); }
 }
 
-function queryPaymentStatus(req, res, parsedUrl) {
+async function queryPaymentStatus(req, res, parsedUrl) {
   const authHeader = req.headers.authorization;
   if (!authHeader || !authHeader.startsWith('Bearer ')) { res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '未登录' })); return; }
   const token = authHeader.slice(7);
@@ -282,7 +282,7 @@ function queryPaymentStatus(req, res, parsedUrl) {
   if (!userId) { res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: 'token无效' })); return; }
   const orderId = parsedUrl.query.orderId;
   if (!orderId) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '缺少订单号' })); return; }
-  const order = paymentsDb.getPaymentOrder(orderId);
+  const order = await paymentsDb.getPaymentOrder(orderId);
   if (!order || order.user_id !== userId) { res.writeHead(404, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '订单不存在' })); return; }
   res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
   res.end(JSON.stringify({ success: true, status: order.status }));
