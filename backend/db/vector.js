@@ -2,10 +2,10 @@ const { getDb } = require('./index');
 
 const VECTOR_DIMENSION = 1536;
 
-function initVectorTables() {
+async function initVectorTables() {
   const db = getDb();
 
-  db.exec(`
+  await db.exec(`
     CREATE TABLE IF NOT EXISTS user_vectors (
       id SERIAL PRIMARY KEY,
       user_id VARCHAR(50) NOT NULL UNIQUE,
@@ -21,7 +21,7 @@ function initVectorTables() {
     CREATE INDEX IF NOT EXISTS idx_user_vectors_expectation ON user_vectors USING hnsw (expectation_vector vector_cosine_ops);
   `);
 
-  db.exec(`
+  await db.exec(`
     COMMENT ON TABLE user_vectors IS '用户画像向量表';
     COMMENT ON COLUMN user_vectors.user_id IS '用户ID';
     COMMENT ON COLUMN user_vectors.profile_vector IS '用户资料向量';
@@ -34,12 +34,12 @@ function initVectorTables() {
   `);
 }
 
-function upsertUserVector(userId, profileVector, expectationVector, profileText, expectationText, model) {
+async function upsertUserVector(userId, profileVector, expectationVector, profileText, expectationText, model) {
   const db = getDb();
   const now = Date.now();
   // 修复：原 SELECT-then-INSERT/UPDATE 在并发下两个 upsert 都查不到都会 INSERT，
   // 第二个因 UNIQUE(user_id) 失败抛错。改用 ON CONFLICT DO UPDATE 原子完成。
-  db.prepare(`
+  await db.prepare(`
     INSERT INTO user_vectors (user_id, profile_vector, expectation_vector, profile_text, expectation_text, model, created_at, updated_at)
     VALUES ($1, $2, $3, $4, $5, $6, $7, $7)
     ON CONFLICT (user_id) DO UPDATE SET
@@ -52,10 +52,10 @@ function upsertUserVector(userId, profileVector, expectationVector, profileText,
   `).run(userId, profileVector, expectationVector, profileText, expectationText, model, now);
 }
 
-function findSimilarUsersByProfile(vector, limit = 10, excludeUserId = null) {
+async function findSimilarUsersByProfile(vector, limit = 10, excludeUserId = null) {
   const db = getDb();
   if (excludeUserId) {
-    return db.prepare(`
+    return await db.prepare(`
       SELECT uv.user_id, 1 - (uv.profile_vector <=> $1) as similarity
       FROM user_vectors uv
       WHERE uv.user_id != $2
@@ -63,7 +63,7 @@ function findSimilarUsersByProfile(vector, limit = 10, excludeUserId = null) {
       LIMIT $3
     `).all(vector, excludeUserId, limit);
   }
-  return db.prepare(`
+  return await db.prepare(`
     SELECT uv.user_id, 1 - (uv.profile_vector <=> $1) as similarity
     FROM user_vectors uv
     ORDER BY uv.profile_vector <=> $1
@@ -71,10 +71,10 @@ function findSimilarUsersByProfile(vector, limit = 10, excludeUserId = null) {
   `).all(vector, limit);
 }
 
-function findSimilarUsersByExpectation(vector, limit = 10, excludeUserId = null) {
+async function findSimilarUsersByExpectation(vector, limit = 10, excludeUserId = null) {
   const db = getDb();
   if (excludeUserId) {
-    return db.prepare(`
+    return await db.prepare(`
       SELECT uv.user_id, 1 - (uv.expectation_vector <=> $1) as similarity
       FROM user_vectors uv
       WHERE uv.user_id != $2
@@ -82,7 +82,7 @@ function findSimilarUsersByExpectation(vector, limit = 10, excludeUserId = null)
       LIMIT $3
     `).all(vector, excludeUserId, limit);
   }
-  return db.prepare(`
+  return await db.prepare(`
     SELECT uv.user_id, 1 - (uv.expectation_vector <=> $1) as similarity
     FROM user_vectors uv
     ORDER BY uv.expectation_vector <=> $1
@@ -90,9 +90,9 @@ function findSimilarUsersByExpectation(vector, limit = 10, excludeUserId = null)
   `).all(vector, limit);
 }
 
-function findMutualMatchUsers(userId, limit = 10) {
+async function findMutualMatchUsers(userId, limit = 10) {
   const db = getDb();
-  return db.prepare(`
+  return await db.prepare(`
     SELECT
       uv.user_id,
       (1 - (uv.profile_vector <=> (SELECT expectation_vector FROM user_vectors WHERE user_id = $1))) as profile_match_score,
@@ -106,14 +106,14 @@ function findMutualMatchUsers(userId, limit = 10) {
   `).all(userId, limit);
 }
 
-function getUserVector(userId) {
+async function getUserVector(userId) {
   const db = getDb();
-  return db.prepare('SELECT * FROM user_vectors WHERE user_id = $1').get(userId);
+  return await db.prepare('SELECT * FROM user_vectors WHERE user_id = $1').get(userId);
 }
 
-function getVectorStats() {
+async function getVectorStats() {
   const db = getDb();
-  const result = db.prepare(`
+  const result = await db.prepare(`
     SELECT
       COUNT(*) as total_vectors,
       COUNT(DISTINCT user_id) as total_users,
