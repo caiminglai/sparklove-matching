@@ -36,9 +36,9 @@ function getAdminTokenFromRequest(req) {
   return null;
 }
 
-function checkAdminAuth(req) {
+async function checkAdminAuth(req) {
   const token = getAdminTokenFromRequest(req);
-  return adminService.isAdminToken(token);
+  return await adminService.isAdminToken(token);
 }
 
 // ========== CORS 配置 ==========
@@ -203,7 +203,7 @@ const server = http.createServer(async (req, res) => {
     res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(ADMIN_HTML); return;
   }
   if (req.method === 'GET' && (pathname === '/admin/m' || pathname === '/admin/m/')) {
-    if (!checkAdminAuth(req)) {
+    if (!(await checkAdminAuth(req))) {
       res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(M_LOGIN_HTML); return;
     }
     res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(M_HTML); return;
@@ -236,28 +236,28 @@ const server = http.createServer(async (req, res) => {
 
   // --- 上传 ---
   if (req.method === 'POST' && pathname === '/api/upload/avatar') {
-    uploadRoutes.uploadAvatar(req, res); return;
+    await uploadRoutes.uploadAvatar(req, res); return;
   }
   if (req.method === 'POST' && pathname === '/api/deposit/upload-proof') {
     uploadRoutes.uploadDepositProof(req, res); return;
   }
   if (req.method === 'GET' && pathname === '/api/admin/deposits') {
-    uploadRoutes.getDeposits(req, res, checkAdminAuth); return;
+    await uploadRoutes.getDeposits(req, res, checkAdminAuth); return;
   }
   if (req.method === 'PUT' && /^\/api\/admin\/deposits\/\d+\/approve$/.test(pathname)) {
-    uploadRoutes.approveDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname); return;
+    await uploadRoutes.approveDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname); return;
   }
   if (req.method === 'PUT' && /^\/api\/admin\/deposits\/\d+\/reject$/.test(pathname)) {
-    uploadRoutes.rejectDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname); return;
+    await uploadRoutes.rejectDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname); return;
   }
   if (req.method === 'GET' && pathname === '/api/users/my-deposit') {
-    uploadRoutes.getMyDeposit(req, res); return;
+    await uploadRoutes.getMyDeposit(req, res); return;
   }
   if (req.method === 'GET' && /^\/api\/admin\/deposits\/proof\/\d+$/.test(pathname)) {
-    uploadRoutes.getDepositProofById(req, res, checkAdminAuth, pathname); return;
+    await uploadRoutes.getDepositProofById(req, res, checkAdminAuth, pathname); return;
   }
   if (req.method === 'DELETE' && /^\/api\/admin\/deposits\/\d+$/.test(pathname)) {
-    uploadRoutes.deleteDeposit(req, res, checkAdminAuth, pathname); return;
+    await uploadRoutes.deleteDeposit(req, res, checkAdminAuth, pathname); return;
   }
 
   // --- 向量搜索 ---
@@ -273,16 +273,16 @@ const server = http.createServer(async (req, res) => {
     contactUnlockRoutes.submitUnlockRequest(req, res); return;
   }
   if (req.method === 'GET' && pathname === '/api/admin/unlock-contact-requests') {
-    contactUnlockRoutes.getUnlockRequests(req, res, checkAdminAuth); return;
+    await contactUnlockRoutes.getUnlockRequests(req, res, checkAdminAuth); return;
   }
   if (req.method === 'PUT' && /^\/api\/admin\/unlock-contact-requests\/\d+\/approve$/.test(pathname)) {
-    contactUnlockRoutes.approveUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname); return;
+    await contactUnlockRoutes.approveUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname); return;
   }
   if (req.method === 'PUT' && /^\/api\/admin\/unlock-contact-requests\/\d+\/reject$/.test(pathname)) {
-    contactUnlockRoutes.rejectUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname); return;
+    await contactUnlockRoutes.rejectUnlockRequest(req, res, checkAdminAuth, readBodyWithLimit, pathname); return;
   }
   if (req.method === 'DELETE' && /^\/api\/admin\/unlock-contact-requests\/\d+$/.test(pathname)) {
-    contactUnlockRoutes.deleteUnlockRequest(req, res, checkAdminAuth, pathname); return;
+    await contactUnlockRoutes.deleteUnlockRequest(req, res, checkAdminAuth, pathname); return;
   }
 
   if (req.method === 'GET' && pathname.startsWith('/uploads/')) {
@@ -298,7 +298,7 @@ const server = http.createServer(async (req, res) => {
     authRoutes.login(req, res, readBodyWithLimit, checkLoginRateLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/auth/change-password') {
-    authRoutes.changePassword(req, res, readBodyWithLimit); return;
+    await authRoutes.changePassword(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'GET' && pathname === '/api/auth/captcha') {
     authRoutes.getCaptcha(req, res); return;
@@ -320,74 +320,74 @@ const server = http.createServer(async (req, res) => {
 
   // --- 管理员统计 ---
   if (req.method === 'GET' && pathname === '/api/admin/stats') {
-    if (!checkAdminAuth(req)) {
+    if (!(await checkAdminAuth(req))) {
       res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'});
       res.end(JSON.stringify({success: false, message: '需要管理员权限'})); return;
     }
-    const stats = userDb.getUserStats();
+    const stats = await userDb.getUserStats();
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify({success: true, stats})); return;
   }
 
   // --- 用户路由 ---
   if (req.method === 'GET' && pathname === '/api/users') {
-    userRoutes.getUsers(req, res, null, parsedUrl); return;
+    await userRoutes.getUsers(req, res, null, parsedUrl); return;
   }
   if (req.method === 'POST' && pathname === '/api/users') {
     userRoutes.addUser(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/users/batch') {
-    userRoutes.batchSaveUsers(req, res, readBodyWithLimit, checkAdminAuth); return;
+    await userRoutes.batchSaveUsers(req, res, readBodyWithLimit, checkAdminAuth); return;
   }
   if (req.method === 'GET' && pathname === '/api/users/my') {
-    userRoutes.getMyUser(req, res); return;
+    await userRoutes.getMyUser(req, res); return;
   }
   if (req.method === 'PUT' && pathname === '/api/users/my') {
     userRoutes.updateMyUser(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'DELETE' && pathname === '/api/users/my') {
-    userRoutes.deleteMyUser(req, res); return;
+    await userRoutes.deleteMyUser(req, res); return;
   }
   if (req.method === 'GET' && pathname === '/api/users/pending') {
-    userRoutes.getPendingUsers(req, res, checkAdminAuth); return;
+    await userRoutes.getPendingUsers(req, res, checkAdminAuth); return;
   }
   if (req.method === 'GET' && pathname === '/api/users/search') {
-    userRoutes.searchUsers(req, res, parsedUrl); return;
+    await userRoutes.searchUsers(req, res, parsedUrl); return;
   }
 
   // --- 用户自定义字段（EAV 键值表） ---
   if (pathname === '/api/users/custom-fields' || /^\/api\/users\/custom-fields\/[^\/]+$/.test(pathname)) {
-    userCustomFieldsRoutes.handleUserCustomFields(req, res, readBodyWithLimit, pathname); return;
+    await userCustomFieldsRoutes.handleUserCustomFields(req, res, readBodyWithLimit, pathname); return;
   }
   // --- 批量获取所有用户自定义字段（公开接口，前端搜索用） ---
   if (req.method === 'GET' && pathname === '/api/users/all-custom-fields') {
-    const allFields = userDb.getAllCustomFields();
+    const allFields = await userDb.getAllCustomFields();
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify({success: true, data: allFields})); return;
   }
 
   // 带ID的用户路由
   if (req.method === 'PUT' && /^\/api\/users\/[^\/]+$/.test(pathname)) {
-    userRoutes.editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname); return;
+    await userRoutes.editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname); return;
   }
   if (req.method === 'DELETE' && /^\/api\/users\/[^\/]+$/.test(pathname)) {
-    userRoutes.deleteUser(req, res, null, pathname); return;
+    await userRoutes.deleteUser(req, res, null, pathname); return;
   }
   if (req.method === 'POST' && /^\/api\/users\/[^\/]+\/approve$/.test(pathname)) {
-    userRoutes.approveUser(req, res, checkAdminAuth, pathname); return;
+    await userRoutes.approveUser(req, res, checkAdminAuth, pathname); return;
   }
   if (req.method === 'POST' && /^\/api\/users\/[^\/]+\/reject$/.test(pathname)) {
-    userRoutes.rejectUser(req, res, checkAdminAuth, pathname); return;
+    await userRoutes.rejectUser(req, res, checkAdminAuth, pathname); return;
   }
   // --- 解锁联系方式 ---
   if (req.method === 'POST' && /^\/api\/users\/[^\/]+\/unlock-contact$/.test(pathname)) {
-    contactUnlockRoutes.adminUnlockContact(req, res, checkAdminAuth, readBodyWithLimit, pathname); return;
+    await contactUnlockRoutes.adminUnlockContact(req, res, checkAdminAuth, readBodyWithLimit, pathname); return;
   }
   if (req.method === 'GET' && /^\/api\/users\/[^\/]+\/check-unlock$/.test(pathname)) {
-    contactUnlockRoutes.checkUnlock(req, res, pathname, parsedUrl.query); return;
+    await contactUnlockRoutes.checkUnlock(req, res, pathname, parsedUrl.query); return;
   }
   if (req.method === 'GET' && pathname === '/api/admin/unlock-records') {
-    contactUnlockRoutes.getUnlockRecords(req, res, checkAdminAuth); return;
+    await contactUnlockRoutes.getUnlockRecords(req, res, checkAdminAuth); return;
   }
 
   // --- 评价 ---
@@ -395,7 +395,7 @@ const server = http.createServer(async (req, res) => {
     ratingRoutes.addRating(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'GET' && /^\/api\/users\/[^\/]+\/ratings$/.test(pathname)) {
-    ratingRoutes.getRatings(req, res, pathname); return;
+    await ratingRoutes.getRatings(req, res, pathname); return;
   }
 
   // --- 举报 ---
@@ -403,39 +403,39 @@ const server = http.createServer(async (req, res) => {
     reportRoutes.addReport(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'GET' && pathname === '/api/reports') {
-    reportRoutes.getAllReports(req, res, checkAdminAuth); return;
+    await reportRoutes.getAllReports(req, res, checkAdminAuth); return;
   }
   if (req.method === 'PUT' && /^\/api\/reports\/\d+\/status$/.test(pathname)) {
-    reportRoutes.updateReportStatus(req, res, checkAdminAuth, pathname); return;
+    await reportRoutes.updateReportStatus(req, res, checkAdminAuth, pathname); return;
   }
   if (req.method === 'DELETE' && /^\/api\/reports\/\d+$/.test(pathname)) {
-    reportRoutes.deleteReport(req, res, checkAdminAuth, pathname); return;
+    await reportRoutes.deleteReport(req, res, checkAdminAuth, pathname); return;
   }
   // --- 支付 ---
   if (req.method === 'POST' && pathname === '/api/payment/create') {
-    paymentRoutes.createPayment(req, res, readBodyWithLimit); return;
+    await paymentRoutes.createPayment(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/payment/notify-wechat') {
-    paymentRoutes.wechatNotify(req, res, readBodyWithLimit); return;
+    await paymentRoutes.wechatNotify(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/payment/notify-alipay') {
-    paymentRoutes.alipayNotify(req, res, readBodyWithLimit); return;
+    await paymentRoutes.alipayNotify(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'GET' && pathname === '/api/payment/mock-pay') {
-    paymentRoutes.mockPay(req, res, parsedUrl); return;
+    await paymentRoutes.mockPay(req, res, parsedUrl); return;
   }
   if (req.method === 'GET' && pathname === '/api/payment/status') {
-    paymentRoutes.queryPaymentStatus(req, res, parsedUrl); return;
+    await paymentRoutes.queryPaymentStatus(req, res, parsedUrl); return;
   }
 
   // --- 字段中文映射表（前端动态获取字段定义，支持 ETag 缓存） ---
   if (req.method === 'GET' && pathname === '/api/field-mappings') {
     try {
-      const version = fieldMappingsDb.getCacheVersion();
+      const version = await fieldMappingsDb.getCacheVersion();
       if (req.headers['if-none-match'] === version) {
         res.writeHead(304); res.end(); return;
       }
-      const mappings = fieldMappingsDb.getAllFieldMappings();
+      const mappings = await fieldMappingsDb.getAllFieldMappings();
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
         'ETag': version
@@ -448,11 +448,11 @@ const server = http.createServer(async (req, res) => {
   }
   if (req.method === 'GET' && pathname === '/api/field-mappings/labels') {
     try {
-      const version = fieldMappingsDb.getCacheVersion();
+      const version = await fieldMappingsDb.getCacheVersion();
       if (req.headers['if-none-match'] === version) {
         res.writeHead(304); res.end(); return;
       }
-      const labelMap = fieldMappingsDb.getFieldLabelMap();
+      const labelMap = await fieldMappingsDb.getFieldLabelMap();
       res.writeHead(200, {
         'Content-Type': 'application/json; charset=utf-8',
         'ETag': version
@@ -465,13 +465,13 @@ const server = http.createServer(async (req, res) => {
   }
   // --- 自定义筛选字段 ---
   if (req.method === 'GET' && pathname === '/api/custom-fields') {
-    adminCustomFieldsRoutes.getCustomFilters(req, res); return;
+    await adminCustomFieldsRoutes.getCustomFilters(req, res); return;
   }
   if (req.method === 'POST' && pathname === '/api/admin/custom-fields') {
-    adminCustomFieldsRoutes.addCustomFilter(req, res, readBodyWithLimit, checkAdminAuth); return;
+    await adminCustomFieldsRoutes.addCustomFilter(req, res, readBodyWithLimit, checkAdminAuth); return;
   }
   if (req.method === 'DELETE' && /^\/api\/admin\/custom-fields\/\d+$/.test(pathname)) {
-    adminCustomFieldsRoutes.deleteCustomFilter(req, res, checkAdminAuth, pathname); return;
+    await adminCustomFieldsRoutes.deleteCustomFilter(req, res, checkAdminAuth, pathname); return;
   }
 
   // 404
@@ -493,9 +493,21 @@ const PORT = process.env.PORT || 8080;
 // 异步初始化数据库连接后再启动服务器
 const { initConnection } = require('./db/index.js');
 const { initVectorTables } = require('./db/vector.js');
-initConnection().then(() => {
+initConnection().then(async () => {
+  // 启动期强校验：管理员密码必须能从环境变量或数据库取到，否则拒绝启动
+  // （替代原 admin.service.js 模块加载期的 process.exit(1)）
+  try {
+    const adminPwd = process.env.ADMIN_PASSWORD || await adminDb.getAdminPassword();
+    if (!adminPwd) {
+      console.error('[FATAL] ADMIN_PASSWORD not configured. Set it in .env or database.');
+      process.exit(1);
+    }
+  } catch (e) {
+    console.error('[FATAL] 管理员密码校验失败:', e.message);
+    process.exit(1);
+  }
   // 自动建向量表 + HNSW 索引（若已存在则跳过）
-  try { initVectorTables(); } catch(e) { console.warn('向量表初始化失败（可忽略）：', e.message); }
+  try { await initVectorTables(); } catch(e) { console.warn('向量表初始化失败（可忽略）：', e.message); }
   server.listen(PORT, () => {
     console.log('');
     console.log('╔══════════════════════════════════════════╗');
@@ -518,7 +530,8 @@ process.on('unhandledRejection', (reason, promise) => {
 
 process.on('uncaughtException', (error) => {
   console.error('[Uncaught Exception]', error);
-  try { dbIndex.closeDb(); } catch(e) {}
+  // closeDb 现在是异步的；进程即将退出，这里不等待、只吞掉可能的 rejection
+  dbIndex.closeDb().catch(() => {});
   process.exit(1);
 });
 
@@ -526,9 +539,10 @@ process.on('uncaughtException', (error) => {
 process.on('SIGINT', () => {
   console.log('\n[Server] 正在关闭...');
   server.close(() => {
-    try { dbIndex.closeDb(); } catch(e) {}
-    console.log('[Server] 已关闭');
-    process.exit(0);
+    dbIndex.closeDb().catch(() => {}).then(() => {
+      console.log('[Server] 已关闭');
+      process.exit(0);
+    });
   });
   // 10秒后强制退出
   setTimeout(() => process.exit(1), 10000);
@@ -537,9 +551,10 @@ process.on('SIGINT', () => {
 process.on('SIGTERM', () => {
   console.log('\n[Server] 收到 SIGTERM，正在关闭...');
   server.close(() => {
-    try { dbIndex.closeDb(); } catch(e) {}
-    console.log('[Server] 已关闭');
-    process.exit(0);
+    dbIndex.closeDb().catch(() => {}).then(() => {
+      console.log('[Server] 已关闭');
+      process.exit(0);
+    });
   });
   setTimeout(() => process.exit(1), 10000);
 });
