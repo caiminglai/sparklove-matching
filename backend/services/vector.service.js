@@ -88,7 +88,7 @@ function generateMockEmbedding(text) {
 }
 
 async function generateAndStoreUserVector(userId) {
-  const user = userDb.getUserById(userId);
+  const user = await userDb.getUserById(userId);
   if (!user) {
     throw new Error('用户不存在');
   }
@@ -104,7 +104,7 @@ async function generateAndStoreUserVector(userId) {
   const profileVecStr = profileVector ? `[${profileVector.join(',')}]` : null;
   const expectationVecStr = expectationVector ? `[${expectationVector.join(',')}]` : null;
 
-  vectorDb.upsertUserVector(
+  await vectorDb.upsertUserVector(
     userId,
     profileVecStr,
     expectationVecStr,
@@ -117,10 +117,10 @@ async function generateAndStoreUserVector(userId) {
 }
 
 async function findSimilarUsers(userId, type = 'profile', limit = 10) {
-  let userVector = vectorDb.getUserVector(userId);
+  let userVector = await vectorDb.getUserVector(userId);
   if (!userVector) {
     await generateAndStoreUserVector(userId);
-    userVector = vectorDb.getUserVector(userId);
+    userVector = await vectorDb.getUserVector(userId);
   }
 
   if (!userVector) {
@@ -136,43 +136,49 @@ async function findSimilarUsers(userId, type = 'profile', limit = 10) {
   }
 
   const results = type === 'profile'
-    ? vectorDb.findSimilarUsersByProfile(vector, limit, userId)
-    : vectorDb.findSimilarUsersByExpectation(vector, limit, userId);
+    ? await vectorDb.findSimilarUsersByProfile(vector, limit, userId)
+    : await vectorDb.findSimilarUsersByExpectation(vector, limit, userId);
 
-  return results.map(r => {
-    const user = userDb.getUserById(r.user_id);
-    return {
+  const users = [];
+  for (const r of results) {
+    const user = await userDb.getUserById(r.user_id);
+    const merged = {
       ...user,
       similarity: r.similarity
     };
-  }).filter(u => u.id);
+    if (merged.id) users.push(merged);
+  }
+  return users;
 }
 
 async function findMutualMatches(userId, limit = 10) {
-  let userVector = vectorDb.getUserVector(userId);
+  let userVector = await vectorDb.getUserVector(userId);
   if (!userVector) {
     await generateAndStoreUserVector(userId);
-    userVector = vectorDb.getUserVector(userId);
+    userVector = await vectorDb.getUserVector(userId);
   }
 
   if (!userVector) {
     return [];
   }
 
-  const results = vectorDb.findMutualMatchUsers(userId, limit);
-  return results.map(r => {
-    const user = userDb.getUserById(r.user_id);
-    return {
+  const results = await vectorDb.findMutualMatchUsers(userId, limit);
+  const users = [];
+  for (const r of results) {
+    const user = await userDb.getUserById(r.user_id);
+    const merged = {
       ...user,
       profile_match_score: r.profile_match_score,
       expectation_match_score: r.expectation_match_score,
       mutual_score: r.mutual_score
     };
-  }).filter(u => u.id);
+    if (merged.id) users.push(merged);
+  }
+  return users;
 }
 
 async function batchGenerateVectors(limit = 100) {
-  const users = userDb.getAllUsers(1, limit);
+  const users = await userDb.getAllUsers(1, limit);
   const results = [];
 
   for (const user of users) {
@@ -187,8 +193,8 @@ async function batchGenerateVectors(limit = 100) {
   return results;
 }
 
-function getStats() {
-  return vectorDb.getVectorStats();
+async function getStats() {
+  return await vectorDb.getVectorStats();
 }
 
 module.exports = {
