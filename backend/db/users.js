@@ -228,7 +228,7 @@ async function getPendingUsers() {
   }
 }
 
-async function searchUsers(criteria, page = 1, limit = 20) {
+async function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
   const database = getDb();
   const conditions = [];
   const params = [];
@@ -259,6 +259,8 @@ async function searchUsers(criteria, page = 1, limit = 20) {
     conditions.push(`CAST(age AS INTEGER) <= $${params.length + 1}`);
     params.push(parseInt(criteria.age_max));
   }
+  // 非管理员不能按联系方式搜索；若只把条件丢弃，会退化成无条件分支返回整张表，故直接判空
+  if (!isAdmin && criteria.contact) return { data: [], count: 0 };
   const contactFilter = criteria.contact || null;
   let keywordContactFilter = null;
 
@@ -303,7 +305,7 @@ async function searchUsers(criteria, page = 1, limit = 20) {
     }
 
     const filtered = allRows.filter(row => {
-      const plainContact = decrypt(row.contact) || '';
+      const plainContact = isAdmin ? (decrypt(row.contact) || '') : '';
       if (contactFilter && keywordContactFilter) {
         const contactMatch = isExact
           ? plainContact === contactFilter
@@ -319,7 +321,7 @@ async function searchUsers(criteria, page = 1, limit = 20) {
       if (keywordContactFilter) {
         const nameMatch = row.name && (isExact ? row.name === keywordContactFilter : row.name.includes(keywordContactFilter));
         const cityMatch = row.city && (isExact ? row.city === keywordContactFilter : row.city.includes(keywordContactFilter));
-        const contactMatch = isExact ? plainContact === keywordContactFilter : plainContact.includes(keywordContactFilter);
+        const contactMatch = isAdmin && (isExact ? plainContact === keywordContactFilter : plainContact.includes(keywordContactFilter));
         return nameMatch || cityMatch || contactMatch;
       }
       return true;
@@ -374,6 +376,11 @@ async function getUserStats() {
     female: parseInt((await database.prepare("SELECT COUNT(*) as count FROM users WHERE gender = '女'").get()).count) || 0,
     ageDistribution
   };
+}
+
+async function countUsers() {
+  const database = getDb();
+  return parseInt((await database.prepare('SELECT COUNT(*) as count FROM users').get()).count) || 0;
 }
 
 async function getUserCustomFields(userId) {
@@ -433,6 +440,7 @@ module.exports = {
   rejectUser,
   getPendingUsers,
   getUserStats,
+  countUsers,
   getUserCustomFields,
   setUserCustomField,
   deleteUserCustomField,

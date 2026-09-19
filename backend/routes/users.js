@@ -55,7 +55,7 @@ async function getUsers(req, res, _, parsedUrl) {
       limit = 50;
     }
     result = await userService.getUserList(page, limit, authInfo.isAdmin);
-    total = (await userService.getUserStats()).total;
+    total = await userService.countUsers();
   }
 
   sendJson(res, 200, { success: true, data: result, total });
@@ -328,6 +328,7 @@ async function rejectUser(req, res, checkAdminAuth, pathname) {
 
 // ========== GET /api/users/search（搜索用户）
 async function searchUsers(req, res, parsedUrl) {
+  const authInfo = await getAuthInfo(req);
   const criteria = { ...parsedUrl.query };
   for (const [key, value] of Object.entries(criteria)) {
     if (typeof value === 'string') {
@@ -341,7 +342,7 @@ async function searchUsers(req, res, parsedUrl) {
   }
   const page = parseInt(criteria.page) || 1;
   const limit = Math.min(parseInt(criteria.limit) || 20, 100);
-  const result = await userService.searchUsers(criteria, page, limit, false);
+  const result = await userService.searchUsers(criteria, page, limit, authInfo.isAdmin);
   sendJson(res, 200, { success: true, ...result });
 }
 

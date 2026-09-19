@@ -287,7 +287,7 @@ server: {
 | GET | `/api/users/pending` | 待审核用户 | 管理员 |
 | POST | `/api/users/:id/approve` | 审核通过 | 管理员 |
 | POST | `/api/users/:id/reject` | 审核拒绝 | 管理员 |
-| GET | `/api/users/search` | 搜索用户 | 可选 |
+| GET | `/api/users/search` | 搜索用户（`contact` 参数仅管理员生效，匿名传入返回空） | 可选 |
 | GET | `/api/users/:id/check-unlock` | 检查解锁状态 | Token |
 
 ### 5.3 上传接口

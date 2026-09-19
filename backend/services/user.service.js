@@ -82,6 +82,10 @@ async function getUserStats() {
   return await userDb.getUserStats();
 }
 
+async function countUsers() {
+  return await userDb.countUsers();
+}
+
 async function getPendingUsers() {
   return await userDb.getPendingUsers();
 }
@@ -195,7 +199,7 @@ async function rejectUser(id) {
 // ========== 搜索 ==========
 
 async function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
-  const result = await userDb.searchUsers(criteria, page, limit);
+  const result = await userDb.searchUsers(criteria, page, limit, isAdmin);
   return {
     data: isAdmin ? result.data : maskUsers(result.data),
     count: result.count
@@ -226,6 +230,7 @@ module.exports = {
   getUserList,
   getMyUser,
   getUserStats,
+  countUsers,
   getPendingUsers,
   searchUsers,
   // 增删改
