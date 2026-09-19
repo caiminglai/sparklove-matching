@@ -1,5 +1,9 @@
 # 站2 后端 deasync → pg.Pool 异步化改造 · 完整交接说明
 
+> ## ✅ 状态：已完成（2026-09-20，分支 `refactor/deasync-to-pg-pool`）
+> 阶段 0→8 全部走完，阶段 7 回归验证全绿。结果见 **§7.9 验证记录表** 与 **§7.10 阶段 7 补记**。
+> 未推送远端（`git push` 由用户执行）。下面第 1~6 节仍是"改造前"视角的施工说明书，保留作历史。
+
 > 本文档是给执行者（AI 助手 Kimi）看的**自包含**说明书。执行者没有参与过之前的任何对话，
 > 本文假设你对这个项目**一无所知**，所有背景、范围、代码、命令、验证方法都写在这里。
 >
@@ -1736,24 +1740,85 @@ docker logs -f jzxr
 改完之后，请把这张表填好粘给我。**没填完不算完成。**
 
 ```
-接口编号  路径                                    期望    实际    通过
-1        GET  /api/users                         数组
-7        GET  /api/field-mappings (带ETag)        304
-8        GET  /api/field-mappings/labels          非空对象
-15       GET  /api/users/my                       有nickname
-18       GET  /api/users/my (改city后)             city=北京
-24       GET  /api/vector/stats                   数字
-26       GET  /api/admin/stats                    非空stats
-32       POST /api/admin/custom-fields            含id
-35       GET  /api/custom-fields (删后)            字段消失
-39       GET  /api/admin/stats (无token)           401 ★
-40       GET  /api/admin/deposits (假token)        401 ★
-批量      POST /api/users/batch                    2条都入库
-contact  GET  /api/users/:id/check-unlock          明文手机号
-上传      POST /api/upload/avatar                  图片可取回
-前端      浏览器8条路径                              全部正常
-日志      docker logs jzxr                          无异常
+接口编号  路径                                    期望    实际                              通过
+1        GET  /api/users                         数组    数组，分页正常                     ✅
+7        GET  /api/field-mappings (带ETag)        304    第二次请求 304                      ✅
+8        GET  /api/field-mappings/labels          非空对象 非空                              ✅
+15       GET  /api/users/my                       有nickname 有                              ✅
+18       GET  /api/users/my (改city后)             city=北京 读回=北京，contact 解密=明文     ✅
+24       GET  /api/vector/stats                   数字    total_vectors=1（是数字不是对象）   ✅
+26       GET  /api/admin/stats                    非空stats 非空                             ✅
+32       POST /api/admin/custom-fields            含id    返回含 id，读回可见                ✅
+35       GET  /api/custom-fields (删后)            字段消失 已消失                            ✅
+39       GET  /api/admin/stats (无token)           401 ★  401                                ✅
+40       GET  /api/admin/deposits (假token)        401 ★  401                                ✅
+批量      POST /api/users/batch                    2条都入库 2 条均可搜索到                    ✅
+contact  GET  /api/users/:id/check-unlock          明文手机号 明文                            ✅
+上传      POST /api/upload/avatar                  图片可取回 可取回                           ✅
+前端      浏览器8条路径                              全部正常                                  ✅
+日志      docker logs jzxr                          无异常    无 Unhandled Rejection/TypeError  ✅
 ```
+
+§7.2 公开接口 15 条中 14 条通过，唯一 404 是 `wechat-qr.png`——已查 git 历史，该文件从未存在过，与本次改造无关。
+§7.4 管理员接口 401 矩阵 44/44 全通过，无一条泄漏数据。
+
+#### 7.10 阶段 7 补记：三个实测发现（2026-09-20）
+
+**发现 1：`routes/upload.js` 漏了 3 个 `await`（真实缺陷，已修，提交 `00eda01`）**
+
+阶段 5 的全局清扫是按 `db.*` / `services.*` 的调用形状匹配的，漏掉了路由文件里
+**内联链式**写法 `database.prepare(...).get()`。后果按危害排序：
+
+- `if (!(await checkAdminAuth(req)))` 少了 await → `!Promise` 恒为 `false` → **管理员鉴权被绕过**
+- `DELETE` 接口：数据**真的删掉了**，但 `result.changes` 是 undefined → 永远返回 500"删除失败"
+- `SELECT` 接口：404 守卫永不触发，`data` 序列化成 `{}`
+
+> 教训：自检脚本必须额外扫一遍 `\.prepare\([^)]*\)\s*\.\s*(get|all|run|exec)\(` 这种链式调用，
+> 它不带 `db.` / `services.` 前缀，按前缀匹配的清扫会整片漏掉。
+
+**发现 2：所有自增序列都落在数据后面（与改造无关，是导入遗留，但会让管理端写入全部 500）**
+
+本地 `match_db` 有 serial 列的 11 张表，`nextval()` 返回值全部 **小于** `max(id)`，
+最早的一条 `POST /api/users/:id/approve` 报的 500 就是这个：
+
+```
+code: '23505'  detail: 'Key (id)=(1) already exists.'  table: 'admin_logs'
+```
+
+排查/修复用这段 SQL（幂等，可重复跑；**迁移到服务器后必须再跑一遍**）：
+
+```sql
+DO $$
+DECLARE r record; n bigint;
+BEGIN
+  FOR r IN
+    SELECT c.table_name, c.column_name
+    FROM information_schema.columns c
+    WHERE c.table_schema='public'
+      AND c.column_default LIKE 'nextval%'
+      AND c.data_type IN ('integer','bigint','smallint')
+  LOOP
+    EXECUTE format('SELECT max(%I)::bigint FROM %I', r.column_name, r.table_name) INTO n;
+    IF n IS NULL THEN
+      PERFORM setval(pg_get_serial_sequence(r.table_name, r.column_name), 1, false);
+    ELSE
+      PERFORM setval(pg_get_serial_sequence(r.table_name, r.column_name), n);
+    END IF;
+    RAISE NOTICE '%.% -> %', r.table_name, r.column_name, COALESCE(n,0)+1;
+  END LOOP;
+END $$;
+```
+
+顺带一个坑：`approveUser` 里 `userDb.approveUser(id)` 和 `logAdminAction` **没有包在同一个事务里**，
+所以撞 PK 时报 500，但**审核状态其实已经改成 approved 了**——接口报错 ≠ 操作没生效。
+
+**发现 3：未登录也能用联系方式搜人（🔴 高危，本次未修）**
+
+`GET /api/users/search?contact=<单个数字>` 不带任何 token 就有返回，10 个数字试探命中 10 次；
+换成无意义关键词则 0 条。说明搜索是在**解密后的明文**上做子串匹配且无 LIMIT，
+等于同时绕过了"联系方式加密存储"和"付费解锁"两道设计。
+修复方向：`contact` 字段从公开搜索白名单里摘掉，或要求登录后才可搜并加 LIMIT。
+
 
 ---
 
