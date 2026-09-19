@@ -114,122 +114,121 @@ function dbRowToJson(row) {
   };
 }
 
-function getAllUsers(page = 1, limit = 20) {
+async function getAllUsers(page = 1, limit = 20) {
   const database = getDb();
   const offset = (page - 1) * limit;
   const stmt = database.prepare(
     `SELECT ${ALL_FIELDS.join(', ')}, status FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`
   );
-  return stmt.all(limit, offset).map(dbRowToJson);
+  return (await stmt.all(limit, offset)).map(dbRowToJson);
 }
 
-function getUserById(id) {
+async function getUserById(id) {
   const database = getDb();
   const stmt = database.prepare(
     `SELECT ${ALL_FIELDS.join(', ')}, status FROM users WHERE id = $1`
   );
-  const row = stmt.get(id);
+  const row = await stmt.get(id);
   return row ? dbRowToJson(row) : null;
 }
 
-function getUsersByUserId(userId) {
+async function getUsersByUserId(userId) {
   const database = getDb();
   const stmt = database.prepare(
     `SELECT ${ALL_FIELDS.join(', ')}, status FROM users WHERE user_id = $1 ORDER BY created_at DESC`
   );
-  return stmt.all(userId).map(dbRowToJson);
+  return (await stmt.all(userId)).map(dbRowToJson);
 }
 
-function addUser(jsonRow) {
+async function addUser(jsonRow) {
   const database = getDb();
   const values = jsonToDbRow(jsonRow);
   const placeholders = ALL_FIELDS.map((_, i) => `$${i + 1}`).join(', ');
   const stmt = database.prepare(`INSERT INTO users (${ALL_FIELDS.join(', ')}) VALUES (${placeholders})`);
-  stmt.run(...values);
+  await stmt.run(...values);
   return jsonRow;
 }
 
-function updateUser(id, jsonRow) {
+async function updateUser(id, jsonRow) {
   const database = getDb();
   const values = jsonToDbRow({ ...jsonRow, id });
   const updateFields = ALL_FIELDS.slice(2).map((f, i) => f + ' = $' + (i + 1)).join(', ');
   const updateValues = values.slice(2);
   updateValues.push(id);
   const stmt = database.prepare(`UPDATE users SET ${updateFields} WHERE id = $${ALL_FIELDS.length - 1}`);
-  stmt.run(...updateValues);
+  await stmt.run(...updateValues);
   return jsonRow;
 }
 
-function deleteUser(id, ownerUserId, isAdmin = false) {
+async function deleteUser(id, ownerUserId, isAdmin = false) {
   const database = getDb();
-  const user = database.prepare('SELECT user_id FROM users WHERE id = $1').get(id);
+  const user = await database.prepare('SELECT user_id FROM users WHERE id = $1').get(id);
   if (!user) return false;
   if (!isAdmin) {
     if (!user.user_id) return false;
     if (user.user_id !== ownerUserId) return false;
   }
-  database.prepare('DELETE FROM user_ratings WHERE rater_id = $1 OR rated_id = $2').run(id, id);
-  database.prepare('DELETE FROM user_reports WHERE reporter_id = $1 OR reported_id = $2').run(id, id);
+  await database.prepare('DELETE FROM user_ratings WHERE rater_id = $1 OR rated_id = $2').run(id, id);
+  await database.prepare('DELETE FROM user_reports WHERE reporter_id = $1 OR reported_id = $2').run(id, id);
   if (user.user_id) {
-    database.prepare('DELETE FROM user_custom_fields WHERE user_id = $1').run(user.user_id);
+    await database.prepare('DELETE FROM user_custom_fields WHERE user_id = $1').run(user.user_id);
   }
   const stmt = database.prepare('DELETE FROM users WHERE id = $1');
-  stmt.run(id);
+  await stmt.run(id);
   return true;
 }
 
-function batchSaveUsers(jsonRows) {
+async function batchSaveUsers(jsonRows) {
   const database = getDb();
   const placeholders = ALL_FIELDS.map((_, i) => `$${i + 1}`).join(', ');
-  const insertStmt = database.prepare(`INSERT INTO users (${ALL_FIELDS.join(', ')}) VALUES (${placeholders})`);
   const updateFields = ALL_FIELDS.slice(2).map((f, i) => f + ' = $' + (i + 1)).join(', ');
-  const updateStmt = database.prepare(`UPDATE users SET ${updateFields} WHERE id = $${ALL_FIELDS.length - 1}`);
 
-  const transaction = database.transaction(() => {
+  await database.transaction(async (tx) => {
+    const insertStmt = tx.prepare(`INSERT INTO users (${ALL_FIELDS.join(', ')}) VALUES (${placeholders})`);
+    const updateStmt = tx.prepare(`UPDATE users SET ${updateFields} WHERE id = $${ALL_FIELDS.length - 1}`);
     for (const jsonRow of jsonRows) {
       if (jsonRow.id) {
-        const existing = database.prepare('SELECT id FROM users WHERE id = $1').get(jsonRow.id);
+        const existing = await tx.prepare('SELECT id FROM users WHERE id = $1').get(jsonRow.id);
         if (existing) {
           const values = jsonToDbRow({ ...jsonRow });
           const updateValues = values.slice(2);
           updateValues.push(jsonRow.id);
-          updateStmt.run(...updateValues);
+          await updateStmt.run(...updateValues);
           continue;
         }
       }
-      insertStmt.run(...jsonToDbRow(jsonRow));
+      await insertStmt.run(...jsonToDbRow(jsonRow));
     }
   });
-  transaction();
 }
 
-function approveUser(id) {
+async function approveUser(id) {
   const database = getDb();
   const stmt = database.prepare('UPDATE users SET status = $1 WHERE id = $2');
-  stmt.run('approved', id);
+  await stmt.run('approved', id);
   return true;
 }
 
-function rejectUser(id) {
+async function rejectUser(id) {
   const database = getDb();
   const stmt = database.prepare('UPDATE users SET status = $1 WHERE id = $2');
-  stmt.run('rejected', id);
+  await stmt.run('rejected', id);
   return true;
 }
 
-function getPendingUsers() {
+async function getPendingUsers() {
   const database = getDb();
   try {
     const stmt = database.prepare(
       `SELECT ${ALL_FIELDS.join(', ')}, status FROM users WHERE status = 'pending' ORDER BY created_at DESC`
     );
-    return stmt.all().map(dbRowToJson);
+    return (await stmt.all()).map(dbRowToJson);
   } catch (e) {
     return [];
   }
 }
 
-function searchUsers(criteria, page = 1, limit = 20) {
+async function searchUsers(criteria, page = 1, limit = 20) {
   const database = getDb();
   const conditions = [];
   const params = [];
@@ -273,7 +272,7 @@ function searchUsers(criteria, page = 1, limit = 20) {
   if (Array.isArray(criteria.custom_fields) && criteria.custom_fields.length > 0) {
     for (const cf of criteria.custom_fields) {
       if (!cf.field_key || !cf.field_value) continue;
-      const matchedIds = searchUsersByCustomField(cf.field_key, cf.field_value, isExact);
+      const matchedIds = await searchUsersByCustomField(cf.field_key, cf.field_value, isExact);
       const idSet = new Set(matchedIds);
       if (customFieldUserIds === null) {
         customFieldUserIds = idSet;
@@ -297,9 +296,9 @@ function searchUsers(criteria, page = 1, limit = 20) {
       const userFilter = `user_id IN (${placeholders})`;
       const fullWhere = whereClause ? whereClause + ' AND ' + userFilter : 'WHERE ' + userFilter;
       params.push(...idList);
-      allRows = database.prepare(`SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${fullWhere} ORDER BY created_at DESC`).all(...params);
+      allRows = (await database.prepare(`SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${fullWhere} ORDER BY created_at DESC`).all(...params));
     } else {
-      allRows = database.prepare(`SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${whereClause} ORDER BY created_at DESC`).all(...params);
+      allRows = (await database.prepare(`SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${whereClause} ORDER BY created_at DESC`).all(...params));
     }
 
     const filtered = allRows.filter(row => {
@@ -341,18 +340,18 @@ function searchUsers(criteria, page = 1, limit = 20) {
     params.push(...idList);
 
     const countSql = `SELECT COUNT(*) as count FROM users ${fullWhere}`;
-    const count = parseInt(database.prepare(countSql).get(...params).count) || 0;
+    const count = parseInt((await database.prepare(countSql).get(...params)).count) || 0;
 
     const sql = `SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${fullWhere} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-    const data = database.prepare(sql).all(...params, limit, offset).map(dbRowToJson);
+    const data = (await database.prepare(sql).all(...params, limit, offset)).map(dbRowToJson);
     return { data, count };
   }
 
   const countSql = `SELECT COUNT(*) as count FROM users ${whereClause}`;
-  const count = parseInt(database.prepare(countSql).get(...params).count) || 0;
+  const count = parseInt((await database.prepare(countSql).get(...params)).count) || 0;
 
   const sql = `SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${whereClause} ORDER BY created_at DESC LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
-  const data = database.prepare(sql).all(...params, limit, offset).map(dbRowToJson);
+  const data = (await database.prepare(sql).all(...params, limit, offset)).map(dbRowToJson);
 
   return { data, count };
 }
@@ -361,62 +360,62 @@ function escapeLikeString(str) {
   return str.replace(/[%_\\]/g, '\\$&');
 }
 
-function getUserStats() {
+async function getUserStats() {
   const database = getDb();
-  const rows = database.prepare("SELECT age FROM users WHERE age IS NOT NULL AND age != ''").all();
+  const rows = await database.prepare("SELECT age FROM users WHERE age IS NOT NULL AND age != ''").all();
   const ageDistribution = {};
   for (const row of rows) {
     const age = String(row.age);
     ageDistribution[age] = (ageDistribution[age] || 0) + 1;
   }
   return {
-    total: parseInt(database.prepare('SELECT COUNT(*) as count FROM users').get().count) || 0,
-    male: parseInt(database.prepare("SELECT COUNT(*) as count FROM users WHERE gender = '男'").get().count) || 0,
-    female: parseInt(database.prepare("SELECT COUNT(*) as count FROM users WHERE gender = '女'").get().count) || 0,
+    total: parseInt((await database.prepare('SELECT COUNT(*) as count FROM users').get()).count) || 0,
+    male: parseInt((await database.prepare("SELECT COUNT(*) as count FROM users WHERE gender = '男'").get()).count) || 0,
+    female: parseInt((await database.prepare("SELECT COUNT(*) as count FROM users WHERE gender = '女'").get()).count) || 0,
     ageDistribution
   };
 }
 
-function getUserCustomFields(userId) {
+async function getUserCustomFields(userId) {
   const database = getDb();
-  return database.prepare(
+  return await database.prepare(
     'SELECT field_key, field_value, created_at FROM user_custom_fields WHERE user_id = $1 ORDER BY created_at'
   ).all(userId);
 }
 
-function setUserCustomField(userId, fieldKey, fieldValue) {
+async function setUserCustomField(userId, fieldKey, fieldValue) {
   const database = getDb();
   const now = Date.now();
-  database.prepare(
+  await database.prepare(
     'INSERT INTO user_custom_fields (user_id, field_key, field_value, created_at) VALUES ($1, $2, $3, $4) ON CONFLICT(user_id, field_key) DO UPDATE SET field_value = EXCLUDED.field_value, created_at = EXCLUDED.created_at'
   ).run(userId, fieldKey.trim(), String(fieldValue).trim(), now);
   return { field_key: fieldKey.trim(), field_value: String(fieldValue).trim() };
 }
 
-function deleteUserCustomField(userId, fieldKey) {
+async function deleteUserCustomField(userId, fieldKey) {
   const database = getDb();
   const stmt = database.prepare(
     'DELETE FROM user_custom_fields WHERE user_id = $1 AND field_key = $2'
   );
-  const result = stmt.run(userId, fieldKey);
+  const result = await stmt.run(userId, fieldKey);
   return result.changes > 0;
 }
 
-function searchUsersByCustomField(fieldKey, fieldValue, isExact) {
+async function searchUsersByCustomField(fieldKey, fieldValue, isExact) {
   const database = getDb();
   if (isExact) {
-    return database.prepare(
+    return (await database.prepare(
       'SELECT DISTINCT user_id FROM user_custom_fields WHERE field_key = $1 AND field_value = $2'
-    ).all(fieldKey, fieldValue).map(r => r.user_id);
+    ).all(fieldKey, fieldValue)).map(r => r.user_id);
   }
-  return database.prepare(
+  return (await database.prepare(
     "SELECT DISTINCT user_id FROM user_custom_fields WHERE field_key = $1 AND field_value LIKE $2"
-  ).all(fieldKey, '%' + escapeLikeString(fieldValue) + '%').map(r => r.user_id);
+  ).all(fieldKey, '%' + escapeLikeString(fieldValue) + '%')).map(r => r.user_id);
 }
 
-function getAllCustomFields() {
+async function getAllCustomFields() {
   const database = getDb();
-  return database.prepare(
+  return await database.prepare(
     'SELECT user_id, field_key, field_value FROM user_custom_fields ORDER BY user_id, created_at'
   ).all();
 }
