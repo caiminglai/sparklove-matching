@@ -1,5 +1,4 @@
-const { Client } = require('pg');
-const deasync = require('deasync');
+const { Pool } = require('pg');
 const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS) || 10;
@@ -14,119 +13,92 @@ const pgConfig = {
   password: process.env.PG_PASSWORD || 'dev-pg-password-do-not-use-in-prod',
   host: process.env.PG_HOST || 'localhost',
   port: parseInt(process.env.PG_PORT) || 5432,
-  database: process.env.PG_DATABASE || 'match_db'
+  database: process.env.PG_DATABASE || 'match_db',
+  max: 10,                        // 连接池上限
+  idleTimeoutMillis: 30000,       // 空闲连接 30s 后回收
+  connectionTimeoutMillis: 5000   // 取连接超过 5s 直接报错，避免请求无限挂起
 };
 
-let client = null;
-let connecting = false;
+let pool = null;
 
-// 异步初始化连接（在 server.js 启动时调用）
+function getPool() {
+  if (!pool) pool = new Pool(pgConfig);
+  return pool;
+}
+
+// 启动时调用：建池 + 立刻发一条探活查询，连不上就快速失败（让 server.js 的 .catch 走 process.exit(1)）
 async function initConnection() {
-  if (client) return;
-  connecting = true;
-  client = new Client(pgConfig);
-  client.on('end', () => { client = null; });
-  client.on('error', () => { client = null; });
-  await client.connect();
-  connecting = false;
+  await getPool().query('SELECT 1');
 }
 
-function getClient() {
-  if (!client && !connecting) {
-    // 首次同步连接（兼容旧代码，但推荐在启动时调用 initConnection）
-    client = new Client(pgConfig);
-    client.on('end', () => { client = null; });
-    client.on('error', () => { client = null; });
-    const connectSync = deasync(client.connect.bind(client));
-    connectSync();
+// 统一执行入口。
+// 关键点：params 为空时必须只传 sql 一个参数，让 pg 走 simple query 协议，
+// 否则多语句 SQL（如 db\vector.js 的建表脚本）会被 pg 拒绝。详见交接说明第 6.3 节。
+async function runQuery(sql, params, boundClient) {
+  const executor = boundClient || getPool();
+  if (!params || params.length === 0) return executor.query(sql);
+  return executor.query(sql, params);
+}
+
+// 造一个 db 句柄。boundClient 非空时，所有查询都绑在这条连接上（事务用）。
+function createDbHandle(boundClient) {
+  function prepare(sql) {
+    return {
+      get: async (...params) => {
+        const result = await runQuery(sql, params, boundClient);
+        return result.rows.length > 0 ? result.rows[0] : null;
+      },
+      all: async (...params) => {
+        const result = await runQuery(sql, params, boundClient);
+        return result.rows;
+      },
+      run: async (...params) => {
+        const result = await runQuery(sql, params, boundClient);
+        return {
+          changes: result.rowCount,
+          lastInsertRowid: result.rows[0] && result.rows[0].id
+        };
+      },
+      exec: async () => {
+        await runQuery(sql, [], boundClient);
+      }
+    };
   }
-  return client;
-}
 
-// 断线重置
-function resetClient() {
-  client = null;
-}
+  async function exec(sql) {
+    await runQuery(sql, [], boundClient);
+  }
 
-function prepare(sql) {
-  function runQuery(method, ...params) {
-    let pgClient = getClient();
+  // 事务：从池里独占一条连接，BEGIN → 执行回调 → COMMIT/ROLLBACK → 归还。
+  // 回调收到的是一个绑定到该连接的 db 句柄，回调内部必须用它（而不是外层的 getDb()），
+  // 否则语句会跑到池里另一条连接上，脱离事务。
+  async function transaction(fn) {
+    const client = await getPool().connect();
     try {
-      const querySync = deasync(pgClient.query.bind(pgClient));
-      const result = querySync(sql, params);
+      await client.query('BEGIN');
+      const result = await fn(createDbHandle(client));
+      await client.query('COMMIT');
       return result;
     } catch (e) {
-      // 连接断开，重置后重试一次
-      if (e.message && (e.message.includes('Connection terminated') || e.message.includes('Connection ended'))) {
-        resetClient();
-        pgClient = getClient();
-        const querySync = deasync(pgClient.query.bind(pgClient));
-        const result = querySync(sql, params);
-        return result;
-      }
+      try { await client.query('ROLLBACK'); } catch (_) { /* 忽略回滚自身失败 */ }
       throw e;
+    } finally {
+      client.release();
     }
   }
-  return {
-    get: (...params) => {
-      const result = runQuery('get', ...params);
-      return result.rows.length > 0 ? result.rows[0] : null;
-    },
-    all: (...params) => {
-      const result = runQuery('all', ...params);
-      return result.rows;
-    },
-    run: (...params) => {
-      const result = runQuery('run', ...params);
-      return {
-        changes: result.rowCount,
-        lastInsertRowid: result.rows[0] && result.rows[0].id
-      };
-    },
-    exec: () => {
-      runQuery('exec');
-    }
-  };
-}
 
-function exec(sql) {
-  const pgClient = getClient();
-  const querySync = deasync(pgClient.query.bind(pgClient));
-  querySync(sql);
+  return { prepare, exec, transaction };
 }
 
 function getDb() {
-  return {
-    prepare,
-    exec,
-    transaction: (fn) => {
-      const pgClient = getClient();
-      const querySync = deasync(pgClient.query.bind(pgClient));
-      querySync('BEGIN');
-      try {
-        const result = fn();
-        querySync('COMMIT');
-        return result;
-      } catch (e) {
-        querySync('ROLLBACK');
-        throw e;
-      }
-    }
-  };
+  return createDbHandle(null);
 }
 
-function closeDb() {
-  if (client) {
-    const c = client;
-    client = null;
-    try {
-      // 修复：pg 的 client.end() 无 callback 时返回 Promise，deasync 等 callback 会永久自旋
-      // 改为显式传入 callback，让 deasync 能正常等待完成
-      const endSync = deasync((cb) => { c.end(() => cb(null, null)); });
-      endSync();
-    } catch (e) {
-      // 忽略关闭错误（连接已断开等情况）
-    }
+async function closeDb() {
+  if (pool) {
+    const p = pool;
+    pool = null;
+    await p.end();
   }
 }
 
