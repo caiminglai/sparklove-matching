@@ -1,8 +1,8 @@
 const { getDb } = require('./index.js');
 
-function getAllFieldMappings() {
+async function getAllFieldMappings() {
   const db = getDb();
-  const rows = db.prepare(
+  const rows = await db.prepare(
     `SELECT field_key, field_label, field_category, field_type, field_options, field_order, is_filterable, description
      FROM field_mappings
      ORDER BY field_order ASC`
@@ -19,9 +19,9 @@ function getAllFieldMappings() {
   }));
 }
 
-function getFieldLabelMap() {
+async function getFieldLabelMap() {
   const db = getDb();
-  const rows = db.prepare('SELECT field_key, field_label FROM field_mappings').all();
+  const rows = await db.prepare('SELECT field_key, field_label FROM field_mappings').all();
   const map = {};
   for (const row of rows) {
     map[row.field_key] = row.field_label;
@@ -29,9 +29,9 @@ function getFieldLabelMap() {
   return map;
 }
 
-function getCacheVersion() {
+async function getCacheVersion() {
   const db = getDb();
-  const row = db.prepare('SELECT MAX(updated_at) as ver FROM field_mappings').get();
+  const row = await db.prepare('SELECT MAX(updated_at) as ver FROM field_mappings').get();
   return String(row?.ver || 0);
 }
 
