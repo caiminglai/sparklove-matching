@@ -103,7 +103,7 @@ async function getMyUser(userId) {
 
 // ========== 用户创建 / 更新 ==========
 
-async function createUser(userData, ownerUserId) {
+async function createUser(userData, ownerUserId, isPrivileged = false) {
   const errors = validateUserData(userData);
   if (errors.length > 0) {
     return { success: false, message: errors.join(', ') };
@@ -111,7 +111,7 @@ async function createUser(userData, ownerUserId) {
   const newUser = {
     id: userData.id || 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
     user_id: ownerUserId || null,
-    deposit: userData.deposit || 0,
+    deposit: isPrivileged ? (userData.deposit || 0) : 0,
     createdAt: Date.now(),
     data: {
       name: sanitizeString(userData.data?.name || ''),
@@ -127,7 +127,7 @@ async function createUser(userData, ownerUserId) {
       avatar: sanitizeString(userData.data?.avatar || ''),
       ...userData.data
     },
-    status: userData.status || 'approved'
+    status: isPrivileged ? (userData.status || 'approved') : 'approved'
   };
   await userDb.addUser(newUser);
   return { success: true, user: newUser };

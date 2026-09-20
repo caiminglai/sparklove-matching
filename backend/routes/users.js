@@ -69,7 +69,7 @@ function addUser(req, res, readBodyWithLimit) {
       const authInfo = await getAuthInfo(req);
 
       if (authInfo.isAdmin) {
-        const result = await userService.createUser(data, null);
+        const result = await userService.createUser(data, null, true);
         if (result.success) {
           sendJson(res, 200, result);
         } else {
