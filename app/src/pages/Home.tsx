@@ -78,17 +78,25 @@ export default function Home() {
       type FetchUsersResult = { users: unknown | null; customFields: unknown | null; };
       const doFetch = async (): Promise<FetchUsersResult> => {
         if (page === 1) await waitForBootstrapSafeWindow();
-        const [usersRes, cfRes] = await Promise.all([
-          fetch(buildApiUrl(page, keyword, exact), { headers }),
-          fetch(`${API_BASE_URL}/users/all-custom-fields`).catch(() => null),
-        ]);
+        const usersRes = await fetch(buildApiUrl(page, keyword, exact), { headers });
         let users: unknown | null = null;
         if (usersRes && usersRes.ok) {
           try { users = await usersRes.json(); } catch { users = null; }
         }
+        // 自定义字段接口只按 user_ids 下发，所以必须等本页 users 到手再请求
+        const userIds = Array.from(new Set(
+          ((users as { data?: FlatRow[] } | null)?.data || [])
+            .map(r => r.user_id)
+            .filter((id): id is string => Boolean(id))
+        ));
         let customFields: unknown | null = null;
-        if (cfRes && (cfRes as Response).ok) {
-          try { customFields = await (cfRes as Response).json(); } catch { customFields = null; }
+        if (userIds.length > 0) {
+          const cfRes = await fetch(
+            `${API_BASE_URL}/users/all-custom-fields?user_ids=${encodeURIComponent(userIds.join(','))}`
+          ).catch(() => null);
+          if (cfRes && cfRes.ok) {
+            try { customFields = await cfRes.json(); } catch { customFields = null; }
+          }
         }
         return { users, customFields };
       };

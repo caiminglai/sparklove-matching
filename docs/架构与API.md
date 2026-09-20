@@ -402,9 +402,10 @@ server: {
 | GET | `/api/users/custom-fields` | 我的自定义字段 | Token |
 | POST | `/api/users/custom-fields` | 写入 / 更新我的某个自定义字段 | Token |
 | DELETE | `/api/users/custom-fields/:fieldKey` | 删除我的某个自定义字段 | Token |
-| GET | `/api/users/all-custom-fields` | 批量获取全部用户自定义字段（前端搜索用） | 否 |
+| GET | `/api/users/all-custom-fields?user_ids=a,b,c` | 按 `user_ids` 批量取自定义字段（首页卡片合并显示用）；单次最多 100 个 id，不带参数即空结果 | 否 |
 
 > 该组路由在 `server.js` 中按前缀整体转交给 `handleUserCustomFields`，方法不匹配返回 405。
+> `all-custom-fields` 不在那条前缀里，由 `server.js` 内联处理：只按调用方给的 `user_ids` 下发，不再整表导出（2026-09-21 收紧）。
 
 ### 5.12 路由分发方式
 

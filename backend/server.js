@@ -359,9 +359,13 @@ const server = http.createServer(async (req, res) => {
   if (pathname === '/api/users/custom-fields' || /^\/api\/users\/custom-fields\/[^\/]+$/.test(pathname)) {
     await userCustomFieldsRoutes.handleUserCustomFields(req, res, readBodyWithLimit, pathname); return;
   }
-  // --- 批量获取所有用户自定义字段（公开接口，前端搜索用） ---
+  // --- 批量获取用户自定义字段（按调用方给的 user_ids 下发，不做整表导出） ---
   if (req.method === 'GET' && pathname === '/api/users/all-custom-fields') {
-    const allFields = await userDb.getAllCustomFields();
+    const rawIds = String(parsedUrl.query.user_ids || '');
+    const userIds = [...new Set(
+      rawIds.split(',').map(s => s.trim()).filter(id => /^[a-zA-Z0-9_-]{1,50}$/.test(id))
+    )].slice(0, 100);
+    const allFields = await userDb.getCustomFieldsByUserIds(userIds);
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify({success: true, data: allFields})); return;
   }

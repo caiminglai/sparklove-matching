@@ -420,11 +420,12 @@ async function searchUsersByCustomField(fieldKey, fieldValue, isExact) {
   ).all(fieldKey, '%' + escapeLikeString(fieldValue) + '%')).map(r => r.user_id);
 }
 
-async function getAllCustomFields() {
+async function getCustomFieldsByUserIds(userIds) {
+  if (!Array.isArray(userIds) || userIds.length === 0) return [];
   const database = getDb();
   return await database.prepare(
-    'SELECT user_id, field_key, field_value FROM user_custom_fields ORDER BY user_id, created_at'
-  ).all();
+    'SELECT user_id, field_key, field_value FROM user_custom_fields WHERE user_id = ANY($1) ORDER BY user_id, created_at'
+  ).all(userIds);
 }
 
 module.exports = {
@@ -445,5 +446,5 @@ module.exports = {
   setUserCustomField,
   deleteUserCustomField,
   searchUsersByCustomField,
-  getAllCustomFields
+  getCustomFieldsByUserIds
 };

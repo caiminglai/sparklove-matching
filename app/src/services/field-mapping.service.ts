@@ -86,7 +86,7 @@ function writeCache<T>(key: string, value: T, version: string) {
 }
 
 // 【字段映射接口专属安全延迟】在 window.load + 1500ms 之后再额外等待 500ms。
-// 根因：首屏并发的 4 个 API（custom-fields / field-mappings / users?page=1 / all-custom-fields）
+// 根因：首屏的 4 个 API（custom-fields / field-mappings / users?page=1 / all-custom-fields）
 //       会一起抢占 HTTP/1.1 仅有的 6 条同 host 连接，其中一条连接上还跑着 @vite/client
 //       的 SSE 长连接。SSE 在 Vite 开发模式下会「断开→重连」(RST)，排在同一条 TCP 连接
 //       上的请求会被连带 abort（Chrome 控制台红字 net::ERR_ABORTED），而其他 3 个 API
