@@ -17,7 +17,8 @@ build/
 *.tsbuildinfo
 
 # ===== 数据库 =====
-data/
+data/*
+!data/reset_sequences.sql
 *.db
 *.db-shm
 *.db-wal
