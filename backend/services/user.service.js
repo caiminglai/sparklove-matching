@@ -22,6 +22,8 @@ function maskContact(contact) {
 function maskUserData(user) {
   if (!user) return user;
   const masked = { ...user };
+  // 保证金余额属于财务信息，只有管理端需要，非管理端一律不下发
+  delete masked.deposit;
   if (user.data && user.data.contact) {
     masked.data = { ...user.data, contact: maskContact(user.data.contact) };
   }

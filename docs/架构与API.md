@@ -307,6 +307,9 @@ server: {
 | GET | `/api/users/search` | 搜索用户（`contact` 参数仅管理员生效，匿名传入返回空） | 可选 |
 | GET | `/api/users/:id/check-unlock` | 检查解锁状态 | Token |
 
+> 非管理员（含匿名）拿到的用户对象由 `services/user.service.js` 的 `maskUserData` 统一出口脱敏：
+> `data.contact` 打码、顶层 `deposit` 不下发；管理端返回原值。
+
 ### 5.3 上传接口
 
 | 方法 | 路径 | 描述 | 认证 |
