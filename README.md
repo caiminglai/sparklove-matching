@@ -9,7 +9,7 @@
 | 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS |
 | 后端 | Node.js 原生 HTTP 服务器(非 Express) |
 | 数据库 | PostgreSQL + pg 连接池（全异步）+ pgvector(向量搜索扩展) |
-| 部署 | 线上现行：阿里云 + Nginx + PM2；目标方案：Docker Compose + Caddy（本机已整站验证，服务器迁移未执行） |
+| 部署 | Docker Compose + Caddy 单轨（本机已整站验证；服务器将重装为 Debian + Docker 后走同一份 compose，旧栈 Nginx + PM2 已作废） |
 
 ## 目录结构
 
@@ -60,7 +60,7 @@ npm run dev
 | 管理后台 | http://localhost:8080/admin |
 | 生产环境 | https://sparklove.cn/ |
 
-> ⚠️ 容器方案下管理后台 `/admin` 公网不可达（前端容器只转发 `/api/`、`/uploads/`、`/avatars/`），切换前需按 `docs/部署运维.md` §3 补 Caddy 路由或走 SSH 隧道。线上 Nginx 不受影响。
+> ⚠️ 上服务器前必须先解决：容器方案下管理后台 `/admin` 公网不可达（前端容器只转发 `/api/`、`/uploads/`、`/avatars/`），需按 `docs/部署运维.md` §3 补 Caddy 的 `/admin` 反代或走 SSH 隧道。
 
 ## 核心功能
 
@@ -82,7 +82,7 @@ npm run dev
 |------|------|
 | [项目总览](docs/项目总览.md) | 项目入口,技术栈,快速启动 |
 | [架构与API](docs/架构与API.md) | 三层架构,数据库 Schema,API 接口 |
-| [部署运维](docs/部署运维.md) | 服务器配置,部署流程；§4/§5/§9=线上现行(Nginx+PM2)，§13=目标方案(Compose+Caddy) |
+| [部署运维](docs/部署运维.md) | 服务器配置、部署流程（单轨 Docker Compose + Caddy 单轨，§7 流程 / §11 服务清单） |
 | [运维记录](docs/运维记录.md) | 改进报告,修复记录,测试指南 |
 
 ## 环境要求

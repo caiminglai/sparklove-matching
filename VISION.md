@@ -85,7 +85,7 @@ Phase 2 要做的是：
 | 后端 | Node.js 原生 HTTP 服务器（非 Express，轻量高效） |
 | 数据库 | PostgreSQL + **pg 连接池（全异步）** + **pgvector**（向量搜索扩展） |
 | 安全 | AES-256-CBC 加密、自定义 HMAC Token、bcrypt |
-| 部署 | 线上现行：阿里云 + Nginx + PM2；目标方案：Docker Compose + Caddy（本机已验证，服务器迁移未执行） |
+| 部署 | Docker Compose + Caddy 单轨（本机已验证；服务器将重装 Debian + Docker 走同一份 compose，旧栈作废） |
 
 ---
 
@@ -134,7 +134,7 @@ cd app && npm run dev
 详细文档见 `docs/` 目录：
 - `docs/项目总览.md` — 项目定位、技术栈、快速启动
 - `docs/架构与API.md` — 三层架构、数据库 Schema、API 接口
-- `docs/部署运维.md` — 服务器配置、部署流程（§4/§5/§9 线上现行 Nginx+PM2，§13 目标方案 Compose+Caddy）
+- `docs/部署运维.md` — 服务器配置、部署流程（单轨 Docker Compose + Caddy 单轨）
 - `docs/运维记录.md` — 改进报告、修复记录、测试指南
 
 ---

@@ -209,7 +209,7 @@ server: {
 ## 4. 数据库 Schema
 
 数据库：PostgreSQL 18 + pgvector v0.8.2
-数据位置（双轨）：**线上现行**=服务器自建 PostgreSQL，数据目录 `/var/www/my-two-website/data/pg_data/`；**容器方案（本机已验证、服务器未迁移）**=Docker 命名卷 `pgdata`（容器内挂 `/var/lib/postgresql`）。两种部署下**本地** `data/` 目录都只存 SQL 种子/导出文件，不含运行数据；但这些 SQL **不在 Git 里**（`data/` 被整目录 ignore），换机器或上服务器必须手工拷贝。
+数据位置：PostgreSQL 跑在 `postgres` 容器内，数据在 Docker 命名卷 `pgdata`（容器挂 `/var/lib/postgresql`）。仓库 `data/` 只存 SQL 种子/导出文件、不含运行数据；但这些 SQL **不在 Git 里**（`data/` 被整目录 ignore），换机器或上服务器必须手工拷贝。
 
 ### 4.1 核心业务数据表
 
