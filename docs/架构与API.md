@@ -13,15 +13,15 @@
 │   │   ├── components/           # 公共组件（13 个）
 │   │   │   ├── ContactPayModal.tsx      # 联系方式支付弹窗
 │   │   │   ├── DeleteConfirmModal.tsx   # 删除确认弹窗
-│   │   │   ├── DetailModal.tsx         # 详情弹窗
 │   │   │   ├── ErrorBoundary.tsx       # 错误边界
 │   │   │   ├── ImagePreview.tsx         # 图片预览
 │   │   │   ├── RatingModal.tsx         # 评价弹窗
 │   │   │   ├── ReportModal.tsx         # 举报弹窗
+│   │   │   ├── RequireAuth.tsx         # 路由守卫（未登录时跳转登录页）
 │   │   │   ├── SearchPanel.tsx         # 搜索面板
-│   │   │   ├── SliderCaptcha.tsx       # 滑动验证码
+│   │   │   ├── ShareButton.tsx         # 分享按钮
 │   │   │   ├── TabBar.tsx             # 底部导航栏
-│   │   │   ├── UserCard.tsx           # 用户卡片
+│   │   │   ├── Toast.tsx              # 全局轻提示
 │   │   │   ├── UserDetailModal.tsx    # 用户详情弹窗
 │   │   │   └── UserList.tsx           # 用户列表
 │   │   ├── data/                 # 数据类型与常量
@@ -40,27 +40,27 @@
 │   │   ├── m-login.html          # 手机版登录页面
 │   │   ├── m.html                # 手机版管理主页
 │   │   └── main.html             # 桌面版管理主页
-│   ├── __tests__/                # 单元测试
-│   │   ├── auth.test.js          # 认证测试
-│   │   └── csrf.test.js          # CSRF 测试
-│   ├── db/                       # 数据访问层（8 个文件）
-│   ├── routes/                   # API 路由层（6 个文件）
+│   ├── db/                       # 数据访问层（9 个文件）
+│   ├── routes/                   # API 路由层（10 个文件）
 │   ├── services/                 # 业务逻辑层（8 个文件）
-│   ├── middleware/              # 中间件
+│   ├── middleware/              # 中间件（安全.js / 日志.js）
+│   ├── utils/                    # 通用工具（config.js / cookie工具.js / extractId.js / multipart.js / sendJson.js）
+│   ├── uploads/                  # 用户上传文件目录（compose 挂载到容器内 /uploads）
+│   │   ├── avatars/              # 用户头像
+│   │   ├── deposits/             # 保证金凭证
+│   │   ├── contact-unlock/       # 联系方式解锁凭证（运行时创建）
+│   │   └── reports/              # 举报凭证
 │   ├── server.js                 # 服务器入口
-│   ├── package.json
-│   └── .prettierrc
+│   └── package.json
 │
-├── data/                        # 数据库
-│   └── pg_data/                # PostgreSQL 数据目录
+├── data/                        # 数据库 SQL（种子 / 导出 / 序列重置）；运行数据不在此（线上=服务器 PG 数据目录，容器方案=命名卷 `pgdata`）
+│   ├── match_db_pg15.sql
+│   ├── match_db_server_seed.sql
+│   └── reset_sequences.sql
 │
-├── uploads/                      # 用户上传文件目录
-│   ├── avatars/                  # 用户头像
-│   ├── deposits/                 # 保证金凭证
-│   ├── contact-unlock/           # 联系方式解锁凭证
-│   └── reports/                  # 举报凭证
-│
-├── nginx-config.conf             # Nginx HTTPS/压缩配置
+├── Dockerfile                    # 后端镜像
+├── Dockerfile.frontend           # 前端镜像（多阶段：vite build → 静态服务）
+├── frontend-server.mjs           # 前端容器运行时（零依赖静态服务 + 反向代理）
 ├── .gitignore
 └── .vscode/settings.json
 ```
@@ -118,15 +118,13 @@ backend/
 │   ├── user-custom-fields.js       # 用户自定义字段 API
 │   └── contact-unlock.js           # 联系方式解锁 API
 │
-├── services/                       # 业务逻辑层（10 个文件）
+├── services/                       # 业务逻辑层（8 个文件）
 │   ├── user.service.js             # 用户业务：数据脱敏 / 验证 / 审核流转
 │   ├── auth.service.js             # 认证业务：注册 / 登录 / Token 生成
 │   ├── reports.service.js          # 举报业务：提交验证 / 状态管理
 │   ├── ratings.service.js          # 评价业务：去重 / 分数范围校验
-│   ├── payments.service.js         # 支付业务：订单生成 / 保证金审核
 │   ├── admin.service.js            # 管理员业务：日志 / 备份 / 字段管理
 │   ├── captcha.service.js          # 滑动验证码服务
-│   ├── csrf.service.js             # CSRF 防护服务
 │   ├── sms.service.js              # 短信验证预留服务
 │   └── vector.service.js           # 向量业务：文本向量化 / 相似搜索 / 双向匹配
 │
@@ -142,18 +140,25 @@ backend/
 | 路径 | 页面 |
 |------|------|
 | `/` | 首页（用户列表、筛选、匹配） |
-| `/post` | 发布个人资料 |
+| `/post` | 发布个人资料（需登录，`RequireAuth` 守卫） |
 | `/deposit` | 保证金缴纳页面 |
 | `/qr` | 二维码分享页面 |
 | `/login` | 登录/注册页面 |
-| `/profile` | 个人资料管理 |
+| `/profile` | 个人资料管理（需登录） |
+| `/my-posts` | 我发布的资料列表（需登录） |
+| `/settings` | 账号设置（含修改密码） |
 | `/circles` | 圈子页面 |
 | `/circle/:circleKey/:tag` | 圈子详情 |
+| `/anti-fraud` | 防诈指南页 |
+| `*` | 404 兜底页（未注册路径显示提示，避免卡在 LoadingFallback） |
 
 ### 3.2 API 配置层（`src/api/config.ts`）
 
 ```typescript
-export const API_BASE_URL = ENV_BASE_URL || '/jzxr/api';
+const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const DEFAULT_DEV_BASE_URL = 'http://localhost:8080/api';   // 开发模式直连后端，绕开 Vite proxy + SSE 连接复用
+const DEFAULT_PROD_BASE_URL = '/jzxr/api';                  // 生产默认同源相对路径
+export const API_BASE_URL = ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL);
 
 export const API_ENDPOINTS = {
   users: '/users',
@@ -173,23 +178,23 @@ export const API_ENDPOINTS = {
 | 组件 | 说明 |
 |------|------|
 | TabBar | 底部导航栏 |
-| UserCard | 用户卡片展示 |
-| DetailModal | 用户详情弹窗 |
+| RequireAuth | 路由守卫，未登录时跳转登录页 |
+| Toast | 全局轻提示（ToastProvider） |
+| ShareButton | 分享按钮 |
+| UserList | 用户列表 |
+| UserDetailModal | 用户详情弹窗 |
 | RatingModal | 评价弹窗 |
 | ReportModal | 举报弹窗 |
 | ImagePreview | 图片预览 |
 | SearchPanel | 搜索面板 |
 | ErrorBoundary | 错误边界 |
-| SliderCaptcha | 滑动验证码 |
 | ContactPayModal | 联系方式支付弹窗 |
 | DeleteConfirmModal | 删除确认弹窗 |
-| UserDetailModal | 用户详情弹窗 |
-| UserList | 用户列表 |
 
 ### 3.4 Vite 配置（`vite.config.ts`）
 
 ```typescript
-base: env.VITE_BASE_URL || '/jzxr'
+base: (env.VITE_BASE_PATH || '/jzxr').replace(/\/+$/, '') + '/'
 server: {
   port: 4000,
   proxy: {
@@ -204,7 +209,7 @@ server: {
 ## 4. 数据库 Schema
 
 数据库：PostgreSQL 18 + pgvector v0.8.2
-数据目录：`data/pg_data/`
+数据位置（双轨）：**线上现行**=服务器自建 PostgreSQL，数据目录 `/var/www/my-two-website/data/pg_data/`；**容器方案（本机已验证、服务器未迁移）**=Docker 命名卷 `pgdata`（容器内挂 `/var/lib/postgresql`）。两种部署下仓库 `data/` 都只存 SQL 种子/导出文件，不含运行数据。
 
 ### 4.1 核心业务数据表
 
@@ -217,9 +222,14 @@ server: {
 | `contact_unlocks` | 联系方式解锁记录 |
 | `deposits` | 保证金记录 |
 | `payment_orders` | 支付订单 |
-| `messages` | 平台内消息（预留表，暂未使用） |
+| `user_custom_fields` | 用户自定义字段（EAV 键值表） |
+| `field_mappings` | 字段中文标签与类型映射（前端动态取字段定义） |
+| `custom_filters` | 管理员配置的自定义筛选字段 |
+| `"数据库映射表"` | 表/列名与中文说明的映射（导入导出用） |
 | `admin_settings` | 管理设置 |
 | `admin_logs` | 管理员操作日志 |
+
+全库共 14 张表（上表 13 张 + §4.2 的 `user_vectors`）。
 
 ### 4.2 向量数据表（pgvector）
 
@@ -257,10 +267,9 @@ server: {
 | `findSimilarUsersByExpectation()` | 按择偶要求向量找相似用户 |
 | `findMutualMatchUsers()` | 双向匹配（我的要求 vs 对方资料 + 对方要求 vs 我的资料） |
 | `getUserVector()` | 获取用户向量 |
-| `deleteUserVector()` | 删除用户向量 |
 | `getVectorStats()` | 获取向量统计信息 |
 
-说明：数据库已从 SQLite 迁移至 PostgreSQL，数据目录位于 `data/pg_data/`，原 `database.js` 已被拆分到 `db/` 目录，不再使用单一大文件。
+说明：数据库已从 SQLite 迁移至 PostgreSQL，运行数据不在仓库 `data/` 内（线上在服务器 PG 数据目录，容器方案在 Docker 命名卷 `pgdata`，见 §4），原 `database.js` 已被拆分到 `db/` 目录，不再使用单一大文件。
 
 ---
 
@@ -272,6 +281,11 @@ server: {
 |------|------|------|------|
 | POST | `/api/auth/register` | 用户注册 | 否 |
 | POST | `/api/auth/login` | 用户登录 | 否 |
+| POST | `/api/auth/change-password` | 修改密码 | Token |
+| GET | `/api/auth/captcha` | 获取滑动验证码 | 否 |
+| POST | `/api/auth/captcha/verify` | 校验滑动验证码 | 否 |
+| POST | `/api/auth/sms/register-code` | 发送注册短信验证码（预留） | 否 |
+| POST | `/api/auth/sms/verify-register-code` | 校验注册短信验证码（预留） | 否 |
 | POST | `/api/admin/login` | 管理员登录 | 否 |
 
 ### 5.2 用户接口
@@ -287,6 +301,9 @@ server: {
 | GET | `/api/users/pending` | 待审核用户 | 管理员 |
 | POST | `/api/users/:id/approve` | 审核通过 | 管理员 |
 | POST | `/api/users/:id/reject` | 审核拒绝 | 管理员 |
+| PUT | `/api/users/:id` | 编辑用户资料 | 管理员 |
+| DELETE | `/api/users/:id` | 删除用户 | Token（本人或管理员） |
+| POST | `/api/users/:id/unlock-contact` | 管理员解锁联系方式 | 管理员 |
 | GET | `/api/users/search` | 搜索用户（`contact` 参数仅管理员生效，匿名传入返回空） | 可选 |
 | GET | `/api/users/:id/check-unlock` | 检查解锁状态 | Token |
 
@@ -320,24 +337,77 @@ server: {
 |------|------|------|------|
 | GET | `/api/admin/stats` | 统计数据 | 管理员 |
 | GET | `/api/admin/deposits` | 保证金列表 | 管理员 |
-| PUT | `/api/admin/deposits/approve` | 审核通过保证金 | 管理员 |
-| PUT | `/api/admin/deposits/reject` | 拒绝保证金 | 管理员 |
+| PUT | `/api/admin/deposits/:id/approve` | 审核通过保证金 | 管理员 |
+| PUT | `/api/admin/deposits/:id/reject` | 拒绝保证金 | 管理员 |
+| GET | `/api/admin/deposits/proof/:id` | 读取保证金凭证图片 | 管理员 |
+| DELETE | `/api/admin/deposits/:id` | 删除保证金记录 | 管理员 |
 | GET | `/api/admin/unlock-records` | 解锁记录 | 管理员 |
 
 ### 5.7 向量搜索接口
 
 | 方法 | 路径 | 描述 | 认证 |
 |------|------|------|------|
-| GET | `/api/vector/stats` | 向量统计信息 | 否 |
+| GET | `/api/vector/stats` | 向量统计信息 | Token |
 | POST | `/api/vector/generate/:userId` | 生成并存储用户向量 | Token |
 | GET | `/api/vector/similar/:userId` | 相似用户搜索 | Token |
 | GET | `/api/vector/match/:userId` | 双向匹配推荐 | Token |
-| POST | `/api/vector/batch` | 批量生成向量 | 管理员 |
+| POST | `/api/vector/batch` | 批量生成向量 | Token |
+
+> 注意：`routes/vector.js` 在处理任何分支前统一 `requireAuth`，所有 `/api/vector/*` 未登录一律 401。
+> `/api/vector/batch` 代码侧未做管理员校验，任意登录用户均可触发批量生成（`limit` 默认 100 条），待评估。
 
 **向量搜索参数说明：**
 - `type`：搜索类型，`profile`（资料相似）或 `expectation`（要求相似），默认 `profile`
 - `limit`：返回结果数量，默认 10
 - 相似度范围：0~1，值越大越相似
+
+### 5.8 支付接口
+
+| 方法 | 路径 | 描述 | 认证 |
+|------|------|------|------|
+| POST | `/api/payment/create` | 创建支付订单（微信/支付宝） | Token |
+| GET | `/api/payment/status` | 查询订单状态 | Token |
+| GET | `/api/payment/mock-pay` | 模拟支付，生产环境返回 404 | Token |
+| POST | `/api/payment/notify-wechat` | 微信支付回调 | 无 Token，校验微信签名 |
+| POST | `/api/payment/notify-alipay` | 支付宝支付回调 | 无 Token，校验支付宝公钥签名 |
+| POST | `/api/payments/view-contact` | 已停用，恒返回 501（改走手动上传凭证） | - |
+
+### 5.9 联系方式解锁申请接口
+
+| 方法 | 路径 | 描述 | 认证 |
+|------|------|------|------|
+| POST | `/api/unlock-contact/submit` | 提交解锁申请（上传凭证） | Token |
+| GET | `/api/admin/unlock-contact-requests` | 解锁申请列表 | 管理员 |
+| PUT | `/api/admin/unlock-contact-requests/:id/approve` | 通过解锁申请 | 管理员 |
+| PUT | `/api/admin/unlock-contact-requests/:id/reject` | 拒绝解锁申请 | 管理员 |
+| DELETE | `/api/admin/unlock-contact-requests/:id` | 删除解锁申请 | 管理员 |
+
+### 5.10 字段映射与自定义筛选字段接口
+
+| 方法 | 路径 | 描述 | 认证 |
+|------|------|------|------|
+| GET | `/api/field-mappings` | 全部字段定义（支持 ETag / 304） | 否 |
+| GET | `/api/field-mappings/labels` | 字段中文标签映射（支持 ETag / 304） | 否 |
+| GET | `/api/custom-fields` | 自定义筛选字段列表 | 否 |
+| POST | `/api/admin/custom-fields` | 新增自定义筛选字段 | 管理员 |
+| DELETE | `/api/admin/custom-fields/:id` | 删除自定义筛选字段 | 管理员 |
+
+### 5.11 用户自定义字段接口（EAV）
+
+| 方法 | 路径 | 描述 | 认证 |
+|------|------|------|------|
+| GET | `/api/users/custom-fields` | 我的自定义字段 | Token |
+| POST | `/api/users/custom-fields` | 写入 / 更新我的某个自定义字段 | Token |
+| DELETE | `/api/users/custom-fields/:fieldKey` | 删除我的某个自定义字段 | Token |
+| GET | `/api/users/all-custom-fields` | 批量获取全部用户自定义字段（前端搜索用） | 否 |
+
+> 该组路由在 `server.js` 中按前缀整体转交给 `handleUserCustomFields`，方法不匹配返回 405。
+
+### 5.12 路由分发方式
+
+路由不是 Express 的 `app.use(router)`，而是 `server.js` 内手写的 pathname 分发器（正则 + 前缀判断），末尾统一 404。
+`normalizePath()` 会把 `/jzxr/api/xxx` 剥前缀归一为 `/api/xxx`，分发器内部只匹配 `/api/xxx`。
+管理员接口统一走 `checkAdminAuth(req)`（只认 `Authorization: Bearer <token>`）。
 
 ---
 

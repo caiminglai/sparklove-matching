@@ -15,7 +15,7 @@
 不是社交软件，没有站内聊天。就是一个大型的、结构化的、可筛选的人的数据库。
 
 目前已有：
-- 603 用户数据
+- 602 用户数据
 - 40+ 维度字段（身高、体重、肤色、脸型、眼型、嘴型、身材、星座、血型、学历、职业、收入、住房、购车、性格、吸烟、饮酒、宗教、宠物、兴趣爱好、标签……）
 - 完整的多条件筛选功能
 - 联系方式 AES-256-CBC 加密存储
@@ -62,7 +62,7 @@ Phase 2 要做的是：
 - **可选**：引入 LLM 对匹配结果给出自然语言解释
 
 已完成工作：
-- ✅ PostgreSQL 数据库迁移（从 SQLite，数据目录：项目/data/pg_data/）
+- ✅ PostgreSQL 数据库迁移（从 SQLite；线上数据目录＝服务器自建 PG，早期为 项目/data/pg_data/，容器方案改用命名卷 `pgdata`）
 - ✅ pgvector 扩展编译安装（v0.8.2）
 - ✅ 向量表结构设计（user_vectors 表，HNSW 索引）
 - ✅ 向量数据库操作模块（db/vector.js）
@@ -85,7 +85,7 @@ Phase 2 要做的是：
 | 后端 | Node.js 原生 HTTP 服务器（非 Express，轻量高效） |
 | 数据库 | PostgreSQL + **pg 连接池（全异步）** + **pgvector**（向量搜索扩展） |
 | 安全 | AES-256-CBC 加密、自定义 HMAC Token、bcrypt |
-| 部署 | 阿里云 + Nginx + PM2 |
+| 部署 | 线上现行：阿里云 + Nginx + PM2；目标方案：Docker Compose + Caddy（本机已验证，服务器迁移未执行） |
 
 ---
 
@@ -134,7 +134,7 @@ cd app && npm run dev
 详细文档见 `docs/` 目录：
 - `docs/项目总览.md` — 项目定位、技术栈、快速启动
 - `docs/架构与API.md` — 三层架构、数据库 Schema、API 接口
-- `docs/部署运维.md` — 服务器配置、Nginx、PM2
+- `docs/部署运维.md` — 服务器配置、部署流程（§4/§5/§9 线上现行 Nginx+PM2，§13 目标方案 Compose+Caddy）
 - `docs/运维记录.md` — 改进报告、修复记录、测试指南
 
 ---
