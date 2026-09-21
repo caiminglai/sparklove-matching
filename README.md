@@ -60,7 +60,7 @@ npm run dev
 | 管理后台 | http://localhost:8080/admin |
 | 生产环境 | https://sparklove.cn/ |
 
-> ⚠️ 上服务器前必须先解决：容器方案下管理后台 `/admin` 公网不可达（前端容器只转发 `/api/`、`/uploads/`、`/avatars/`），需按 `docs/部署运维.md` §3 补 Caddy 的 `/admin` 反代或走 SSH 隧道。
+> 管理后台：`https://sparklove.cn/admin`（由前端容器转发到后端，与站点同源，不额外开端口）。
 
 ## 核心功能
 

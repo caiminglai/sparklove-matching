@@ -1,6 +1,6 @@
 // 站2 前端运行时：零第三方依赖的「静态资源服务 + 反向代理」
 // 作用：以根路径 "/" 提供构建好的 React dist（含支付二维码等静态资源），
-//       并把 /api、/uploads、/avatars 请求反代到后端容器，实现同源访问、免 CORS。
+//       并把 /api、/uploads、/avatars、/admin（后端自己发的管理后台页面）反代到后端容器，实现同源访问、免 CORS。
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -36,7 +36,7 @@ const MIME = {
   '.wasm': 'application/wasm',
 };
 
-const PROXY_PREFIXES = ['/api/', '/uploads/', '/avatars/'];
+const PROXY_PREFIXES = ['/api/', '/uploads/', '/avatars/', '/admin/'];
 
 function isProxy(pathname) {
   return PROXY_PREFIXES.some((p) => pathname === p.slice(0, -1) || pathname.startsWith(p));
