@@ -82,6 +82,11 @@ function serveIndex(res) {
   });
 }
 
+function serveNotFound(res) {
+  res.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+  res.end('404 Not Found');
+}
+
 function serveStatic(res, urlPath) {
   const safePath = path.normalize(urlPath).replace(/^(\.\.[/\\])+/, '');
   const filePath = path.join(DIST_DIR, safePath);
@@ -89,7 +94,12 @@ function serveStatic(res, urlPath) {
     return serveIndex(res);
   }
   fs.stat(filePath, (err, stat) => {
-    if (err) return serveIndex(res); // SPA 前端路由回退到 index.html
+    if (err) {
+      // 带扩展名却没找到文件 = 真的不存在，必须回 404。
+      // 否则微信业务域名校验文件（WW_verify_xxx.txt）缺失时会被 index.html 顶替成 200，平台侧误判校验通过。
+      if (/\.[a-zA-Z0-9]{1,8}$/.test(urlPath)) return serveNotFound(res);
+      return serveIndex(res); // SPA 前端路由回退到 index.html
+    }
     if (stat.isDirectory()) {
       return serveStatic(res, path.posix.join(urlPath, 'index.html'));
     }
