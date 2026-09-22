@@ -24,11 +24,10 @@ beforeEach(() => {
 });
 
 describe('loadRows', () => {
-  it('无缓存时返回默认数据', async () => {
+  it('无缓存时返回空列表（真实数据由 /users 接口填充）', async () => {
     const { loadRows } = await import('./user.service');
     const rows = loadRows();
-    expect(rows.length).toBeGreaterThan(0);
-    expect(rows[0].data?.name).toBe('小雅');
+    expect(rows).toHaveLength(0);
   });
 
   it('有缓存时解析并返回', async () => {
