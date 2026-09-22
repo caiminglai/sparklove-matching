@@ -1,7 +1,7 @@
 import { Link, useNavigate } from 'react-router';
 import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Clock, Ban, Wallet, FileCheck, RefreshCw, HelpCircle, Users, AlertOctagon, Upload, Zap } from 'lucide-react';
 import { DEPOSIT_RULES } from '../data/constants';
-import { API_BASE_URL, getBasePath } from '../api/config';
+import { API_BASE_URL } from '../api/config';
 import { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
 import { getAuthToken } from '../utils/auth';
@@ -580,7 +580,7 @@ export default function DepositPage() {
                         </div>
                       ) : (
                         <img 
-                          src={`${getBasePath()}/${selectedMethod}-qr.png`} 
+                          src={`/${selectedMethod}-qr.png`} 
                           alt={`${selectedMethod === 'alipay' ? '支付宝' : '微信'}收款码`}
                           className="w-full h-full object-contain"
                           onError={() => { setQrError(true); }}

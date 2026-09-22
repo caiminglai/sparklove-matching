@@ -10,7 +10,7 @@ window.fetch = function (input: RequestInfo | URL, init?: RequestInit) {
   return _origFetch(input, { credentials: 'include', ...init });
 };
 
-const basePath = import.meta.env.VITE_BASE_PATH || (window.location.pathname.startsWith('/jzxr') ? '/jzxr' : '');
+const basePath = import.meta.env.VITE_BASE_PATH || '';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

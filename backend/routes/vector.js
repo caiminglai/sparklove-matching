@@ -22,8 +22,6 @@ const { sendJson } = require('../utils/sendJson');
 async function handleVectorRequest(req, res) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   let pathname = url.pathname;
-  // 统一剥离 /jzxr 前缀，与 server.js 的 normalizePath 保持一致
-  pathname = pathname.replace(/^\/jzxr\//, '/');
   const method = req.method;
 
   // 关键修复：仅当路径以 /api/vector/ 开头时才视为向量路由

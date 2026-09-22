@@ -128,13 +128,6 @@ function readBodyWithLimit(req) {
   });
 }
 
-// ========== 统一路径处理（核心修复）==========
-// 把 /jzxr/api/xxx 统一转成 /api/xxx，后续只处理 /api/xxx
-function normalizePath(pathname) {
-  return pathname.replace(/^\/jzxr\//, '/');
-}
-
-
 // ========== 创建服务器 ==========
 const server = http.createServer(async (req, res) => {
   // ===== 中间件 =====
@@ -162,7 +155,7 @@ const server = http.createServer(async (req, res) => {
 
   const parsedUrl = url.parse(req.url, true);
   const rawPath = parsedUrl.pathname;
-  const pathname = normalizePath(rawPath);  // ← 统一处理路径
+  const pathname = rawPath;
 
   // ========== 静态文件服务 ==========
   // 收款码图片

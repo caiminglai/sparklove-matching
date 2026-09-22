@@ -53,7 +53,7 @@
     {
       "label": "🐳 重建容器 (docker compose)",
       "type": "shell",
-      "command": "docker compose -f ../docker-compose.yml up -d --build jzxr jzxr-web",
+      "command": "docker compose -f ../compose/docker-compose.yml up -d --build jzxr jzxr-web",
       "group": "none",
       "presentation": {
         "echo": true,
@@ -67,7 +67,7 @@
     {
       "label": "📊 查看项目信息",
       "type": "shell",
-      "command": "echo '=== 精准匹配项目信息 ===' && echo '本地路径: E:/website/2.my-two-website' && echo '部署口径: Docker Compose + Caddy 单轨（旧栈 Nginx + PM2 已作废）' && echo '编排文件: E:/website/docker-compose.yml（服务名 jzxr jzxr-web）' && echo '反向代理: E:/website/caddy/Caddyfile（域名 sparklove.cn，证书自动签发续期）' && echo '本机访问: 前端 http://127.0.0.1:4000/ 后端 http://127.0.0.1:8080/' && echo '' && echo '常用命令:' && echo '  docker compose -f E:/website/docker-compose.yml up -d --build jzxr jzxr-web' && echo '  docker compose -f E:/website/docker-compose.yml logs --tail=100 jzxr jzxr-web' && echo '  docker compose -f E:/website/docker-compose.yml ps'",
+      "command": "echo '=== 精准匹配项目信息 ===' && echo '本地路径: E:/website/2.my-two-website' && echo '部署口径: Docker Compose + Caddy 单轨（旧栈 Nginx + PM2 已作废）' && echo '编排文件: E:/website/compose/docker-compose.yml（服务名 jzxr jzxr-web）' && echo '反向代理: E:/website/compose/caddy/Caddyfile（域名 sparklove.cn，证书自动签发续期）' && echo '本机访问: 前端 http://127.0.0.1:4000/ 后端 http://127.0.0.1:8080/' && echo '' && echo '常用命令:' && echo '  docker compose -f E:/website/compose/docker-compose.yml up -d --build jzxr jzxr-web' && echo '  docker compose -f E:/website/compose/docker-compose.yml logs --tail=100 jzxr jzxr-web' && echo '  docker compose -f E:/website/compose/docker-compose.yml ps'",
       "group": "none",
       "presentation": {
         "echo": true,

@@ -157,7 +157,7 @@ backend/
 ```typescript
 const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 const DEFAULT_DEV_BASE_URL = 'http://localhost:8080/api';   // 开发模式直连后端，绕开 Vite proxy + SSE 连接复用
-const DEFAULT_PROD_BASE_URL = '/jzxr/api';                  // 生产默认同源相对路径
+const DEFAULT_PROD_BASE_URL = '/api';                  // 生产默认同源相对路径
 export const API_BASE_URL = ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL);
 
 export const API_ENDPOINTS = {
@@ -194,12 +194,12 @@ export const API_ENDPOINTS = {
 ### 3.4 Vite 配置（`vite.config.ts`）
 
 ```typescript
-base: (env.VITE_BASE_PATH || '/jzxr').replace(/\/+$/, '') + '/'
+base: (env.VITE_BASE_PATH || '/').replace(/\/+$/, '') + '/'
 server: {
   port: 4000,
   proxy: {
-    '/jzxr/api':   { target: 'http://localhost:8080', rewrite: path => path.replace(/^\/jzxr/, '') },
-    '/jzxr/admin': { target: 'http://localhost:8080', rewrite: path => path.replace(/^\/jzxr/, '') },
+    '/api':   { target: 'http://localhost:8080' },
+    '/admin': { target: 'http://localhost:8080' },
   }
 }
 ```
@@ -421,7 +421,7 @@ server: {
 ### 5.12 路由分发方式
 
 路由不是 Express 的 `app.use(router)`，而是 `server.js` 内手写的 pathname 分发器（正则 + 前缀判断），末尾统一 404。
-`normalizePath()` 会把 `/jzxr/api/xxx` 剥前缀归一为 `/api/xxx`，分发器内部只匹配 `/api/xxx`。
+分发器内部只匹配 `/api/xxx`。后端曾有一条剥 `/jzxr` 前缀的兼容分支，已删除（线上前端从不用带前缀的地址，删除不影响任何现有请求）。
 管理员接口统一走 `checkAdminAuth(req)`（只认 `Authorization: Bearer <token>`）。
 
 ---

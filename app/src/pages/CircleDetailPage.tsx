@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router';
 import { ArrowLeft, Heart, Users, Sparkles, Utensils, Dumbbell, Music, MapPin, ChevronLeft } from 'lucide-react';
-import { API_BASE_URL, normalizeAvatarUrl, getBasePath } from '../api/config';
+import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import type { Row } from '../data/types';
 import ImagePreview from '../components/ImagePreview';
 import { maskContact } from '../utils/mask';
@@ -288,14 +288,14 @@ export default function CircleDetailPage() {
                   </p>
                   <div className="flex flex-col gap-3">
                     <div className="p-3 rounded-xl text-center cursor-pointer" style={{ background: '#f8f9fa' }}
-                      onClick={() => setPreviewImage(`${getBasePath()}/wechat-qr.png`)}>
+                      onClick={() => setPreviewImage(`/wechat-qr.png`)}>
                       <div className="text-xs mb-1 font-medium" style={{ color: '#666' }}>微信支付</div>
-                      <img src={`${getBasePath()}/wechat-qr.png`} alt="微信收款码" className="w-40 h-40 mx-auto rounded-lg" style={{ objectFit: 'cover' }} />
+                      <img src={`/wechat-qr.png`} alt="微信收款码" className="w-40 h-40 mx-auto rounded-lg" style={{ objectFit: 'cover' }} />
                     </div>
                     <div className="p-3 rounded-xl text-center cursor-pointer" style={{ background: '#f8f9fa' }}
-                      onClick={() => setPreviewImage(`${getBasePath()}/alipay-qr.png`)}>
+                      onClick={() => setPreviewImage(`/alipay-qr.png`)}>
                       <div className="text-xs mb-1 font-medium" style={{ color: '#666' }}>支付宝</div>
-                      <img src={`${getBasePath()}/alipay-qr.png`} alt="支付宝收款码" className="w-40 h-40 mx-auto rounded-lg" style={{ objectFit: 'cover' }} />
+                      <img src={`/alipay-qr.png`} alt="支付宝收款码" className="w-40 h-40 mx-auto rounded-lg" style={{ objectFit: 'cover' }} />
                     </div>
                   </div>
                   <p className="text-xs text-center mt-3" style={{ color: 'var(--color-text-secondary)' }}>

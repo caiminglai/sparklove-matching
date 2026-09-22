@@ -9,7 +9,7 @@ const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 // 【关键修复：开发模式直连后端，绕开 Vite proxy + SSE reset 连接池复用】
 // 根因：Vite 开发模式下 /@vite/client 建立 SSE 长连接，且该连接会因 HMR 触发
 //       反复「断开→重连」(RST)。Chrome 对同一 host 最多 6 条 HTTP/1.1 连接，
-//       发往 4000 /jzxr/api 的代理请求和 SSE 长连接共享同 6 条连接，若
+//       发往 4000 /api 的代理请求和 SSE 长连接共享同 6 条连接，若
 //       某条请求刚好排在 SSE 长连接即将 RST 的那条 TCP socket 上，就会被
 //       连带 abort → Chrome 控制台红字 net::ERR_ABORTED。
 //
@@ -22,11 +22,11 @@ const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 //       后端已正确配置 CORS（允许 http://localhost:4000 + credentials），
 //       实测直连 fetch 200 成功（见 console 验证）。
 //
-// 生产构建：VITE_API_BASE_URL 环境变量会覆盖（或用默认相对路径 /jzxr/api），
+// 生产构建：VITE_API_BASE_URL 环境变量会覆盖（或用默认相对路径 /api），
 //         生产无 SSE 也无 proxy，不会有此问题。
 // ======================================================
 const DEFAULT_DEV_BASE_URL = 'http://localhost:8080/api';
-const DEFAULT_PROD_BASE_URL = '/jzxr/api';
+const DEFAULT_PROD_BASE_URL = '/api';
 export const API_BASE_URL = ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL);
 
 // API 端点
@@ -58,23 +58,16 @@ export const API_ENDPOINTS = {
   fieldLabels: '/field-mappings/labels',
 } as const;
 
-// 动态获取基础路径（支持 /jzxr 子路径部署和根路径部署）
-export const getBasePath = (): string => {
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/jzxr')) return '/jzxr';
-  return '';
-};
-
 // 头像 URL 规范化 - 处理各种 avatar 存储格式：/uploads/avatars/x.jpg、/avatars/x.jpg、x.jpg、http(s)://...
 export const normalizeAvatarUrl = (avatar: string | undefined | null): string | null => {
   if (!avatar) return null;
   if (avatar.startsWith('http') || avatar.startsWith('data:')) return avatar;
-  const base = getBasePath();
   if (avatar.startsWith('/uploads/') || avatar.startsWith('/avatars/')) {
-    return `${base}${avatar}`
+    return `${avatar}`
   }
   if (avatar.startsWith('/')) {
-    return `${base}${avatar}`
+    return `${avatar}`
   }
-  return `${base}/uploads/avatars/${avatar}`
+  return `/uploads/avatars/${avatar}`
 };
 

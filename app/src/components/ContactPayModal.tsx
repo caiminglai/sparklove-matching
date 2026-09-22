@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { ArrowLeft, Zap, Upload, CheckCircle } from 'lucide-react';
-import { API_BASE_URL, getBasePath } from '../api/config';
+import { API_BASE_URL } from '../api/config';
 import { getAuthToken } from '../utils/auth';
 
 interface ContactPayModalProps {
@@ -191,7 +191,7 @@ export default function ContactPayModal({ targetUserId, amount = DEFAULT_AMOUNT,
                   </div>
                 ) : (
                   <img
-                    src={`${getBasePath()}/${method}-qr.png`}
+                    src={`/${method}-qr.png`}
                     alt={`${method === 'alipay' ? '支付宝' : '微信'}收款码`}
                     className="w-full h-full object-contain rounded-lg"
                     onError={() => { setQrError(true); }}

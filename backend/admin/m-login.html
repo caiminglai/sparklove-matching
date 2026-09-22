@@ -53,8 +53,7 @@
   </div>
 
   <script>
-    // 自动检测是否需要 /jzxr 前缀
-    const API_BASE = window.location.pathname.includes('/jzxr') ? '/jzxr' : '';
+    const API_BASE = '';
     
     async function login() {
       const username = document.getElementById('username').value.trim() || 'admin';
