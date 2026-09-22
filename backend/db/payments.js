@@ -118,13 +118,21 @@ async function getPaymentOrder(orderId) {
   return await stmt.get(orderId);
 }
 
-async function updatePaymentOrder(orderId, status) {
+async function updatePaymentOrder(orderId, status, channelTxnId = null) {
   const database = getDb();
   const stmt = database.prepare(
-    'UPDATE payment_orders SET status = $1, paid_at = $2 WHERE order_id = $3'
+    'UPDATE payment_orders SET status = $1, paid_at = $2, channel_txn_id = COALESCE($3, channel_txn_id) WHERE order_id = $4'
   );
-  await stmt.run(status, status === 'paid' ? Date.now() : null, orderId);
+  await stmt.run(status, status === 'paid' ? Date.now() : null, channelTxnId, orderId);
   return true;
+}
+
+// 种子库里的 payment_orders 没有渠道流水号列，启动期幂等补上，老库不用手工迁移
+async function ensurePaymentColumns() {
+  const database = getDb();
+  await database.prepare(
+    'ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS channel_txn_id text'
+  ).run();
 }
 
 async function approveDepositByUserId(userId, amount) {
@@ -196,6 +204,7 @@ module.exports = {
   addPaymentOrder,
   getPaymentOrder,
   updatePaymentOrder,
+  ensurePaymentColumns,
   approveDepositByUserId,
   getAllDeposits,
   updateDepositStatus,

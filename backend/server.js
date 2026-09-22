@@ -512,6 +512,8 @@ initConnection().then(async () => {
   }
   // 自动建向量表 + HNSW 索引（若已存在则跳过）
   try { await initVectorTables(); } catch(e) { console.warn('向量表初始化失败（可忽略）：', e.message); }
+  // 支付订单表补 channel_txn_id 列（种子库没有这一列；IF NOT EXISTS 幂等）
+  try { await paymentsDb.ensurePaymentColumns(); } catch(e) { console.warn('支付订单表补列失败：', e.message); }
   server.listen(PORT, () => {
     console.log('');
     console.log('╔══════════════════════════════════════════╗');

@@ -5,6 +5,7 @@ import { API_BASE_URL, getBasePath } from '../api/config';
 import { useState, useEffect } from 'react';
 import { useToast } from '../components/Toast';
 import { getAuthToken } from '../utils/auth';
+import QRCode from 'qrcode';
 
 export default function DepositPage() {
   const { toast } = useToast();
@@ -18,6 +19,7 @@ export default function DepositPage() {
   const [depositStatus, setDepositStatus] = useState<{status: string; admin_note?: string} | null>(null);
   const [loadingStatus, setLoadingStatus] = useState(true);
   const [creatingOrder, setCreatingOrder] = useState(false); // 新增：创建订单中
+  const [nativeQr, setNativeQr] = useState<string | null>(null); // 微信 Native 下单返回的支付二维码
 
   // 加载用户的保证金状态
   useEffect(() => {
@@ -33,6 +35,17 @@ export default function DepositPage() {
     const interval = setInterval(loadDepositStatus, 30000);
     return () => clearInterval(interval);
   }, []);
+
+  // 二维码展示期间轮询订单状态，回调落库后自动收起
+  useEffect(() => {
+    if (!nativeQr) return;
+    const timer = setInterval(() => {
+      const id = localStorage.getItem('pending_order_id');
+      if (!id) { setNativeQr(null); return; }
+      checkPaymentStatus(id);
+    }, 3000);
+    return () => clearInterval(timer);
+  }, [nativeQr]);
 
   // 检查支付订单状态
   const checkPaymentStatus = async (orderId: string) => {
@@ -51,13 +64,16 @@ export default function DepositPage() {
         if (result.success && result.status === 'paid') {
           // 支付成功，清除待确认订单
           localStorage.removeItem('pending_order_id');
+          setNativeQr(null);
           // 重新加载保证金状态
           await loadDepositStatus();
+          return true;
         }
       }
     } catch (err) {
       console.warn('查询订单状态失败', err);
     }
+    return false;
   };
 
   const loadDepositStatus = async () => {
@@ -168,7 +184,11 @@ export default function DepositPage() {
 
       if (res.ok) {
         const result = await res.json();
-        if (result.success && result.payUrl) {
+        if (result.success && result.codeUrl) {
+          // 微信扫码支付：不跳转，本页出码等扫码
+          localStorage.setItem('pending_order_id', result.orderId);
+          setNativeQr(await QRCode.toDataURL(result.codeUrl, { margin: 1, width: 240 }));
+        } else if (result.success && result.payUrl) {
           // 保存订单号，用于支付成功后查询
           localStorage.setItem('pending_order_id', result.orderId);
           // 跳转到支付页面
@@ -520,6 +540,13 @@ export default function DepositPage() {
                       支付成功后自动解锁，无需等待审核
                     </p>
                   </div>
+                  {nativeQr && (
+                    <div className="bg-white rounded-xl p-4 mb-4 text-center" style={{ border: '1px solid var(--color-border-light)' }}>
+                      <img src={nativeQr} alt="微信支付二维码" className="mx-auto mb-2" style={{ width: 200, height: 200 }} />
+                      <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>用微信扫一扫完成支付</p>
+                      <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)' }}>支付完成后本页自动解锁，不用刷新</p>
+                    </div>
+                  )}
                   <button 
                     onClick={handleAutoPayment}
                     disabled={creatingOrder}

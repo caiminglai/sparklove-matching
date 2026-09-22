@@ -368,12 +368,23 @@ server: {
 
 | 方法 | 路径 | 描述 | 认证 |
 |------|------|------|------|
-| POST | `/api/payment/create` | 创建支付订单（微信/支付宝） | Token |
+| POST | `/api/payment/create` | 创建支付订单。微信返回 `codeUrl`（前端本地生成二维码），支付宝返回 `payUrl`（跳转） | Token |
 | GET | `/api/payment/status` | 查询订单状态 | Token |
 | GET | `/api/payment/mock-pay` | 模拟支付，生产环境返回 404 | Token |
-| POST | `/api/payment/notify-wechat` | 微信支付回调 | 无 Token，校验微信签名 |
+| POST | `/api/payment/notify-wechat` | 微信支付 v3 回调 | 无 Token，AES-256-GCM 解密即认证来源 |
 | POST | `/api/payment/notify-alipay` | 支付宝支付回调 | 无 Token，校验支付宝公钥签名 |
 | POST | `/api/payments/view-contact` | 已停用，恒返回 501（改走手动上传凭证） | - |
+
+回调侧的三条硬约定（改代码前先读）：
+
+- 金额只认服务端：下单时请求体里的 `amount` 被忽略，一律取 `DEPOSIT_AMOUNT`；回调再逐笔比对回调金额与订单金额，两者都要有，缺任何一个都能被"付一分钱解锁保证金"绕过。
+- 微信 v3 靠 HTTP 状态码决定是否重推：处理失败必须回 500。回 200 等于告诉微信"已送达"，那一次没落库就是永久丢单，且全程无报错。
+- 回调地址只能填 `https://sparklove.cn/api/payment/notify-wechat` 与 `.../notify-alipay`，**不能带 `/jzxr` 前缀**。带前缀会被前端单页应用兜底成 200 的 index.html，症状与上一条相同：钱扣了、保证金不解锁、全程零报错。
+
+开通支付需要在 `backend/.env` 填的键（模板见 `.env.example`）：
+`WECHAT_APP_ID`、`WECHAT_MCH_ID`、`WECHAT_API_V3_KEY`、`WECHAT_MERCHANT_SERIAL_NO`、`WECHAT_MERCHANT_PRIVATE_KEY`、`WECHAT_NOTIFY_URL`、
+`ALIPAY_APP_ID`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY`、`ALIPAY_NOTIFY_URL`、`ALIPAY_RETURN_URL`。
+某个渠道的键没填全则该渠道不可用；`payment_orders.channel_txn_id`（渠道流水号，对账用）由服务启动时自动补列。
 
 ### 5.9 联系方式解锁申请接口
 
