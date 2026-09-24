@@ -19,7 +19,7 @@ const { sendJson } = require('../utils/sendJson');
  * 向量搜索API路由（原生HTTP）
  * 返回 true 表示已处理该请求，false 表示非向量路由，由 server.js 继续匹配
  */
-async function handleVectorRequest(req, res) {
+async function handleVectorRequest(req, res, checkAdminAuth) {
   const url = new URL(req.url, `http://${req.headers.host}`);
   let pathname = url.pathname;
   const method = req.method;
@@ -99,8 +99,12 @@ async function handleVectorRequest(req, res) {
     return true;
   }
 
-  // POST /api/vector/batch - 批量生成向量（需要登录，防止匿名滥用）
+  // POST /api/vector/batch - 批量生成向量（仅管理员：一次最多跑 limit 个用户的付费向量）
   if (method === 'POST' && pathname === '/api/vector/batch') {
+    if (!checkAdminAuth || !(await checkAdminAuth(req))) {
+      sendJson(res, 403, { success: false, message: '仅管理员可批量生成向量' });
+      return true;
+    }
     try {
       const body = await collectBody(req, MAX_VECTOR_BODY);
       const { limit = 100 } = body ? JSON.parse(body) : {};

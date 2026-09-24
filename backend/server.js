@@ -254,7 +254,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // --- 向量搜索 ---
-  const handled = await handleVectorRequest(req, res);
+  const handled = await handleVectorRequest(req, res, checkAdminAuth);
   if (handled) return;
 
   // --- 查看联系方式支付 ---

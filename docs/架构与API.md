@@ -354,10 +354,11 @@ server: {
 | POST | `/api/vector/generate/:userId` | 生成并存储用户向量 | Token |
 | GET | `/api/vector/similar/:userId` | 相似用户搜索 | Token |
 | GET | `/api/vector/match/:userId` | 双向匹配推荐 | Token |
-| POST | `/api/vector/batch` | 批量生成向量 | Token |
+| POST | `/api/vector/batch` | 批量生成向量 | 管理员 Token |
 
 > 注意：`routes/vector.js` 在处理任何分支前统一 `requireAuth`，所有 `/api/vector/*` 未登录一律 401。
-> `/api/vector/batch` 代码侧未做管理员校验，任意登录用户均可触发批量生成（`limit` 默认 100 条），待评估。
+> `/api/vector/batch` 额外要求管理员令牌（`server.js` 把 `checkAdminAuth` 传进来），因为它一次最多跑 `limit`（默认 100）个用户的付费向量。
+> 现状：前端没有任何页面调用 `/api/vector/*`，`user_vectors` 表里有向量的行数为 0（唯一一行的两个向量列都是 NULL）。这套匹配引擎已实现但还没接到产品上，启用前先配 `EMBEDDING_API_KEY`，否则 `generateEmbedding` 直接抛错。
 
 **向量搜索参数说明：**
 - `type`：搜索类型，`profile`（资料相似）或 `expectation`（要求相似），默认 `profile`
