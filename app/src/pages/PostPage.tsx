@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { ArrowLeft } from 'lucide-react';
 import { loadColumns, loadRows, addRow } from '../services/user.service';
@@ -6,6 +6,8 @@ import type { Row } from '../data/types';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import { useToast } from '../components/Toast';
 import { getAuthToken } from '../utils/auth';
+import { formatDraftAge } from '../services/draft.service';
+import { useFormDraft } from '../utils/useFormDraft';
 
 export default function PostPage() {
   const { toast } = useToast();
@@ -17,6 +19,22 @@ export default function PostPage() {
   const userId = localStorage.getItem('user_id');
   const authToken = getAuthToken();
   // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处不再重复
+  // 草稿自动保存：只落盘 services/draft.service.ts 白名单里的字段（联系方式/头像/生日等一律不存）
+  const { restoredAt, restore, afterSubmit, discard } = useFormDraft('post', data, true);
+
+  // 进页面时尝试恢复上次未提交的草稿（超过 7 天的草稿由 loadDraft 直接丢弃并清理）
+  useEffect(() => {
+    const draftValues = restore();
+    if (!draftValues) return;
+    setData(draftValues);
+    const tags: Record<string, string[]> = {};
+    Object.entries(draftValues).forEach(([key, val]) => {
+      if (typeof val === 'string' && val.includes(',')) tags[key] = val.split(',');
+    });
+    setSelectedTags(tags);
+    toast('已恢复上次未提交的草稿', 'info');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const setVal = (key: string, val: string) => setData(p => ({ ...p, [key]: val }));
 
@@ -54,6 +72,7 @@ export default function PostPage() {
           body: JSON.stringify(row),
         });
         if (res.ok) {
+          afterSubmit(); // 已发布成功，草稿作废
           navigate('/profile');
         } else {
           toast('发布失败', 'error');
@@ -63,6 +82,7 @@ export default function PostPage() {
       }
     } else {
       addRow(loadRows(), row);
+      afterSubmit(); // 已落库（本地兜底），草稿作废
       navigate('/');
     }
   };
@@ -76,6 +96,27 @@ export default function PostPage() {
             <ArrowLeft size={18} />
           </Link>
           <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>发布资料</h1>
+        </div>
+
+        {/* 草稿提示：联系方式/头像/生日等敏感与大体积字段不在白名单内，不会被存到本地 */}
+        <div
+          className="flex items-center justify-between gap-2 rounded-xl px-4 py-2.5 mb-5"
+          style={{ background: 'var(--color-bg-card)', border: `1px solid ${restoredAt ? 'rgba(var(--color-success-rgb), 0.25)' : 'var(--color-border-light)'}` }}
+        >
+          <span className="text-xs" style={{ color: restoredAt ? 'var(--color-success)' : 'var(--color-text-secondary)' }}>
+            {restoredAt
+              ? `已恢复 ${formatDraftAge(restoredAt)}保存的未提交草稿`
+              : '填写内容会自动存为本地草稿（敏感字段不保存）'}
+          </span>
+          {restoredAt && (
+            <button
+              onClick={() => { discard(); setData({}); setSelectedTags({}); toast('已放弃草稿', 'info'); }}
+              className="shrink-0 text-xs px-2 py-1 rounded-lg"
+              style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)' }}
+            >
+              放弃草稿
+            </button>
+          )}
         </div>
 
         {/* Avatar Upload */}

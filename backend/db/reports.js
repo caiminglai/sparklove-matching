@@ -1,3 +1,11 @@
+// ============================================================
+// 数据访问层 - 用户举报（user_reports 表）
+// 导出 addReport / getAllReports / updateReportStatus / deleteReport
+// addReport 固定写入 status='pending'，处理进度全靠 updateReportStatus 改这一列
+// getAllReports 会把被举报人的 contact（本站付费解锁字段）一并 JOIN 出来，所以只能给带 checkAdminAuth 的后台路由用，别拿到公开接口上
+// deleteReport 是物理 DELETE，不是软删；删掉举报记录就查不到原始描述和证据图路径了
+// ============================================================
+
 const { getDb } = require('./index');
 
 async function addReport(reporterId, reportedId, reportType, description, proofPath) {

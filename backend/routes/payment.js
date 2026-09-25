@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const dbIndex = require('../db/index.js');
 const paymentsDb = require('../db/payments.js');
+const paymentVerify = require('../utils/payment-verify.js');
 
 // 支付配置
 let wechatConfig = null;
@@ -119,21 +120,48 @@ async function createWechatOrder(userId, amount) {
 }
 
 async function handleWechatNotify(rawBody) {
+  // 每个失败都带 retryable：能靠微信重推救回来的才回 5xx，伪通知回 204 收口（见 wechatNotify）
+  // 微信支付没配齐时压根下不了单（createWechatOrder 会先 throw），此时的通知必然不是自家产生的；
+  // 但归类成可重试：未配置多半是重新部署时 .env 没挂上这类本站侧的临时状态，配置补齐后微信重推还能把这单救回来。
+  // 这条早退同时保证 .env 缺支付键时的优雅降级——不进解密、不抛异常
+  if (!isPaymentConfigured().wechat) {
+    console.warn('[wechatNotify] 收到通知但本站微信支付未配齐，按可重试失败处理');
+    return { success: false, retryable: true, message: '微信支付未配置' };
+  }
+  let envelope;
+  try {
+    envelope = JSON.parse(rawBody);
+  } catch (e) {
+    return { success: false, retryable: true, message: '回调报文解析失败' };
+  }
+  if (!envelope || typeof envelope !== 'object' || !envelope.event_type || !envelope.resource) {
+    // 结构不完整的报文（含运维文档里 `curl -d {}` 那条探活）留 500，
+    // 这样"回 5xx 才说明请求打到了后端、没被前端 SPA 兜底吃掉"这个判据继续成立
+    return { success: false, retryable: true, message: '回调报文结构不完整' };
+  }
+  if (envelope.event_type !== 'TRANSACTION.SUCCESS') {
+    // 退款等事件也推到同一个地址，本站没有对应处理逻辑；回 5xx 只会让微信按策略空重推一整天
+    return { success: false, retryable: false, message: '非支付成功通知' };
+  }
   let payload;
   try {
-    const envelope = JSON.parse(rawBody);
-    if (envelope.event_type !== 'TRANSACTION.SUCCESS') return { success: false, message: '非支付成功通知' };
     payload = decryptWechatResource(envelope.resource, wechatConfig.apiV3Key);
   } catch (e) {
-    return { success: false, message: '回调解析或解密失败' };
+    // 密钥轮换或配置刚改还没生效时，下一次重推就能解开，这类留给微信重试
+    return { success: false, retryable: true, message: '回调解密失败' };
   }
-  const orderId = payload.out_trade_no;
+  const orderId = payload && payload.out_trade_no;
+  if (!orderId) return { success: false, retryable: false, message: '通知缺少 out_trade_no' };
   const order = await paymentsDb.getPaymentOrder(orderId);
-  if (!order) return { success: false, message: '订单不存在' };
-  // 🔴 能解密只证明"出自微信"，不证明"金额对得上"。少这一步，一笔小额真实支付的通知就能把大额订单标成已付
-  const paidFen = Number(payload.amount && payload.amount.total);
-  const expectFen = Math.round(Number(order.amount) * 100);
-  if (paidFen !== expectFen) return { success: false, message: '回调金额与订单不符' };
+  if (!order) return { success: false, retryable: true, message: '订单不存在' };
+  // 🔴 能解密只证明"出自微信持有同一把密钥的一方"，不证明这笔钱是付给本站这张单的。
+  // 交易状态、appid/mchid、金额三项全部对齐才允许入账
+  const verdict = paymentVerify.screenWechatNotify({ payload, order, config: wechatConfig });
+  if (!verdict.ok) {
+    // verdict.log 只含订单号、金额与两个公开标识符；密钥/证书/密文/签名串不允许进日志
+    console.warn('[wechatNotify] 拒绝入账：' + verdict.reason, verdict.log);
+    return { success: false, retryable: false, message: verdict.reason };
+  }
   // 微信会重复通知同一笔；已是 paid 就直接回成功，避免重复写 deposits
   if (order.status === 'paid') return { success: true, orderId: orderId };
   await paymentsDb.updatePaymentOrder(orderId, 'paid', payload.transaction_id);
@@ -287,16 +315,23 @@ async function createPayment(req, res, readBodyWithLimit) {
 }
 
 async function wechatNotify(req, res, readBodyWithLimit) {
-  // v3 用 HTTP 状态码决定是否重推：回 2xx 就等于宣告处理完成。
-  // 失败必须回 5xx，否则微信不再重发，那一次失败就是永久丢单。
+  // v3 用 HTTP 状态码决定是否重推：回 2xx 就等于宣告处理完成，非 2xx/204 会被按策略重推约一天。
+  // 所以两类失败要分开：暂时处理不了的（解密失败、订单暂时查不到）回 5xx 换重推，
+  // 金额/身份不符这种重推多少次也不会变好的伪通知回 204 收口，别把重推队列和日志刷满。
   const reply = (statusCode, payload) => {
     res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify(payload));
+  };
+  const ackAndStopRetry = () => {
+    // 204 是微信文档认可的"已收到"应答，且按规范不带 body
+    res.writeHead(204);
+    res.end();
   };
   try {
     const body = await readBodyWithLimit(req);
     const result = await handleWechatNotify(body);
     if (result.success) reply(200, { code: 'SUCCESS' });
+    else if (result.retryable === false) ackAndStopRetry();
     else reply(500, { code: 'FAIL', message: result.message || '处理失败' });
   } catch (e) {
     reply(500, { code: 'FAIL', message: (e && e.message) || '服务器处理失败' });

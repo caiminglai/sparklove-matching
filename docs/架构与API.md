@@ -288,6 +288,12 @@ server: {
 | POST | `/api/auth/sms/verify-register-code` | 校验注册短信验证码（预留） | 否 |
 | POST | `/api/admin/login` | 管理员登录 | 否 |
 
+`/api/auth/register` 的"该手机号已注册"（400）依赖数据库唯一约束，不靠代码查重：`auth_users.phone` 上有一个部分唯一索引
+`auth_users_phone_uniq`（排除 NULL 与空串），由服务启动时 `ensurePhoneUniqueIndex()` 幂等创建。
+在此之前注册链路没有任何查重，同一个手机号可以注册出两个账号，而登录用的 `WHERE phone = $1` 只取一行，
+命中哪个账号变成不确定。若表里已存在重复手机号，启动时索引建不起来——只在日志告警一次，不阻断启动，
+需要先人工合并重复账号再重启服务（本机与服务器已实测均无重复手机号）。
+
 ### 5.2 用户接口
 
 | 方法 | 路径 | 描述 | 认证 |
@@ -378,8 +384,8 @@ server: {
 
 回调侧的三条硬约定（改代码前先读）：
 
-- 金额只认服务端：下单时请求体里的 `amount` 被忽略，一律取 `DEPOSIT_AMOUNT`；回调再逐笔比对回调金额与订单金额，两者都要有，缺任何一个都能被"付一分钱解锁保证金"绕过。
-- 微信 v3 靠 HTTP 状态码决定是否重推：处理失败必须回 500。回 200 等于告诉微信"已送达"，那一次没落库就是永久丢单，且全程无报错。
+- 金额与身份只认逐笔比对：下单时请求体里的 `amount` 被忽略，一律取 `DEPOSIT_AMOUNT`；入账前还要把通知的 `amount.total`（分）与订单应收、通知的 `appid`/`mchid` 与 `backend/.env` 的配置、`trade_state` 与 `SUCCESS` 三项同时对齐，缺任何一个都能被"付一分钱解锁保证金"、或被同一把 APIv3 密钥下别的应用发来的通知绕过。这几项判定是纯函数，写在 `backend/utils/payment-verify.js`，单测在 `app/src/utils/payment-verify.test.ts`（`cd app && npx vitest run`）。
+- 微信 v3 靠 HTTP 状态码决定是否重推，失败分两类回：暂时处理不了的（解密失败、订单暂时查不到、本站支付键没配齐）回 500——回 2xx 等于告诉微信"已送达"，那一次没落库就是永久丢单，且全程无报错；而重推多少次也不会变好的伪通知（金额不符、appid/mchid 不符、交易状态非 SUCCESS、非支付成功事件）回 204 空响应收口，否则会被按退避策略重推约一天，把重推队列和日志刷满。
 - 回调地址只能填 `https://sparklove.cn/api/payment/notify-wechat` 与 `.../notify-alipay`，**不能带 `/jzxr` 前缀**。带前缀会被前端单页应用兜底成 200 的 index.html，症状与上一条相同：钱扣了、保证金不解锁、全程零报错。
 
 开通支付需要在 `backend/.env` 填的键（模板见 `.env.example`）：

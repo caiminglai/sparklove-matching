@@ -10,6 +10,9 @@ import { DEPOSIT_RULES } from '../data/constants';
 import type { Column, Row } from '../data/types';
 import { getAuthToken } from '../utils/auth';
 import { useToast } from '../components/Toast';
+import { computeProfileCompleteness } from '../utils/profile-completeness';
+import { formatDraftAge } from '../services/draft.service';
+import { useFormDraft } from '../utils/useFormDraft';
 
 export default function ProfilePage() {
   const { toast } = useToast();
@@ -42,6 +45,8 @@ export default function ProfilePage() {
   const authToken = getAuthToken();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const customFieldOriginalRef = useRef<Record<string, string>>({});
+  // 草稿自动保存：仅在编辑态落盘，字段范围由 services/draft.service.ts 的白名单决定
+  const { restoredAt, restore, afterSubmit, discard } = useFormDraft('profile', formData, editMode);
 
   // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处只负责加载数据
   useEffect(() => {
@@ -57,9 +62,13 @@ export default function ProfilePage() {
         const data = await res.json();
         if (data.user) {
           setUserData(data.user);
-          setFormData(data.user.data || {});
+          const serverData: Record<string, string> = data.user.data || {};
+          const draftValues = restore();
+          const merged = draftValues ? { ...serverData, ...draftValues } : serverData;
+          setFormData(merged);
+          if (draftValues) toast('已恢复上次未提交的草稿', 'info');
           const tags: Record<string, string[]> = {};
-          Object.entries(data.user.data || {}).forEach(([key, val]) => {
+          Object.entries(merged).forEach(([key, val]) => {
             if (typeof val === 'string' && val.includes(',')) {
               tags[key] = val.split(',');
             }
@@ -114,6 +123,8 @@ export default function ProfilePage() {
       });
 
       if (res.ok) {
+        // 修改已落库，草稿必须清掉，否则下次进页面会拿旧草稿覆盖新数据
+        afterSubmit();
         setEditMode(false);
         loadMyData();
       } else {
@@ -294,6 +305,9 @@ export default function ProfilePage() {
     );
   }
 
+  // 编辑态下 formData 会随输入变化，完整度条实时跟着走
+  const completeness = computeProfileCompleteness(formData);
+
   return (
     <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
       <div className="max-w-lg mx-auto px-4 pt-6">
@@ -306,6 +320,51 @@ export default function ProfilePage() {
             <button onClick={() => setEditMode(false)} className="ml-auto text-sm" style={{ color: 'var(--color-primary)' }}>
               取消
             </button>
+          )}
+        </div>
+
+        {/* 资料完整度提示条：分母是头像/昵称/性别/城市/职业这 5 个门面字段（见 utils/profile-completeness.ts） */}
+        <div className="rounded-xl px-4 py-3 mb-4" style={{ background: 'var(--color-bg-card)', border: '1px solid var(--color-border-light)' }}>
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium" style={{ color: 'var(--color-text-primary)' }}>资料完整度</span>
+            <span className="text-xs" style={{ color: 'var(--color-primary)' }}>{completeness.filled}/{completeness.total} · {completeness.percent}%</span>
+          </div>
+          <div
+            className="h-1.5 rounded-full overflow-hidden mt-2"
+            style={{ background: 'var(--color-border-light)' }}
+            role="progressbar"
+            aria-valuenow={completeness.percent}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label="资料完整度"
+          >
+            <div
+              className="h-full rounded-full"
+              style={{
+                width: `${completeness.percent}%`,
+                background: 'linear-gradient(90deg, var(--color-primary), var(--color-primary-dark))',
+                transition: 'width 0.25s ease',
+              }}
+            />
+          </div>
+          {completeness.missing.length > 0 ? (
+            <p className="text-xs mt-2" style={{ color: 'var(--color-text-secondary)' }}>
+              还差：{completeness.missing.join('、')}
+            </p>
+          ) : (
+            <p className="text-xs mt-2" style={{ color: 'var(--color-success)' }}>资料已完整</p>
+          )}
+          {restoredAt && (
+            <div className="flex items-center justify-between gap-2 mt-2 pt-2" style={{ borderTop: '1px dashed var(--color-border-light)' }}>
+              <span className="text-xs" style={{ color: 'var(--color-success)' }}>已恢复 {formatDraftAge(restoredAt)}保存的未提交草稿</span>
+              <button
+                onClick={() => { discard(); setEditMode(false); loadMyData(); toast('已放弃草稿', 'info'); }}
+                className="shrink-0 text-xs px-2 py-1 rounded-lg"
+                style={{ color: 'var(--color-text-muted)', border: '1px solid var(--color-border)', background: 'var(--color-bg-input)' }}
+              >
+                放弃草稿
+              </button>
+            </div>
           )}
         </div>
 

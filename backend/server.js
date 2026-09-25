@@ -490,6 +490,7 @@ const PORT = process.env.PORT || 8080;
 // 异步初始化数据库连接后再启动服务器
 const { initConnection } = require('./db/index.js');
 const { initVectorTables } = require('./db/vector.js');
+const authDb = require('./db/auth.js');
 initConnection().then(async () => {
   // 启动期强校验：管理员密码必须能从环境变量或数据库取到，否则拒绝启动
   // （替代原 admin.service.js 模块加载期的 process.exit(1)）
@@ -507,6 +508,10 @@ initConnection().then(async () => {
   try { await initVectorTables(); } catch(e) { console.warn('向量表初始化失败（可忽略）：', e.message); }
   // 支付订单表补 channel_txn_id 列（种子库没有这一列；IF NOT EXISTS 幂等）
   try { await paymentsDb.ensurePaymentColumns(); } catch(e) { console.warn('支付订单表补列失败：', e.message); }
+  // 注册账号表补手机号唯一索引（IF NOT EXISTS 幂等）。
+  // 失败通常只有一个原因：表里已经存在同手机号的重复账号，必须先人工合并再重启，
+  // 否则注册仍可重复、登录命中哪个账号不确定。这里只告警不阻断启动。
+  try { await authDb.ensurePhoneUniqueIndex(); } catch(e) { console.warn('手机号唯一索引创建失败（表内可能已有重复手机号，需先清理）：', e.message); }
   server.listen(PORT, () => {
     console.log('');
     console.log('╔══════════════════════════════════════════╗');

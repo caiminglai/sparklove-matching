@@ -1,3 +1,10 @@
+// ============================================================
+// 数据访问层 - 用户互相评分（user_ratings 表）
+// 导出 addRating / getRatingsForUser / getAverageRating / checkUserRated
+// addRating 用 ON CONFLICT(rater_id, rated_id) DO UPDATE：同一个人对同一个人只留最新一条评分，不是追加历史，重复打分直接覆盖旧分
+// getAverageRating 没人评过的时候回 {avg:0, count:0} 而不是 null，前端可以直接显示 0 分，但"0 分"和"还没人评"是两种状态，要区分得看 count
+// ============================================================
+
 const { getDb } = require('./index');
 
 async function addRating(raterId, ratedId, rating, comment) {
