@@ -7,7 +7,7 @@
 import { API_BASE_URL, API_ENDPOINTS } from '../api/config';
 import type { Row, Column, FlatRow } from '../data/types';
 import { DEFAULT_COLUMNS } from '../data/constants';
-import { getAuthToken, getAuthHeaders } from '../utils/auth';
+import { getAuthHeaders } from '../utils/auth';
 
 const LS_ROWS = 'match_rows';
 const LS_COLUMNS = 'match_columns';

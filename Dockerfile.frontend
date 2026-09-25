@@ -11,6 +11,8 @@ COPY app/ ./
 # 以根路径部署：base=/，API 走同源相对路径 /api（运行时由前端服务反代到后端）
 ENV VITE_BASE_PATH=/ \
     VITE_API_BASE_URL=/api
+# 门禁走 npm run build（= tsc -b && vite build）：类型错误当场卡住构建。
+# 09-25 先清零存量 45 条再打开，与站1、站3 口径一致。
 RUN npm run build
 
 # ---- 运行阶段 ----

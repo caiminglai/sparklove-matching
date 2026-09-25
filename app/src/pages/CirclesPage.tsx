@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router';
 import { Heart, Users, Sparkles, Music, Utensils, Dumbbell, MapPin, ChevronRight, Search } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import type { Row } from '../data/types';
-import { getAuthToken, getAuthHeaders } from '../utils/auth';
+import { getAuthHeaders } from '../utils/auth';
 import { hexToRgba } from '../utils/color';
 
 const CIRCLE_CONFIGS = [

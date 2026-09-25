@@ -1,13 +1,13 @@
 import { useState, useEffect, useMemo } from 'react';
 import { Link, useParams, useNavigate } from 'react-router';
-import { ArrowLeft, Heart, Users, Sparkles, Utensils, Dumbbell, Music, MapPin, ChevronLeft } from 'lucide-react';
+import { Heart, Users, Sparkles, Utensils, Dumbbell, Music, MapPin, ChevronLeft } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import type { Row } from '../data/types';
 import ImagePreview from '../components/ImagePreview';
 import { maskContact } from '../utils/mask';
 import { hexToRgba } from '../utils/color';
 import { useToast } from '../components/Toast';
-import { getAuthToken, getAuthHeaders } from '../utils/auth';
+import { getAuthHeaders } from '../utils/auth';
 
 // 客服微信号配置（从环境变量读取，避免硬编码在前端代码）
 const CUSTOMER_SERVICE_WECHAT = import.meta.env.VITE_CUSTOMER_SERVICE_WECHAT || 'chanmiao0430';

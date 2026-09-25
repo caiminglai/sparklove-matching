@@ -15,7 +15,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { API_BASE_URL } from '../api/config';
 import { CATEGORIES, PURPOSE_OPTIONS } from '../data/constants';
-import type { AdminCustomField, Column, CustomField, MatchCondition } from '../data/types';
+import type { AdminCustomField, Column, MatchCondition } from '../data/types';
 import { waitForBootstrapSafeWindow, withInFlightDedup } from '../utils/bootstrap-guard';
 
 const QUICK_TAGS = [
@@ -144,7 +144,6 @@ export default function SearchPanel({
   onColumnsChange,
   conditions,
   onConditionsChange,
-  hasSearched,
   onHasSearchedChange,
   selectedPurpose,
   onSelectedPurposeChange,
@@ -156,7 +155,6 @@ export default function SearchPanel({
   activeSearchExact,
   onSearch,
   onResetSearch,
-  userCustomFieldKeys = [],
 }: SearchPanelProps) {
   const [showCustomFilter, setShowCustomFilter] = useState(false);
   const [customFieldKey, setCustomFieldKey] = useState('');
@@ -253,7 +251,7 @@ export default function SearchPanel({
     if (!customFieldKey.trim()) return;
     const rawKey = customFieldKey.trim();
     const cleanKey = rawKey.toLowerCase().replace(/[^a-z0-9_]/g, '') || rawKey;
-    const adminField = adminCustomFields.find((f: CustomField) =>
+    const adminField = adminCustomFields.find((f: AdminCustomField) =>
       f.field_label === rawKey || f.field_key === rawKey || f.field_key === cleanKey);
     let finalKey: string;
     let finalLabel: string;

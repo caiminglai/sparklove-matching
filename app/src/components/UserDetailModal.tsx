@@ -154,7 +154,7 @@ export default function UserDetailModal({
               <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.6)', border: '1px solid rgba(var(--color-border-warm-rgb), 0.4)' }}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="text-xs font-semibold flex items-center gap-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-                    <Star size={12} fill={averageRating?.count > 0 ? 'var(--color-star)' : 'none'} style={{ color: averageRating?.count > 0 ? 'var(--color-star)' : 'var(--color-text-secondary)' }} />
+                    <Star size={12} fill={averageRating && averageRating.count > 0 ? 'var(--color-star)' : 'none'} style={{ color: averageRating && averageRating.count > 0 ? 'var(--color-star)' : 'var(--color-text-secondary)' }} />
                     用户评价
                   </div>
                   <button
@@ -165,7 +165,7 @@ export default function UserDetailModal({
                     写评价
                   </button>
                 </div>
-                {averageRating?.count > 0 ? (
+                {averageRating && averageRating.count > 0 ? (
                   <div className="space-y-3">
                     <div className="flex items-center gap-2">
                       <span className="text-2xl font-bold" style={{ color: 'var(--color-text-primary)' }}>{averageRating.avg.toFixed(1)}</span>

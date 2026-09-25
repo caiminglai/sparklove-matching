@@ -1,4 +1,4 @@
-import { Link, useNavigate } from 'react-router';
+import { Link } from 'react-router';
 import { ArrowLeft, Shield, AlertTriangle, CheckCircle, Clock, Ban, Wallet, FileCheck, RefreshCw, HelpCircle, Users, AlertOctagon, Upload, Zap } from 'lucide-react';
 import { DEPOSIT_RULES } from '../data/constants';
 import { API_BASE_URL } from '../api/config';
@@ -9,7 +9,6 @@ import QRCode from 'qrcode';
 
 export default function DepositPage() {
   const { toast } = useToast();
-  const navigate = useNavigate();
   const [showPayment, setShowPayment] = useState(false);
   const [selectedMethod, setSelectedMethod] = useState<'alipay' | 'wechat'>('alipay');
   const [qrError, setQrError] = useState(false);

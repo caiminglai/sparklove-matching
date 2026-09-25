@@ -53,7 +53,7 @@ function safeOptions(opts: unknown): string[] {
   return out;
 }
 
-function normalizeColumn(col: Partial<Column> & { key?: string; label?: unknown; options?: unknown; category?: unknown; type?: unknown; }): Column {
+function normalizeColumn(col: { key?: unknown; label?: unknown; type?: unknown; options?: unknown; category?: unknown }): Column {
   return {
     key: String(col.key || ''),
     label: safeLabel(col.label) || String(col.key || ''),

@@ -55,10 +55,10 @@ export default function PostPage() {
 
     const row: Row = {
       id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
-      user_id: userId,
+      user_id: userId ?? undefined,
       deposit: 0,
       createdAt: Date.now(),
-      data: finalData,
+      data: finalData as Row['data'],
     };
 
     if (userId && authToken) {

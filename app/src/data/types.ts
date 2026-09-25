@@ -8,6 +8,7 @@ export interface Row {
   deposit: number;
   createdAt: number;
   data?: {
+    avatar?: string;
     name: string;
     gender: string;
     age: number | string;

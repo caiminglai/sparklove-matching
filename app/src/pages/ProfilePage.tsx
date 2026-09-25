@@ -6,7 +6,6 @@ import type { CustomField } from '../data/types';
 import { handleApiError } from '../utils/errorHandler';
 import { loadColumns } from '../services/user.service';
 import { fetchFieldMappings } from '../services/field-mapping.service';
-import { DEPOSIT_RULES } from '../data/constants';
 import type { Column, Row } from '../data/types';
 import { getAuthToken } from '../utils/auth';
 import { useToast } from '../components/Toast';

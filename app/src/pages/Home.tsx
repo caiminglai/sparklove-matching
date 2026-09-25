@@ -154,10 +154,10 @@ export default function Home() {
           }
           rows = rows.map((row: FlatRow) => {
             if (row.user_id && cfMap[row.user_id]) {
-              return { ...row, data: { ...row.data, ...cfMap[row.user_id] } };
+              return { ...row, data: { ...row.data, ...cfMap[row.user_id] } as FlatRow['data'] };
             }
             return row;
-          });
+          }) as FlatRow[];
         }
 
         setRows(rows);
