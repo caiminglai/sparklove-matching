@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router';
-import { ArrowLeft, FileText, MapPin, Heart, Trash2, Clock, Plus } from 'lucide-react';
+import { ArrowLeft, FileText, Trash2, Clock, Plus } from 'lucide-react';
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config';
 import { loadColumns } from '../services/user.service';
 import type { Row } from '../data/types';
@@ -52,12 +52,12 @@ export default function MyPostsPage() {
 
   const handleDelete = async (id: string) => {
     try {
-      const res = await fetch(`${API_BASE_URL}/users/my`, {
+      const res = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${authToken}` },
       });
       if (res.ok) {
-        setRows([]);
+        setRows((prev) => prev.filter((r) => r.id !== id));
         setShowDelModal(null);
       } else {
         toast('删除失败', 'error');
