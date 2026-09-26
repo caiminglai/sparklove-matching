@@ -38,34 +38,35 @@ export default function DepositPage() {
   const [creatingOrder, setCreatingOrder] = useState(false) // 新增：创建订单中
   const [nativeQr, setNativeQr] = useState<string | null>(null) // 微信 Native 下单返回的支付二维码
 
-  // 加载用户的保证金状态
-  useEffect(() => {
-    loadDepositStatus()
-
-    // 检查是否有待确认的订单（从支付页面返回）
-    const pendingOrderId = localStorage.getItem('pending_order_id')
-    if (pendingOrderId) {
-      checkPaymentStatus(pendingOrderId)
-    }
-
-    // 每30秒自动检查一次审核状态
-    const interval = setInterval(loadDepositStatus, 30000)
-    return () => clearInterval(interval)
-  }, [])
-
-  // 二维码展示期间轮询订单状态，回调落库后自动收起
-  useEffect(() => {
-    if (!nativeQr) return
-    const timer = setInterval(() => {
-      const id = localStorage.getItem('pending_order_id')
-      if (!id) {
-        setNativeQr(null)
+  const loadDepositStatus = async () => {
+    try {
+      const token = getAuthToken()
+      if (!token) {
+        setLoadingStatus(false)
         return
       }
-      checkPaymentStatus(id)
-    }, 3000)
-    return () => clearInterval(timer)
-  }, [nativeQr])
+
+      const res = await fetch(`${API_BASE_URL}/users/my-deposit`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+
+      if (res.ok) {
+        const result = await res.json()
+        if (result.success && result.data) {
+          setDepositStatus({
+            status: result.data.status,
+            admin_note: result.data.admin_note,
+          })
+        }
+      }
+    } catch (err) {
+      console.warn('查询保证金状态失败', err)
+    } finally {
+      setLoadingStatus(false)
+    }
+  }
 
   // 检查支付订单状态
   const checkPaymentStatus = async (orderId: string) => {
@@ -96,35 +97,34 @@ export default function DepositPage() {
     return false
   }
 
-  const loadDepositStatus = async () => {
-    try {
-      const token = getAuthToken()
-      if (!token) {
-        setLoadingStatus(false)
+  // 加载用户的保证金状态
+  useEffect(() => {
+    loadDepositStatus()
+
+    // 检查是否有待确认的订单（从支付页面返回）
+    const pendingOrderId = localStorage.getItem('pending_order_id')
+    if (pendingOrderId) {
+      checkPaymentStatus(pendingOrderId)
+    }
+
+    // 每30秒自动检查一次审核状态
+    const interval = setInterval(loadDepositStatus, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // 二维码展示期间轮询订单状态，回调落库后自动收起
+  useEffect(() => {
+    if (!nativeQr) return
+    const timer = setInterval(() => {
+      const id = localStorage.getItem('pending_order_id')
+      if (!id) {
+        setNativeQr(null)
         return
       }
-
-      const res = await fetch(`${API_BASE_URL}/users/my-deposit`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      })
-
-      if (res.ok) {
-        const result = await res.json()
-        if (result.success && result.data) {
-          setDepositStatus({
-            status: result.data.status,
-            admin_note: result.data.admin_note,
-          })
-        }
-      }
-    } catch (err) {
-      console.warn('查询保证金状态失败', err)
-    } finally {
-      setLoadingStatus(false)
-    }
-  }
+      checkPaymentStatus(id)
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [nativeQr])
 
   const handleUploadProof = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]

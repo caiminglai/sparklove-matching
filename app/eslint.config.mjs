@@ -34,8 +34,16 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      // eslint-plugin-react-hooks 7.x 新加的编译器规则，存量代码一次改不完，
-      // 先降为 warn 让门禁能跑；这三条清零后可以删掉。
+      // eslint-plugin-react-hooks 7.x 新加的三条编译器规则，先降为 warn 让门禁能跑。
+      // 实测计数（react-hooks 7.1.1，0 error，总 53 warning）：immutability 0
+      // （原 4 条＝DepositPage×2/MyPostsPage/ProfilePage，都不是真违反不可变，只是
+      // const 箭头函数声明在它调用的 effect 之后，已把声明整体上移清零）、
+      // set-state-in-effect 10（原 7 条＝ReportModal/ShareButton/Home×3/PostPage/
+      // useFormDraft，加 3 条＝上移后编译器才看得见的 DepositPage/MyPostsPage/
+      // ProfilePage，那三个组件此前整体 Compilation Skipped）、
+      // preserve-manual-memoization 13（全在 Home.tsx：useMemo/useCallback 的依赖
+      // 写了 []，编译器推断出的依赖是 setXxx 这类 state setter，补进依赖数组即可）。
+      // 后两条清零后再删这三行；版本低于 7.1.1 时这三条规则还没实现，量出来是假绿。
       'react-hooks/preserve-manual-memoization': 'warn',
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/immutability': 'warn',

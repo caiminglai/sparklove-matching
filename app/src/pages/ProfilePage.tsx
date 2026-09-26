@@ -61,11 +61,6 @@ export default function ProfilePage() {
   // 草稿自动保存：仅在编辑态落盘，字段范围由 services/draft.service.ts 的白名单决定
   const { restoredAt, restore, afterSubmit, discard } = useFormDraft('profile', formData, editMode)
 
-  // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处只负责加载数据
-  useEffect(() => {
-    loadMyData()
-  }, [])
-
   const loadMyData = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/users/my`, {
@@ -105,6 +100,11 @@ export default function ProfilePage() {
       setLoading(false)
     }
   }
+
+  // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处只负责加载数据
+  useEffect(() => {
+    loadMyData()
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('auth_token')

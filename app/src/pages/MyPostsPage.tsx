@@ -19,11 +19,6 @@ export default function MyPostsPage() {
   const userId = localStorage.getItem('user_id')
   const authToken = getAuthToken()
 
-  // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处只负责加载数据
-  useEffect(() => {
-    loadMyPosts()
-  }, [])
-
   const loadMyPosts = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/users/my`, {
@@ -49,6 +44,11 @@ export default function MyPostsPage() {
       setLoading(false)
     }
   }
+
+  // 鉴权逻辑已由 App.tsx 中的 <RequireAuth> 守卫处理，此处只负责加载数据
+  useEffect(() => {
+    loadMyPosts()
+  }, [])
 
   const handleDelete = async (id: string) => {
     try {
