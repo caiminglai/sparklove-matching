@@ -25,44 +25,44 @@
   --radius: 0.5rem;
   /* ===== 语义化设计变量 ===== */
   /* 主色 */
-  --color-primary: #E87A5D;
-  --color-primary-dark: #D96A4D;
+  --color-primary: #e87a5d;
+  --color-primary-dark: #d96a4d;
   --color-primary-rgb: 232, 122, 93;
   /* 背景色 */
-  --color-bg-main: #FAF6F1;
-  --color-bg-card: #FFFDF9;
-  --color-bg-input: #F5EDE3;
+  --color-bg-main: #faf6f1;
+  --color-bg-card: #fffdf9;
+  --color-bg-input: #f5ede3;
   /* 文字色（对比度均满足 WCAG AA ≥ 4.5:1，层次：primary > muted > secondary > light） */
-  --color-text-primary: #3D2E20;
-  --color-text-secondary: #8B7B6B;
-  --color-text-muted: #8B7B6B;
-  --color-text-light: #8B7B6B;
+  --color-text-primary: #3d2e20;
+  --color-text-secondary: #8b7b6b;
+  --color-text-muted: #8b7b6b;
+  --color-text-light: #8b7b6b;
   --color-text-dark-rgb: 61, 46, 32;
   /* 边框色 */
-  --color-border: #E8DED0;
-  --color-border-light: #F0E4D4;
+  --color-border: #e8ded0;
+  --color-border-light: #f0e4d4;
   --color-border-warm-rgb: 240, 228, 212;
   /* 功能色 */
-  --color-success: #6BAF7D;
+  --color-success: #6baf7d;
   --color-success-rgb: 107, 175, 125;
-  --color-info: #7B8CDE;
+  --color-info: #7b8cde;
   --color-info-rgb: 123, 140, 222;
-  --color-danger: #C4515C;
+  --color-danger: #c4515c;
   --color-danger-rgb: 196, 81, 92;
   /* 第三方品牌色 */
-  --color-alipay: #1677FF;
-  --color-alipay-dark: #0958D9;
-  --color-wechat: #07C160;
-  --color-wechat-dark: #06AD56;
+  --color-alipay: #1677ff;
+  --color-alipay-dark: #0958d9;
+  --color-wechat: #07c160;
+  --color-wechat-dark: #06ad56;
   /* 评分星色 */
-  --color-star: #F5A623;
+  --color-star: #f5a623;
   /* 分类强调色（SearchPanel 自定义标签等） */
-  --color-accent-purple: #A78BFA;
+  --color-accent-purple: #a78bfa;
   --color-accent-purple-rgb: 167, 139, 250;
-  --color-accent-teal: #5BA4B5;
+  --color-accent-teal: #5ba4b5;
   /* 其他 */
-  --color-bg-warm: #F5D0C4;
-  --color-bg-pink: #F0D0D4;
+  --color-bg-warm: #f5d0c4;
+  --color-bg-pink: #f0d0d4;
 }
 
 @layer base {
@@ -70,7 +70,9 @@
     -webkit-tap-highlight-color: transparent;
   }
   body {
-    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    font-family:
+      -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Microsoft YaHei',
+      sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
   }
@@ -89,14 +91,23 @@
     -webkit-backdrop-filter: blur(24px);
   }
   .avatar-gradient {
-    background: linear-gradient(135deg, var(--color-primary) 0%, #F5A088 50%, var(--color-primary-dark) 100%);
+    background: linear-gradient(
+      135deg,
+      var(--color-primary) 0%,
+      #f5a088 50%,
+      var(--color-primary-dark) 100%
+    );
     box-shadow: 0 4px 14px rgba(var(--color-primary-rgb), 0.35);
   }
   .card-shadow {
-    box-shadow: 0 2px 8px rgba(var(--color-text-dark-rgb), 0.04), 0 8px 24px rgba(var(--color-text-dark-rgb), 0.06);
+    box-shadow:
+      0 2px 8px rgba(var(--color-text-dark-rgb), 0.04),
+      0 8px 24px rgba(var(--color-text-dark-rgb), 0.06);
   }
   .card-shadow-hover {
-    box-shadow: 0 4px 12px rgba(var(--color-text-dark-rgb), 0.06), 0 12px 36px rgba(var(--color-text-dark-rgb), 0.1);
+    box-shadow:
+      0 4px 12px rgba(var(--color-text-dark-rgb), 0.06),
+      0 12px 36px rgba(var(--color-text-dark-rgb), 0.1);
   }
   .btn-primary {
     background: linear-gradient(135deg, var(--color-primary) 0%, var(--color-primary-dark) 100%);
@@ -145,22 +156,45 @@
 }
 
 @keyframes slideInRight {
-  from { transform: translateX(100%); opacity: 0; }
-  to { transform: translateX(0); opacity: 1; }
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
 }
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
 }
 @keyframes scaleIn {
-  from { transform: scale(0.95); opacity: 0; }
-  to { transform: scale(1); opacity: 1; }
+  from {
+    transform: scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
 }
 
-.scrollbar-hide::-webkit-scrollbar { display: none; }
-.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
 
-input:focus, select:focus, textarea:focus {
+input:focus,
+select:focus,
+textarea:focus {
   outline: none;
   border-color: rgba(var(--color-primary-rgb), 0.4) !important;
   box-shadow: 0 0 0 3px rgba(var(--color-primary-rgb), 0.08);

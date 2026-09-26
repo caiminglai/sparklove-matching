@@ -1,17 +1,17 @@
-import { X } from 'lucide-react';
+import { X } from 'lucide-react'
 
 interface ImagePreviewProps {
-  src: string;
-  alt?: string;
-  isOpen: boolean;
-  onClose: () => void;
+  src: string
+  alt?: string
+  isOpen: boolean
+  onClose: () => void
 }
 
 export default function ImagePreview({ src, alt, isOpen, onClose }: ImagePreviewProps) {
-  if (!isOpen) return null;
+  if (!isOpen) return null
 
   return (
-    <div 
+    <div
       className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 backdrop-blur-sm"
       onClick={onClose}
     >
@@ -25,8 +25,8 @@ export default function ImagePreview({ src, alt, isOpen, onClose }: ImagePreview
         src={src}
         alt={alt || '预览图片'}
         className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl"
-        onClick={e => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
       />
     </div>
-  );
+  )
 }

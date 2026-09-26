@@ -7,9 +7,9 @@
 
 export interface CompletenessField {
   /** user.data 里的真实字段名 */
-  key: string;
+  key: string
   /** 展示给用户的中文名 */
-  label: string;
+  label: string
 }
 
 /**
@@ -25,7 +25,7 @@ export const PROFILE_COMPLETENESS_FIELDS: readonly CompletenessField[] = Object.
   { key: 'gender', label: '性别' },
   { key: 'city', label: '城市' },
   { key: 'job', label: '职业' },
-]);
+])
 
 /** 后端/历史数据里常见的脏占位值：看起来有内容，实际等于没填 */
 export const DIRTY_PLACEHOLDER_VALUES: ReadonlySet<string> = new Set([
@@ -37,43 +37,43 @@ export const DIRTY_PLACEHOLDER_VALUES: ReadonlySet<string> = new Set([
   '[object object]',
   '—',
   '-',
-]);
+])
 
 /** 单个字段是否算「已填」：空串 / 纯空格 / null / undefined / 脏占位值都算未填 */
 export function isFieldFilled(value: unknown): boolean {
-  if (value === null || value === undefined) return false;
+  if (value === null || value === undefined) return false
 
   if (typeof value === 'string') {
-    const trimmed = value.trim();
-    if (!trimmed) return false;
-    return !DIRTY_PLACEHOLDER_VALUES.has(trimmed.toLowerCase());
+    const trimmed = value.trim()
+    if (!trimmed) return false
+    return !DIRTY_PLACEHOLDER_VALUES.has(trimmed.toLowerCase())
   }
 
   if (typeof value === 'number') {
     // 0 / NaN / Infinity 都视为未填（年龄、身高为 0 没有业务含义）
-    return Number.isFinite(value) && value !== 0;
+    return Number.isFinite(value) && value !== 0
   }
 
-  if (typeof value === 'boolean') return value;
+  if (typeof value === 'boolean') return value
 
-  if (Array.isArray(value)) return value.some(item => isFieldFilled(item));
+  if (Array.isArray(value)) return value.some((item) => isFieldFilled(item))
 
   if (typeof value === 'object') {
-    return Object.values(value as Record<string, unknown>).some(item => isFieldFilled(item));
+    return Object.values(value as Record<string, unknown>).some((item) => isFieldFilled(item))
   }
 
-  return false;
+  return false
 }
 
 export interface CompletenessResult {
-  filled: number;
-  total: number;
+  filled: number
+  total: number
   /** 0 ~ 1 */
-  ratio: number;
+  ratio: number
   /** 百分比整数，0 ~ 100 */
-  percent: number;
+  percent: number
   /** 未填字段的中文名，用于提示「还差什么」 */
-  missing: string[];
+  missing: string[]
 }
 
 /**
@@ -83,19 +83,19 @@ export interface CompletenessResult {
 export function computeProfileCompleteness(
   data: Record<string, unknown> | null | undefined,
 ): CompletenessResult {
-  const source = data && typeof data === 'object' ? data : {};
-  const missing: string[] = [];
-  let filled = 0;
+  const source = data && typeof data === 'object' ? data : {}
+  const missing: string[] = []
+  let filled = 0
 
   for (const field of PROFILE_COMPLETENESS_FIELDS) {
     if (isFieldFilled(source[field.key])) {
-      filled += 1;
+      filled += 1
     } else {
-      missing.push(field.label);
+      missing.push(field.label)
     }
   }
 
-  const total = PROFILE_COMPLETENESS_FIELDS.length;
-  const ratio = total === 0 ? 0 : filled / total;
-  return { filled, total, ratio, percent: Math.round(ratio * 100), missing };
+  const total = PROFILE_COMPLETENESS_FIELDS.length
+  const ratio = total === 0 ? 0 : filled / total
+  return { filled, total, ratio, percent: Math.round(ratio * 100), missing }
 }

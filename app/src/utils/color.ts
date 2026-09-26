@@ -14,9 +14,9 @@
  *   hexToRgba('E87A5D', 0.5)  // 'rgba(232, 122, 93, 0.5)'
  */
 export function hexToRgba(hex: string, alpha: number): string {
-  const cleanHex = hex.replace('#', '');
-  const r = parseInt(cleanHex.slice(0, 2), 16);
-  const g = parseInt(cleanHex.slice(2, 4), 16);
-  const b = parseInt(cleanHex.slice(4, 6), 16);
-  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  const cleanHex = hex.replace('#', '')
+  const r = parseInt(cleanHex.slice(0, 2), 16)
+  const g = parseInt(cleanHex.slice(2, 4), 16)
+  const b = parseInt(cleanHex.slice(4, 6), 16)
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`
 }

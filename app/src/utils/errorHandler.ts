@@ -3,11 +3,13 @@
  */
 
 /** 可被注入的 toast 函数，由 React 组件在初始化时设置 */
-let toastFn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null = null;
+let toastFn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null = null
 
 /** 注入 toast 函数（由 ToastProvider 在初始化时调用） */
-export function setToastFn(fn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null): void {
-  toastFn = fn;
+export function setToastFn(
+  fn: ((msg: string, type?: 'success' | 'error' | 'info') => void) | null,
+): void {
+  toastFn = fn
 }
 
 /**
@@ -15,31 +17,33 @@ export function setToastFn(fn: ((msg: string, type?: 'success' | 'error' | 'info
  */
 export function showError(message: string): void {
   if (toastFn) {
-    toastFn(message, 'error');
-    return;
+    toastFn(message, 'error')
+    return
   }
-  alert(message);
+  alert(message)
 }
 
 /**
  * 处理 API 请求错误
  */
-export function handleApiError(error: unknown, fallbackMessage: string = '操作失败，请稍后重试'): void {
+export function handleApiError(
+  error: unknown,
+  fallbackMessage: string = '操作失败，请稍后重试',
+): void {
   if (error instanceof Error) {
     if (error.name === 'AbortError') {
-      showError('请求超时，请检查网络连接');
-      return;
+      showError('请求超时，请检查网络连接')
+      return
     }
-    
+
     // 网络错误
     if (error.message.includes('fetch') || error.message.includes('network')) {
-      showError('网络连接失败，请检查网络');
-      return;
+      showError('网络连接失败，请检查网络')
+      return
     }
-    
-    showError(error.message || fallbackMessage);
+
+    showError(error.message || fallbackMessage)
   } else {
-    showError(fallbackMessage);
+    showError(fallbackMessage)
   }
 }
-

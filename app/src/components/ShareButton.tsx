@@ -1,10 +1,10 @@
-import { Check, Copy, ExternalLink, Share2, X } from 'lucide-react';
-import QRCode from 'qrcode';
-import { useEffect, useState } from 'react';
+import { Check, Copy, ExternalLink, Share2, X } from 'lucide-react'
+import QRCode from 'qrcode'
+import { useEffect, useState } from 'react'
 
 interface ShareButtonProps {
   /** 分享的网址,默认当前网站根地址 */
-  url?: string;
+  url?: string
 }
 
 /**
@@ -16,16 +16,15 @@ interface ShareButtonProps {
  */
 export default function ShareButton({ url }: ShareButtonProps) {
   // 分享地址:优先用传入的,否则取当前网站根地址(去掉路径和查询)
-  const shareUrl =
-    url ?? (typeof window !== 'undefined' ? window.location.origin : '');
+  const shareUrl = url ?? (typeof window !== 'undefined' ? window.location.origin : '')
 
-  const [open, setOpen] = useState(false);
-  const [qrDataUrl, setQrDataUrl] = useState<string>('');
-  const [copied, setCopied] = useState(false);
+  const [open, setOpen] = useState(false)
+  const [qrDataUrl, setQrDataUrl] = useState<string>('')
+  const [copied, setCopied] = useState(false)
 
   // 对话框打开时才生成二维码,省点性能
   useEffect(() => {
-    if (!open || !shareUrl || qrDataUrl) return;
+    if (!open || !shareUrl || qrDataUrl) return
     QRCode.toDataURL(shareUrl, {
       width: 256,
       margin: 2,
@@ -33,33 +32,33 @@ export default function ShareButton({ url }: ShareButtonProps) {
     })
       .then(setQrDataUrl)
       .catch((err: unknown) => {
-        console.error('二维码生成失败:', err);
-      });
-  }, [open, shareUrl, qrDataUrl]);
+        console.error('二维码生成失败:', err)
+      })
+  }, [open, shareUrl, qrDataUrl])
 
   // 对话框关闭时重置二维码缓存(下次打开重新生成,确保地址最新)
   useEffect(() => {
     if (!open) {
-      setQrDataUrl('');
-      setCopied(false);
+      setQrDataUrl('')
+      setCopied(false)
     }
-  }, [open]);
+  }, [open])
 
   // 复制链接到剪贴板
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(shareUrl);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      await navigator.clipboard.writeText(shareUrl)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
     } catch (err) {
-      console.error('复制失败:', err);
+      console.error('复制失败:', err)
     }
-  };
+  }
 
   // 在新标签页打开(方便电脑用户)
   const handleOpen = () => {
-    window.open(shareUrl, '_blank', 'noopener,noreferrer');
-  };
+    window.open(shareUrl, '_blank', 'noopener,noreferrer')
+  }
 
   return (
     <>
@@ -99,7 +98,10 @@ export default function ShareButton({ url }: ShareButtonProps) {
             </button>
 
             {/* 标题 */}
-            <h3 className="text-center text-lg font-medium mb-4" style={{ color: 'var(--color-text-primary)' }}>
+            <h3
+              className="text-center text-lg font-medium mb-4"
+              style={{ color: 'var(--color-text-primary)' }}
+            >
               扫码访问本站
             </h3>
 
@@ -110,19 +112,20 @@ export default function ShareButton({ url }: ShareButtonProps) {
                 style={{ background: '#ffffff' }}
               >
                 {qrDataUrl ? (
-                  <img
-                    src={qrDataUrl}
-                    alt="网站二维码"
-                    className="w-full h-full object-contain"
-                  />
+                  <img src={qrDataUrl} alt="网站二维码" className="w-full h-full object-contain" />
                 ) : (
-                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>生成中...</div>
+                  <div className="text-sm" style={{ color: 'var(--color-text-muted)' }}>
+                    生成中...
+                  </div>
                 )}
               </div>
             </div>
 
             {/* 网址文字 */}
-            <div className="text-center text-xs mb-4 break-all" style={{ color: 'var(--color-text-secondary)' }}>
+            <div
+              className="text-center text-xs mb-4 break-all"
+              style={{ color: 'var(--color-text-secondary)' }}
+            >
               {shareUrl.replace(/^https?:\/\//, '')}
             </div>
 
@@ -161,7 +164,10 @@ export default function ShareButton({ url }: ShareButtonProps) {
             </div>
 
             {/* 使用提示 */}
-            <p className="text-xs text-center leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
+            <p
+              className="text-xs text-center leading-relaxed"
+              style={{ color: 'var(--color-text-muted)' }}
+            >
               微信扫一扫二维码即可在手机打开
               <br />
               也可复制链接发到微信聊天
@@ -170,5 +176,5 @@ export default function ShareButton({ url }: ShareButtonProps) {
         </div>
       )}
     </>
-  );
+  )
 }

@@ -21,8 +21,8 @@
 
 // window.load 之后额外再等待 1500ms（覆盖 @vite/client SSE 重连 + StrictMode cleanup +
 // StrictMode 双 mount 期间的 HTTP/1.1 连接池排空 —— 彻底避免连接 reset 连带中断）
-export const BOOTSTRAP_SAFE_DELAY_MS = 1500;
-const STRICTMODE_DEBOUNCE_MS = 300;
+export const BOOTSTRAP_SAFE_DELAY_MS = 1500
+const STRICTMODE_DEBOUNCE_MS = 300
 
 // ============================================================
 // 【开发模式 HMR 稳定性关键】以下所有共享状态（窗口 Promise / in-flight 缓存
@@ -32,104 +32,103 @@ const STRICTMODE_DEBOUNCE_MS = 300;
 //       跨两次 HMR 实例全部失效 → 再次撞 SSE reset 窗口。
 //       只有挂到全局 window 才能在 HMR 重实例化期间保持一份共享状态。
 // ============================================================
-const GLOBAL_KEY = '__jzxr_bootstrap_guard__';
+const GLOBAL_KEY = '__jzxr_bootstrap_guard__'
 
 type GlobalState = {
-  safeWindowPromise?: Promise<void>;
-  inFlightMap: Map<string, Promise<unknown>>;
-  pendingMap: Map<string, PendingEntry>;
-};
+  safeWindowPromise?: Promise<void>
+  inFlightMap: Map<string, Promise<unknown>>
+  pendingMap: Map<string, PendingEntry>
+}
 
 type PendingEntry = {
-  timerId: ReturnType<typeof setTimeout>;
-  resolveWrapper: (factoryToRun: null | (() => Promise<unknown>)) => void;
-};
+  timerId: ReturnType<typeof setTimeout>
+  resolveWrapper: (factoryToRun: null | (() => Promise<unknown>)) => void
+}
 
 function _getGlobal(): GlobalState {
-  const g = (globalThis as unknown as { [GLOBAL_KEY]?: GlobalState; });
+  const g = globalThis as unknown as { [GLOBAL_KEY]?: GlobalState }
   if (!g[GLOBAL_KEY]) {
     g[GLOBAL_KEY] = {
       inFlightMap: new Map(),
       pendingMap: new Map(),
-    };
+    }
   }
-  return g[GLOBAL_KEY] as GlobalState;
+  return g[GLOBAL_KEY] as GlobalState
 }
 
 function _waitForWindowLoad(): Promise<void> {
-  if (typeof window === 'undefined') return Promise.resolve(); // SSR 兜底
-  if (document.readyState === 'complete') return Promise.resolve();
-  return new Promise<void>(resolve => {
+  if (typeof window === 'undefined') return Promise.resolve() // SSR 兜底
+  if (document.readyState === 'complete') return Promise.resolve()
+  return new Promise<void>((resolve) => {
     const done = () => {
-      window.removeEventListener('load', done);
-      document.removeEventListener('DOMContentLoaded', done);
-      resolve();
-    };
-    window.addEventListener('load', done, { once: true });
+      window.removeEventListener('load', done)
+      document.removeEventListener('DOMContentLoaded', done)
+      resolve()
+    }
+    window.addEventListener('load', done, { once: true })
     // 兜底：DOMContentLoaded + 800ms 也视为 load 完成（防止 load 因慢资源卡住）
-    document.addEventListener('DOMContentLoaded', () => setTimeout(done, 800), { once: true });
-  });
+    document.addEventListener('DOMContentLoaded', () => setTimeout(done, 800), { once: true })
+  })
 }
 
 export function waitForBootstrapSafeWindow(): Promise<void> {
   // 生产环境无需等待 Vite HMR SSE 重置（生产无 HMR），直接 resolve 避免 1.5s 首屏延迟
-  if (!import.meta.env.DEV) return Promise.resolve();
-  const g = _getGlobal();
-  if (g.safeWindowPromise) return g.safeWindowPromise;
+  if (!import.meta.env.DEV) return Promise.resolve()
+  const g = _getGlobal()
+  if (g.safeWindowPromise) return g.safeWindowPromise
   g.safeWindowPromise = _waitForWindowLoad().then(
-    () => new Promise<void>(r => setTimeout(r, BOOTSTRAP_SAFE_DELAY_MS)),
-  );
-  return g.safeWindowPromise;
+    () => new Promise<void>((r) => setTimeout(r, BOOTSTRAP_SAFE_DELAY_MS)),
+  )
+  return g.safeWindowPromise
 }
 
 function _runFactoryNow<T>(key: string, factory: () => Promise<T>): Promise<T> {
-  const g = _getGlobal();
-  const existing = g.inFlightMap.get(key);
-  if (existing) return existing as Promise<T>;
-  const p = factory().finally(() => { g.inFlightMap.delete(key); });
-  g.inFlightMap.set(key, p as Promise<unknown>);
-  return p;
+  const g = _getGlobal()
+  const existing = g.inFlightMap.get(key)
+  if (existing) return existing as Promise<T>
+  const p = factory().finally(() => {
+    g.inFlightMap.delete(key)
+  })
+  g.inFlightMap.set(key, p as Promise<unknown>)
+  return p
 }
 
-export async function withInFlightDedup<T>(
-  key: string,
-  factory: () => Promise<T>,
-): Promise<T> {
-  const g = _getGlobal();
+export async function withInFlightDedup<T>(key: string, factory: () => Promise<T>): Promise<T> {
+  const g = _getGlobal()
   // 如果同 key 的请求已在跑（真的 fetch 已发起），直接复用结果
-  if (g.inFlightMap.has(key)) return g.inFlightMap.get(key) as Promise<T>;
+  if (g.inFlightMap.has(key)) return g.inFlightMap.get(key) as Promise<T>
 
-  const existingPending = g.pendingMap.get(key);
+  const existingPending = g.pendingMap.get(key)
   if (existingPending) {
     // ---------- 第二次同 key 调用在窗口内到达（StrictMode 第二轮 / HMR 重入）----------
-    clearTimeout(existingPending.timerId);
-    g.pendingMap.delete(key);
-    existingPending.resolveWrapper(factory as unknown as () => Promise<unknown>);
-    return _runFactoryNow(key, factory);
+    clearTimeout(existingPending.timerId)
+    g.pendingMap.delete(key)
+    existingPending.resolveWrapper(factory as unknown as () => Promise<unknown>)
+    return _runFactoryNow(key, factory)
   }
 
   // ---------- 第一次到达：挂起 debounce，等待 300ms 看有没有第二轮 ----------
-  let wrapperResolve: PendingEntry['resolveWrapper'] | null = null;
+  let wrapperResolve: PendingEntry['resolveWrapper'] | null = null
   const wrapperPromise = new Promise<T>((resolve, reject) => {
     wrapperResolve = (factoryToRun) => {
       if (factoryToRun === null) {
-        _runFactoryNow(key, factory).then(resolve, reject);
+        _runFactoryNow(key, factory).then(resolve, reject)
       } else {
-        _runFactoryNow(key, factoryToRun as () => Promise<T>).then(resolve, reject);
+        _runFactoryNow(key, factoryToRun as () => Promise<T>).then(resolve, reject)
       }
-    };
-  });
+    }
+  })
 
   const timerId = setTimeout(() => {
-    const gg = _getGlobal();
-    gg.pendingMap.delete(key);
-    wrapperResolve!(null);
-  }, STRICTMODE_DEBOUNCE_MS);
+    const gg = _getGlobal()
+    gg.pendingMap.delete(key)
+    wrapperResolve!(null)
+  }, STRICTMODE_DEBOUNCE_MS)
 
   g.pendingMap.set(key, {
     timerId,
     resolveWrapper: wrapperResolve as NonNullable<typeof wrapperResolve>,
-  });
+  })
 
-  return wrapperPromise;
+  return wrapperPromise
 }

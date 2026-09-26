@@ -10,9 +10,9 @@
  * @returns 脱敏后的字符串；输入为空则返回空字符串
  */
 export function maskContact(contact: string): string {
-  if (!contact) return '';
+  if (!contact) return ''
   if (/^\d{11}$/.test(contact)) {
-    return contact.slice(0, 3) + '****' + contact.slice(7);
+    return contact.slice(0, 3) + '****' + contact.slice(7)
   }
-  return contact.slice(0, 3) + '****' + contact.slice(-2);
+  return contact.slice(0, 3) + '****' + contact.slice(-2)
 }

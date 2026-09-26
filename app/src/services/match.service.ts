@@ -6,46 +6,51 @@
  * ================================================================
  */
 
-import type { Row, MatchCondition } from '../data/types';
+import type { Row, MatchCondition } from '../data/types'
 
-export function matchRows(rows: Row[], conditions: MatchCondition[]): { row: Row; score: number; matches: string[] }[] {
-  const activeConditions = conditions.filter(c => c.column && c.value);
+export function matchRows(
+  rows: Row[],
+  conditions: MatchCondition[],
+): { row: Row; score: number; matches: string[] }[] {
+  const activeConditions = conditions.filter((c) => c.column && c.value)
 
-  return rows.map(row => {
-    let score = 0;
-    const matches: string[] = [];
-    let allMatch = true;
-    for (const cond of activeConditions) {
-      const val = String(row.data?.[cond.column as keyof typeof row.data] || '').toLowerCase();
-      const search = cond.value.toLowerCase();
-      let matched = false;
+  return rows
+    .map((row) => {
+      let score = 0
+      const matches: string[] = []
+      let allMatch = true
+      for (const cond of activeConditions) {
+        const val = String(row.data?.[cond.column as keyof typeof row.data] || '').toLowerCase()
+        const search = cond.value.toLowerCase()
+        let matched = false
 
-      if (cond.column === 'age' && search.includes('-')) {
-        const [min, max] = search.split('-').map(Number);
-        const age = Number(val);
-        if (!isNaN(age) && !isNaN(min) && !isNaN(max) && age >= min && age <= max) {
-          matched = true;
+        if (cond.column === 'age' && search.includes('-')) {
+          const [min, max] = search.split('-').map(Number)
+          const age = Number(val)
+          if (!isNaN(age) && !isNaN(min) && !isNaN(max) && age >= min && age <= max) {
+            matched = true
+          }
+        } else if (cond.column === 'age' && (search.startsWith('>') || search.startsWith('<'))) {
+          const age = Number(val)
+          const cmp = Number(search.slice(1))
+          if (!isNaN(age) && !isNaN(cmp)) {
+            if (search.startsWith('>') && age > cmp) matched = true
+            if (search.startsWith('<') && age < cmp) matched = true
+          }
+        } else if (val.includes(search)) {
+          matched = true
         }
-      } else if (cond.column === 'age' && (search.startsWith('>') || search.startsWith('<'))) {
-        const age = Number(val);
-        const cmp = Number(search.slice(1));
-        if (!isNaN(age) && !isNaN(cmp)) {
-          if (search.startsWith('>') && age > cmp) matched = true;
-          if (search.startsWith('<') && age < cmp) matched = true;
-        }
-      } else if (val.includes(search)) {
-        matched = true;
-      }
 
-      if (matched) {
-        score += 1;
-        matches.push(`${cond.column}:${cond.value}`);
-      } else {
-        allMatch = false;
+        if (matched) {
+          score += 1
+          matches.push(`${cond.column}:${cond.value}`)
+        } else {
+          allMatch = false
+        }
       }
-    }
-    return { row, score, matches, allMatch };
-  }).filter(r => r.allMatch)
+      return { row, score, matches, allMatch }
+    })
+    .filter((r) => r.allMatch)
     .map(({ row, score, matches }) => ({ row, score, matches }))
-    .sort((a, b) => b.score - a.score);
+    .sort((a, b) => b.score - a.score)
 }

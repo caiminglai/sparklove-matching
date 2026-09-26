@@ -3,7 +3,7 @@
  * 支持本地开发和线上部署的环境变量配置
  */
 
-const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL
 
 // ======================================================
 // 【关键修复：开发模式直连后端，绕开 Vite proxy + SSE reset 连接池复用】
@@ -25,9 +25,10 @@ const ENV_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 // 生产构建：VITE_API_BASE_URL 环境变量会覆盖（或用默认相对路径 /api），
 //         生产无 SSE 也无 proxy，不会有此问题。
 // ======================================================
-const DEFAULT_DEV_BASE_URL = 'http://localhost:8080/api';
-const DEFAULT_PROD_BASE_URL = '/api';
-export const API_BASE_URL = ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL);
+const DEFAULT_DEV_BASE_URL = 'http://localhost:8080/api'
+const DEFAULT_PROD_BASE_URL = '/api'
+export const API_BASE_URL =
+  ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL)
 
 // API 端点
 export const API_ENDPOINTS = {
@@ -56,12 +57,12 @@ export const API_ENDPOINTS = {
   // 字段中文映射表
   fieldMappings: '/field-mappings',
   fieldLabels: '/field-mappings/labels',
-} as const;
+} as const
 
 // 头像 URL 规范化 - 处理各种 avatar 存储格式：/uploads/avatars/x.jpg、/avatars/x.jpg、x.jpg、http(s)://...
 export const normalizeAvatarUrl = (avatar: string | undefined | null): string | null => {
-  if (!avatar) return null;
-  if (avatar.startsWith('http') || avatar.startsWith('data:')) return avatar;
+  if (!avatar) return null
+  if (avatar.startsWith('http') || avatar.startsWith('data:')) return avatar
   if (avatar.startsWith('/uploads/') || avatar.startsWith('/avatars/')) {
     return `${avatar}`
   }
@@ -69,5 +70,4 @@ export const normalizeAvatarUrl = (avatar: string | undefined | null): string | 
     return `${avatar}`
   }
   return `/uploads/avatars/${avatar}`
-};
-
+}

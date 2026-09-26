@@ -3,14 +3,14 @@
  * 替代 11 个文件中重复的 localStorage.getItem('auth_token') + 手写 Authorization header
  */
 
-const AUTH_TOKEN_KEY = 'auth_token';
+const AUTH_TOKEN_KEY = 'auth_token'
 
 /**
  * 从 localStorage 读取 auth_token
  * @returns token 字符串，未登录时返回 null
  */
 export function getAuthToken(): string | null {
-  return localStorage.getItem(AUTH_TOKEN_KEY);
+  return localStorage.getItem(AUTH_TOKEN_KEY)
 }
 
 /**
@@ -24,6 +24,6 @@ export function getAuthToken(): string | null {
  *   if (!getAuthToken()) return;
  */
 export function getAuthHeaders(): Record<string, string> {
-  const token = getAuthToken();
-  return token ? { 'Authorization': `Bearer ${token}` } : {};
+  const token = getAuthToken()
+  return token ? { Authorization: `Bearer ${token}` } : {}
 }
