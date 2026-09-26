@@ -393,9 +393,12 @@ export default function Home() {
     ? results.filter((r) => favorites.includes(r.row.id))
     : results
 
-  const toggleFavorite = useCallback((id: string) => {
-    setFavorites((prev) => (prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]))
-  }, [])
+  const toggleFavorite = useCallback(
+    (id: string) => {
+      setFavorites((prev) => (prev.includes(id) ? prev.filter((fid) => fid !== id) : [...prev, id]))
+    },
+    [setFavorites],
+  )
 
   const toggleSelect = useCallback(
     (id: string) => {
@@ -406,36 +409,48 @@ export default function Home() {
         prev.includes(id) ? prev.filter((sid) => sid !== id) : [...prev, id],
       )
     },
-    [showSelectMode],
+    [showSelectMode, setShowSelectMode, setSelectedRows],
   )
 
   const exitSelectMode = useCallback(() => {
     setShowSelectMode(false)
     setSelectedRows([])
-  }, [])
+  }, [setShowSelectMode, setSelectedRows])
 
   // 列表项事件处理器（stable 引用，配合 React.memo 避免整列表重渲染）
-  const handleDeleteItem = useCallback((id: string) => {
-    setSelRowId(id)
-    setShowDelModal(true)
-  }, [])
+  const handleDeleteItem = useCallback(
+    (id: string) => {
+      setSelRowId(id)
+      setShowDelModal(true)
+    },
+    [setSelRowId, setShowDelModal],
+  )
 
-  const handlePreviewImage = useCallback((url: string) => {
-    setPreviewImage(url)
-  }, [])
+  const handlePreviewImage = useCallback(
+    (url: string) => {
+      setPreviewImage(url)
+    },
+    [setPreviewImage],
+  )
 
-  const handleShowPay = useCallback((id: string) => {
-    setPayContactTarget(id)
-    setShowPayModal(true)
-  }, [])
+  const handleShowPay = useCallback(
+    (id: string) => {
+      setPayContactTarget(id)
+      setShowPayModal(true)
+    },
+    [setPayContactTarget, setShowPayModal],
+  )
 
-  const handleSwipeStart = useCallback((id: string) => {
-    setSwipeRowId(id)
-  }, [])
+  const handleSwipeStart = useCallback(
+    (id: string) => {
+      setSwipeRowId(id)
+    },
+    [setSwipeRowId],
+  )
 
   const handleSwipeEnd = useCallback(() => {
     setSwipeRowId(null)
-  }, [])
+  }, [setSwipeRowId])
 
   // 获取用户评价
   const loadRatings = useCallback(async (userId: string) => {
@@ -461,7 +476,7 @@ export default function Home() {
       setShowDetail(id)
       loadRatings(id)
     },
-    [loadRatings],
+    [loadRatings, setShowDetail],
   )
 
   // 提交评价
