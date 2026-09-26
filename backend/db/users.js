@@ -170,9 +170,9 @@ async function deleteUser(id, ownerUserId, isAdmin = false) {
   }
   await database.prepare('DELETE FROM user_ratings WHERE rater_id = $1 OR rated_id = $2').run(id, id);
   await database.prepare('DELETE FROM user_reports WHERE reporter_id = $1 OR reported_id = $2').run(id, id);
-  if (user.user_id) {
-    await database.prepare('DELETE FROM user_custom_fields WHERE user_id = $1').run(user.user_id);
-  }
+  // 自定义字段是账号级的（EAV 主键 user_id + field_key，user_id 指向 auth_users），
+  // 删一条资料不该把兄弟资料的字段一起连坐清掉。账号注销当前没有删除路径，
+  // 这批字段的生命周期不归 deleteUser 管。
   const stmt = database.prepare('DELETE FROM users WHERE id = $1');
   await stmt.run(id);
   return true;
