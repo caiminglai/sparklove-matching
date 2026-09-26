@@ -80,4 +80,6 @@ export interface AdminCustomField {
 }
 
 /** 扁平行数据（后端/旧localStorage中的扁平格式，字段在顶层而非 data 下） */
-export type FlatRow = Row & Record<string, string | number | undefined>
+export type FlatRow = Row & {
+  [K in keyof NonNullable<Row['data']>]?: NonNullable<Row['data']>[K]
+}
