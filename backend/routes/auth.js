@@ -11,6 +11,7 @@ const { setAuthCookie } = require('../utils/cookie工具');
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
+const { clientIp: getClientIp } = require('../utils/clientIp');
 
 // ========== POST /api/auth/register
 function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp) {
@@ -45,7 +46,7 @@ function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp)
 
 // ========== POST /api/auth/login
 function login(req, res, readBodyWithLimit, checkLoginRateLimit) {
-  const clientIp = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   if (!checkLoginRateLimit(clientIp)) {
     sendJson(res, 429, { success: false, message: '登录尝试过多，请5分钟后再试' });
     return;
@@ -122,7 +123,7 @@ function verifyRegisterSmsCode(req, res, readBodyWithLimit) {
 
 // ========== POST /api/admin/login
 function adminLogin(req, res, readBodyWithLimit, checkLoginRateLimit) {
-  const clientIp = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   if (!checkLoginRateLimit(clientIp)) {
     sendJson(res, 429, { success: false, message: '登录尝试过多，请5分钟后再试' });
     return;

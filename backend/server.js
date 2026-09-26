@@ -16,6 +16,7 @@ const { requestLogger } = require('./middleware/日志');
 const { parseMultipart, collectBody, validateMagicBytes, validateExtension } = require('./utils/multipart');
 const { getAuthTokenFromCookie } = require('./utils/cookie工具');
 const { handleVectorRequest } = require('./routes/vector');
+const { clientIp: getClientIp } = require('./utils/clientIp');
 
 // ========== 管理员安全配置 ==========
 // 管理员密码由 admin.service.js 管理，优先从环境变量读取，其次从数据库读取
@@ -283,7 +284,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   // --- 认证 ---
-  const clientIp = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
+  const clientIp = getClientIp(req);
   if (req.method === 'POST' && pathname === '/api/auth/register') {
     authRoutes.register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp); return;
   }

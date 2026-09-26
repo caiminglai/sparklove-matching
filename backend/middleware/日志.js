@@ -3,6 +3,8 @@
  * 提供请求日志记录功能
  */
 
+const { clientIp: getClientIp } = require('../utils/clientIp');
+
 /**
  * 根据 HTTP 状态码返回日志级别
  * @param {number} statusCode
@@ -53,7 +55,7 @@ function requestLogger(req, res) {
   res.on('finish', () => {
     const elapsed = Date.now() - startTime;
     const level = getLogLevel(res.statusCode);
-    const ip = req.headers['x-forwarded-for'] || req.headers['x-real-ip'] || req.socket.remoteAddress || 'unknown';
+    const ip = getClientIp(req);
     const time = new Date().toISOString();
 
     console.log(
