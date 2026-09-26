@@ -34,16 +34,21 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
-      // eslint-plugin-react-hooks 7.x 新加的三条编译器规则，先降为 warn 让门禁能跑。
-      // 实测计数（react-hooks 7.1.1，0 error，总 53 warning）：immutability 0
+      // eslint-plugin-react-hooks 7.x 新增的三条编译器规则。定案（09-26 深夜）：三站都没启用 React
+      // Compiler（react-compiler 在 vite.config.ts 与 package.json 里 0 命中），这三条只是编译器的
+      // 配套告警、不改变任何产物，所以 warn 是长期设置而非过渡；哪天真要启用编译器，这三行必须升回
+      // error 并逐组件清零，理由与判据见 compose/CONVENTIONS.md §10。
+      // 实测计数（react-hooks 7.1.1，0 error / 40 warning）：immutability 0
       // （原 4 条＝DepositPage×2/MyPostsPage/ProfilePage，都不是真违反不可变，只是
       // const 箭头函数声明在它调用的 effect 之后，已把声明整体上移清零）、
+      // preserve-manual-memoization 0（原 13 条全在 Home.tsx：useCallback 依赖写了 []，
+      // 编译器推断出的依赖是 setXxx 这类 state setter，补进依赖数组即可——useState 的
+      // setter 本身引用恒定，所以这笔改动零行为变化，exhaustive-deps 也不会反过来报
+      // "多余的依赖"，已在 53b325d 清零）、
       // set-state-in-effect 10（原 7 条＝ReportModal/ShareButton/Home×3/PostPage/
       // useFormDraft，加 3 条＝上移后编译器才看得见的 DepositPage/MyPostsPage/
-      // ProfilePage，那三个组件此前整体 Compilation Skipped）、
-      // preserve-manual-memoization 13（全在 Home.tsx：useMemo/useCallback 的依赖
-      // 写了 []，编译器推断出的依赖是 setXxx 这类 state setter，补进依赖数组即可）。
-      // 后两条清零后再删这三行；版本低于 7.1.1 时这三条规则还没实现，量出来是假绿。
+      // ProfilePage，那三个组件此前整体 Compilation Skipped）。
+      // 版本低于 7.1.1 时这三条规则还没实现，量出来是假绿。
       'react-hooks/preserve-manual-memoization': 'warn',
       'react-hooks/set-state-in-effect': 'warn',
       'react-hooks/immutability': 'warn',
