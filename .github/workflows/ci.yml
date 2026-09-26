@@ -27,6 +27,10 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # 放最前面：格式不合规几秒就能判，不必等类型和测试跑完才红
+      - name: Format check
+        run: npm run format:check
+
       - name: Type check
         run: npm run typecheck
 
@@ -38,6 +42,3 @@ jobs:
 
       - name: Build
         run: npm run build
-
-      # 暂不挂 format:check：实测 npm run format:check 有 49 个文件不合规，挂上就是常驻红灯。
-      # 想收口时单独跑一次 npm run format 再取消这两行的注释。
