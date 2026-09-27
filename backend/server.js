@@ -349,6 +349,11 @@ const server = http.createServer(async (req, res) => {
     await userRoutes.searchUsers(req, res, parsedUrl); return;
   }
 
+  // --- 圈子页成员（访客本来就能逐页翻完全站成员，这里只是把几十次请求合成一次） ---
+  if (req.method === 'GET' && pathname === '/api/circles/members') {
+    await userRoutes.getCircleMembers(req, res); return;
+  }
+
   // --- 用户自定义字段（EAV 键值表） ---
   if (pathname === '/api/users/custom-fields' || /^\/api\/users\/custom-fields\/[^\/]+$/.test(pathname)) {
     await userCustomFieldsRoutes.handleUserCustomFields(req, res, readBodyWithLimit, pathname); return;

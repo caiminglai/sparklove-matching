@@ -47,7 +47,7 @@ export default function CircleDetailPage() {
   useEffect(() => {
     const headers = getAuthHeaders()
 
-    fetch(`${API_BASE_URL}/users?limit=200`, { headers })
+    fetch(`${API_BASE_URL}/circles/members`, { headers })
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.data) {

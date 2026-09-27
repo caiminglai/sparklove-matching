@@ -80,6 +80,15 @@ async function getUserList(page = 1, limit = 20, isAdmin = false) {
   return isAdmin ? users : maskUsers(users);
 }
 
+// 圈子页按标签在前端分组，需要一次拿全成员：走 /api/users 逐页翻（非管理员被夹到 20/50）
+// 会打出几十次请求。触顶不静默截断——调用方用 total（全表计数）与 data 条数对表即可发现
+const CIRCLE_MEMBER_LIMIT = 2000;
+
+async function getCircleMembers() {
+  const users = await userDb.getAllUsers(1, CIRCLE_MEMBER_LIMIT);
+  return maskUsers(users);
+}
+
 async function getUserStats() {
   return await userDb.getUserStats();
 }
@@ -230,6 +239,7 @@ module.exports = {
   authenticateUser,
   // 查询
   getUserList,
+  getCircleMembers,
   getMyUser,
   getUserStats,
   countUsers,

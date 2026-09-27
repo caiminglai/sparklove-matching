@@ -61,6 +61,19 @@ async function getUsers(req, res, _, parsedUrl) {
   sendJson(res, 200, { success: true, data: result, total });
 }
 
+// ========== GET /api/circles/members（圈子页：一次返回全部成员的脱敏行）
+// 与 /api/users 返回同样的行形状，圈子页才不必逐页翻；脱敏由 service 层统一走 maskUsers
+async function getCircleMembers(req, res) {
+  try {
+    const result = await userService.getCircleMembers();
+    const total = await userService.countUsers();
+    sendJson(res, 200, { success: true, data: result, total });
+  } catch (err) {
+    console.error('圈子成员查询失败:', err.message);
+    sendJson(res, 500, { success: false, error: '服务器错误' });
+  }
+}
+
 // ========== POST /api/users（创建用户）
 function addUser(req, res, readBodyWithLimit) {
   return readBodyWithLimit(req).then(async body => {
@@ -350,6 +363,6 @@ async function searchUsers(req, res, parsedUrl) {
 // 所有 multipart 解析统一使用 utils/multipart.js 的 parseMultipart（Buffer 安全版）
 
 module.exports = {
-  getUsers, addUser, batchSaveUsers, getMyUser, updateMyUser, deleteMyUser,
+  getUsers, getCircleMembers, addUser, batchSaveUsers, getMyUser, updateMyUser, deleteMyUser,
   editUser, deleteUser, getPendingUsers, approveUser, rejectUser, searchUsers
 };
