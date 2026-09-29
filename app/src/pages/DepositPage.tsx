@@ -412,7 +412,7 @@ export default function DepositPage() {
               <div>
                 •{' '}
                 <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                  甲方获得退还 {refundAfterNoFault} 元
+                  乙方获得退还 {refundAfterNoFault} 元
                 </span>
               </div>
               <div>• 大家好聚好散~</div>
