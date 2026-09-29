@@ -1,0 +1,78 @@
+// ============================================================
+// 收价配置：金额存在 admin_settings 里，后台可直接改，不用动代码
+// ============================================================
+//
+// 一律以「分」为单位存整数字符串、读出来再换算成元，避免用浮点存钱。
+// DEFAULTS 取自环境变量（或 29.9 / 9.9 的硬编码兜底），只在那张表还没有对应
+// 记录时生效 —— 后台改过一次之后，环境变量就不再是权威来源了。
+
+const adminDb = require('../db/admin.js');
+const { yuanToFen } = require('./payment-verify.js');
+
+const ITEMS = {
+  deposit: { key: 'deposit_amount_fen', field: 'deposit_amount', label: '保证金', defaultFen: yuanToFen(process.env.DEPOSIT_AMOUNT) || 2990 },
+  contactUnlock: { key: 'contact_unlock_amount_fen', field: 'contact_unlock_amount', label: '查看联系方式', defaultFen: yuanToFen(process.env.CONTACT_UNLOCK_AMOUNT) || 990 },
+};
+
+const MIN_FEN = 1;
+const MAX_FEN = 9999999;
+
+function itemNames() {
+  return Object.keys(ITEMS);
+}
+
+function pickFen(row, item) {
+  const fen = row ? parseInt(row.value, 10) : NaN;
+  return Number.isInteger(fen) && fen > 0 ? fen : item.defaultFen;
+}
+
+async function getAmountFen(name) {
+  return pickFen(await adminDb.getSettingRow(ITEMS[name].key), ITEMS[name]);
+}
+
+/** 下单/入账用的金额（元）；调用方不再接受前端传来的数字 */
+async function getYuan(name) {
+  return (await getAmountFen(name)) / 100;
+}
+
+async function setAmountYuan(name, raw) {
+  const value = String(raw ?? '').trim();
+  if (!/^\d+(\.\d{1,2})?$/.test(value)) {
+    return { ok: false, error: '金额最多两位小数，例如 29.9 或 99' };
+  }
+  const fen = yuanToFen(value);
+  if (!Number.isInteger(fen) || fen < MIN_FEN || fen > MAX_FEN) {
+    return { ok: false, error: '金额需在 0.01 ～ 99999.99 元之间' };
+  }
+  await adminDb.setSetting(ITEMS[name].key, String(fen));
+  return { ok: true, fen };
+}
+
+/** 后台展示用：当前值 + 默认值 + 来源 + 上次改动时间（毫秒时间戳） */
+async function describeAll() {
+  const out = {};
+  for (const name of itemNames()) {
+    const item = ITEMS[name];
+    const row = await adminDb.getSettingRow(item.key);
+    const fen = pickFen(row, item);
+    out[name] = {
+      label: item.label,
+      field: item.field,
+      amount: fen / 100,
+      amount_fen: fen,
+      default_amount: item.defaultFen / 100,
+      source: row ? 'db' : 'env',
+      updated_at: row ? row.updated_at : null,
+    };
+  }
+  return out;
+}
+
+/** 前端展示用：只有两个「元」为单位的数字，不暴露默认值与改动时间 */
+async function publicView() {
+  const out = {};
+  for (const name of itemNames()) out[ITEMS[name].field] = await getYuan(name);
+  return out;
+}
+
+module.exports = { ITEMS, itemNames, getAmountFen, getYuan, setAmountYuan, describeAll, publicView };

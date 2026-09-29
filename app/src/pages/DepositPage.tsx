@@ -20,10 +20,12 @@ import { API_BASE_URL } from '../api/config'
 import { useState, useEffect } from 'react'
 import { useToast } from '../components/Toast'
 import { getAuthToken } from '../utils/auth'
+import { usePricing } from '../utils/pricing'
 import QRCode from 'qrcode'
 
 export default function DepositPage() {
   const { toast } = useToast()
+  const depositPrice = usePricing().deposit_amount
   const [showPayment, setShowPayment] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState<'alipay' | 'wechat'>('alipay')
   const [qrError, setQrError] = useState(false)
@@ -153,7 +155,6 @@ export default function DepositPage() {
     try {
       const formData = new FormData()
       formData.append('proof', uploadedProof)
-      formData.append('amount', String(DEPOSIT_RULES.amount))
 
       const token = getAuthToken()
       const res = await fetch(`${API_BASE_URL}/deposit/upload-proof`, {
@@ -198,7 +199,6 @@ export default function DepositPage() {
         },
         body: JSON.stringify({
           channel: selectedMethod,
-          amount: DEPOSIT_RULES.amount,
         }),
       })
 
@@ -284,7 +284,7 @@ export default function DepositPage() {
                 保证金金额
               </span>
               <span className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                {DEPOSIT_RULES.amount} 元
+                {depositPrice} 元
               </span>
             </div>
             <div
@@ -310,7 +310,7 @@ export default function DepositPage() {
           <div className="flex items-center gap-2 mb-3">
             <Users size={15} style={{ color: 'var(--color-success)' }} />
             <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>
-              29.9元分配方案
+              {depositPrice}元分配方案
             </span>
           </div>
           <div className="space-y-2.5 text-xs">
@@ -669,7 +669,7 @@ export default function DepositPage() {
             </span>
           </div>
           <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
-            支付 {DEPOSIT_RULES.amount} 元，支付成功后自动解锁联系方式，无需等待审核
+            支付 {depositPrice} 元，支付成功后自动解锁联系方式，无需等待审核
           </p>
           <button
             onClick={() => setShowPayment(true)}
@@ -810,7 +810,7 @@ export default function DepositPage() {
                       点击下方按钮，跳转到{selectedMethod === 'alipay' ? '支付宝' : '微信'}完成支付
                     </p>
                     <p className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                      ¥{DEPOSIT_RULES.amount}
+                      ¥{depositPrice}
                     </p>
                     <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)' }}>
                       支付成功后自动解锁，无需等待审核
@@ -853,7 +853,7 @@ export default function DepositPage() {
                       </>
                     ) : (
                       <>
-                        <Zap size={16} /> 立即支付 ¥{DEPOSIT_RULES.amount}
+                        <Zap size={16} /> 立即支付 ¥{depositPrice}
                       </>
                     )}
                   </button>
@@ -892,7 +892,7 @@ export default function DepositPage() {
                         className="text-sm font-medium mb-1"
                         style={{ color: 'var(--color-text-primary)' }}
                       >
-                        扫码支付 {DEPOSIT_RULES.amount} 元
+                        扫码支付 {depositPrice} 元
                       </p>
                       <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                         使用{selectedMethod === 'alipay' ? '支付宝' : '微信'}扫一扫

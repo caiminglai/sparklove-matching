@@ -2,11 +2,13 @@ const crypto = require('crypto');
 const dbIndex = require('../db/index.js');
 const paymentsDb = require('../db/payments.js');
 const paymentVerify = require('../utils/payment-verify.js');
+const pricing = require('../utils/pricing.js');
+const adminDb = require('../db/admin.js');
+const { sendJson } = require('../utils/sendJson');
 
 // 支付配置
 let wechatConfig = null;
 let alipayConfig = null;
-let depositAmount = 29.9;
 
 // 微信 v3 与支付宝后台导出的密钥都是"无 PEM 头的 base64"，而 compose 注入多行值会把换行压成空格，
 // 所以 PEM 原文 / 含字面 \n / base64 三种写法都要能还原成 crypto 认得的 PEM。
@@ -21,7 +23,6 @@ function loadKey(raw, kind) {
 }
 
 function initConfig(env) {
-  depositAmount = parseFloat(env.DEPOSIT_AMOUNT) || 29.9;
   wechatConfig = {
     appId: env.WECHAT_APP_ID || '',
     mchId: env.WECHAT_MCH_ID || '',
@@ -297,8 +298,9 @@ async function createPayment(req, res, readBodyWithLimit) {
     const data = JSON.parse(body);
     const { channel } = data;
     if (!channel) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '缺少参数' })); return; }
-    // 🔴 金额只认服务端配置。前端那个 29.9 是写死在 constants.ts 的展示值，请求体可被任意改写
-    const amount = depositAmount;
+    // 🔴 金额只认服务端配置。请求体里的 amount 可被任意改写，前端那个数只是展示值；
+    // 具体数字在后台「价格设置」里改，读的是 admin_settings
+    const amount = await pricing.getYuan('deposit');
     let result;
     const config = isPaymentConfigured();
     const isProd = process.env.NODE_ENV === 'production';
@@ -363,4 +365,80 @@ async function queryPaymentStatus(req, res, parsedUrl) {
   res.end(JSON.stringify({ success: true, status: order.status }));
 }
 
-module.exports = { initConfig, createPayment, mockPay, wechatNotify, alipayNotify, queryPaymentStatus };
+// ============================================================
+// 价格配置（金额存 admin_settings，后台「价格设置」直接改，不用动代码）
+// ============================================================
+
+/** GET /api/payment/config：公开，只回前端要展示的两个数 */
+async function publicConfig(req, res) {
+  try {
+    const view = await pricing.publicView();
+    sendJson(res, 200, { success: true, data: view });
+  } catch (e) {
+    console.error('[价格] 读取公开配置失败:', e.message);
+    sendJson(res, 500, { success: false, message: '读取价格配置失败' });
+  }
+}
+
+/** GET /api/admin/payment-price：当前价、代码默认值、来源、上次改动时间 */
+async function adminGetPrice(req, res, checkAdminAuth) {
+  if (!(await checkAdminAuth(req))) {
+    sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
+  }
+  try {
+    sendJson(res, 200, { success: true, data: await pricing.describeAll() });
+  } catch (e) {
+    console.error('[价格] 读取价格配置失败:', e.message);
+    sendJson(res, 500, { success: false, message: '读取价格配置失败' });
+  }
+}
+
+/**
+ * PUT /api/admin/payment-price：body 里给了哪个改哪个。
+ * 只影响之后新建的订单：payment_orders 每行都存着下单那一刻的 amount，
+ * 回调与查单核对的都是自己那一行，所以改价不会让正在付的单子对不上账。
+ */
+async function adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit) {
+  if (!(await checkAdminAuth(req))) {
+    sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
+  }
+  readBodyWithLimit(req).then(async body => {
+    let data;
+    try {
+      data = JSON.parse(body);
+    } catch (e) {
+      sendJson(res, 400, { success: false, message: '请求格式错误' }); return;
+    }
+    const changes = [];
+    for (const name of pricing.itemNames()) {
+      const raw = data[pricing.ITEMS[name].field];
+      if (raw === undefined || raw === null || raw === '') continue;
+      const result = await pricing.setAmountYuan(name, raw);
+      if (!result.ok) {
+        sendJson(res, 400, { success: false, message: pricing.ITEMS[name].label + '：' + result.error });
+        return;
+      }
+      changes.push({ field: pricing.ITEMS[name].field, amount_fen: result.fen });
+    }
+    if (!changes.length) {
+      sendJson(res, 400, { success: false, message: '没有要改的金额' }); return;
+    }
+    await adminDb.logAdminAction('update_price', null, { changes });
+    console.log('[价格] 标价变更:', JSON.stringify(changes));
+    sendJson(res, 200, { success: true, message: '价格已更新', data: await pricing.describeAll() });
+  }).catch(e => {
+    sendJson(res, 413, { success: false, message: e.message || '请求体过大' });
+  });
+}
+
+module.exports = {
+  initConfig,
+  createPayment,
+  mockPay,
+  wechatNotify,
+  alipayNotify,
+  queryPaymentStatus,
+  publicConfig,
+  adminGetPrice,
+  adminSavePrice,
+};

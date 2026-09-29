@@ -415,6 +415,15 @@ const server = http.createServer(async (req, res) => {
     await reportRoutes.deleteReport(req, res, checkAdminAuth, pathname); return;
   }
   // --- 支付 ---
+  if (req.method === 'GET' && pathname === '/api/payment/config') {
+    await paymentRoutes.publicConfig(req, res); return;
+  }
+  if (req.method === 'GET' && pathname === '/api/admin/payment-price') {
+    await paymentRoutes.adminGetPrice(req, res, checkAdminAuth); return;
+  }
+  if (req.method === 'PUT' && pathname === '/api/admin/payment-price') {
+    await paymentRoutes.adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit); return;
+  }
   if (req.method === 'POST' && pathname === '/api/payment/create') {
     await paymentRoutes.createPayment(req, res, readBodyWithLimit); return;
   }

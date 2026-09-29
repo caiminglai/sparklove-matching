@@ -6,20 +6,32 @@ const { getDb } = require('./index');
 
 // ========== 管理员设置 ==========
 
-async function getAdminPassword() {
+async function getSettingRow(key) {
   const database = getDb();
-  const stmt = database.prepare('SELECT "value" FROM admin_settings WHERE "key" = $1');
-  const row = await stmt.get('admin_password');
+  const stmt = database.prepare('SELECT "value", updated_at FROM admin_settings WHERE "key" = $1');
+  return (await stmt.get(key)) || null;
+}
+
+async function getSetting(key) {
+  const row = await getSettingRow(key);
   return row ? row.value : null;
 }
 
-async function setAdminPassword(password) {
+async function setSetting(key, value) {
   const database = getDb();
   const stmt = database.prepare(
     'INSERT INTO admin_settings ("key", "value", updated_at) VALUES ($1, $2, $3) ON CONFLICT("key") DO UPDATE SET "value" = EXCLUDED."value", updated_at = EXCLUDED.updated_at'
   );
-  await stmt.run('admin_password', password, Date.now());
+  await stmt.run(key, value, Date.now());
   return true;
+}
+
+async function getAdminPassword() {
+  return await getSetting('admin_password');
+}
+
+async function setAdminPassword(password) {
+  return await setSetting('admin_password', password);
 }
 
 async function getAdminLogs(limit = 50) {
@@ -41,20 +53,15 @@ async function getAdminWhitelist() {
   if (envWhitelist) {
     return envWhitelist.split(',').map(s => s.trim()).filter(Boolean);
   }
-  const database = getDb();
-  const stmt = database.prepare('SELECT "value" FROM admin_settings WHERE "key" = $1');
-  const row = await stmt.get('admin_whitelist');
-  if (row && row.value) {
-    return row.value.split(',').map(s => s.trim()).filter(Boolean);
+  const value = await getSetting('admin_whitelist');
+  if (value) {
+    return value.split(',').map(s => s.trim()).filter(Boolean);
   }
   return [];
 }
 
 async function getAdminAccountPassword(username) {
-  const database = getDb();
-  const stmt = database.prepare('SELECT "value" FROM admin_settings WHERE "key" = $1');
-  const row = await stmt.get('admin_password_' + username);
-  return row ? row.value : null;
+  return await getSetting('admin_password_' + username);
 }
 
 // ========== 自定义筛选字段 ==========
@@ -87,6 +94,9 @@ async function deleteCustomFilter(id) {
 }
 
 module.exports = {
+  getSetting,
+  getSettingRow,
+  setSetting,
   getAdminPassword,
   setAdminPassword,
   getAdminLogs,

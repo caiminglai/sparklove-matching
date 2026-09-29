@@ -381,10 +381,13 @@ server: {
 | POST | `/api/payment/notify-wechat` | 微信支付 v3 回调 | 无 Token，AES-256-GCM 解密即认证来源 |
 | POST | `/api/payment/notify-alipay` | 支付宝支付回调 | 无 Token，校验支付宝公钥签名 |
 | POST | `/api/payments/view-contact` | 已停用，恒返回 501（改走手动上传凭证） | - |
+| GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount}`（元），前端展示金额用，不含任何写权限 | 否 |
+| GET | `/api/admin/payment-price` | 后台读标价：每项给当前值、分值、环境变量兜底值、来源（`db`/`env`）与最后改动时间 | 管理员 |
+| PUT | `/api/admin/payment-price` | 后台改标价，写进 `admin_settings`（按分存整数）。只影响之后新建的订单，已下单的金额不变 | 管理员 |
 
 回调侧的三条硬约定（改代码前先读）：
 
-- 金额与身份只认逐笔比对：下单时请求体里的 `amount` 被忽略，一律取 `DEPOSIT_AMOUNT`；入账前还要把通知的 `amount.total`（分）与订单应收、通知的 `appid`/`mchid` 与 `backend/.env` 的配置、`trade_state` 与 `SUCCESS` 三项同时对齐，缺任何一个都能被"付一分钱解锁保证金"、或被同一把 APIv3 密钥下别的应用发来的通知绕过。这几项判定是纯函数，写在 `backend/utils/payment-verify.js`，单测在 `app/src/utils/payment-verify.test.ts`（`cd app && npx vitest run`）。
+- 金额与身份只认逐笔比对：下单时请求体里的 `amount` 被忽略，一律取服务端标价（`backend/utils/pricing.js` 读 `admin_settings`，后台「价格设置」没写过的项才退回 `DEPOSIT_AMOUNT` / `CONTACT_UNLOCK_AMOUNT`）；入账前还要把通知的 `amount.total`（分）与订单应收、通知的 `appid`/`mchid` 与 `backend/.env` 的配置、`trade_state` 与 `SUCCESS` 三项同时对齐，缺任何一个都能被"付一分钱解锁保证金"、或被同一把 APIv3 密钥下别的应用发来的通知绕过。这几项判定是纯函数，写在 `backend/utils/payment-verify.js`，单测在 `app/src/utils/payment-verify.test.ts`（`cd app && npx vitest run`）。
 - 微信 v3 靠 HTTP 状态码决定是否重推，失败分两类回：暂时处理不了的（解密失败、订单暂时查不到、本站支付键没配齐）回 500——回 2xx 等于告诉微信"已送达"，那一次没落库就是永久丢单，且全程无报错；而重推多少次也不会变好的伪通知（金额不符、appid/mchid 不符、交易状态非 SUCCESS、非支付成功事件）回 204 空响应收口，否则会被按退避策略重推约一天，把重推队列和日志刷满。
 - 回调地址只能填 `https://sparklove.cn/api/payment/notify-wechat` 与 `.../notify-alipay`，**不能带 `/jzxr` 前缀**。带前缀会被前端单页应用兜底成 200 的 index.html，症状与上一条相同：钱扣了、保证金不解锁、全程零报错。
 
@@ -392,6 +395,7 @@ server: {
 `WECHAT_APP_ID`、`WECHAT_MCH_ID`、`WECHAT_API_V3_KEY`、`WECHAT_MERCHANT_SERIAL_NO`、`WECHAT_MERCHANT_PRIVATE_KEY`、`WECHAT_NOTIFY_URL`、
 `ALIPAY_APP_ID`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY`、`ALIPAY_NOTIFY_URL`、`ALIPAY_RETURN_URL`。
 某个渠道的键没填全则该渠道不可用；`payment_orders.channel_txn_id`（渠道流水号，对账用）由服务启动时自动补列。
+`DEPOSIT_AMOUNT`、`CONTACT_UNLOCK_AMOUNT` 只是「后台从没改过这个价」时的兜底默认值：日常改价在后台「价格设置」页（桌面 `/admin/`、手机 `/admin/m`）做，写进 `admin_settings` 后即刻生效，不用改代码、不用重新部署。
 
 ### 5.9 联系方式解锁申请接口
 

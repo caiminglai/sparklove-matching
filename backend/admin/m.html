@@ -144,6 +144,7 @@
       <div class="tab" onclick="switchTab('reports')">举报管理</div>
       <div class="tab" onclick="switchTab('deposits')">保证金</div>
       <div class="tab" onclick="switchTab('fields')">自定义筛选</div>
+      <div class="tab" onclick="switchTab('price')">价格</div>
     </div>
     
     <!-- 用户管理 -->
@@ -214,6 +215,18 @@
         <button class="btn-search" onclick="saveField()">添加/更新字段</button>
       </div>
       <div id="fieldsList"></div>
+    </div>
+
+    <!-- 价格设置 -->
+    <div id="priceSection" class="section">
+      <div class="search-box">
+        <div id="priceMeta" style="font-size:13px;color:#666;line-height:1.7;margin-bottom:12px;"></div>
+        <label>保证金（元）</label>
+        <input type="text" id="priceDepositInput" placeholder="例如：29.9">
+        <label>查看联系方式（元）</label>
+        <input type="text" id="priceUnlockInput" placeholder="例如：9.9">
+        <button class="btn-search" onclick="savePrices()">保存价格</button>
+      </div>
     </div>
     
     <button class="btn-logout" onclick="logout()">退出登录</button>
@@ -401,7 +414,7 @@
     };
     
     function switchTab(tab) {
-      const tabNames = ['users', 'records', 'reports', 'deposits', 'fields'];
+      const tabNames = ['users', 'records', 'reports', 'deposits', 'fields', 'price'];
       document.querySelectorAll('.tab').forEach((t, i) => {
         t.classList.toggle('active', tabNames[i] === tab);
       });
@@ -410,11 +423,13 @@
       document.getElementById('reportsSection').classList.toggle('active', tab === 'reports');
       document.getElementById('depositsSection').classList.toggle('active', tab === 'deposits');
       document.getElementById('fieldsSection').classList.toggle('active', tab === 'fields');
+      document.getElementById('priceSection').classList.toggle('active', tab === 'price');
       
       if (tab === 'records') loadUnlockRecords();
       if (tab === 'fields') loadCustomFields();
       if (tab === 'reports') loadReports();
       if (tab === 'deposits') loadDeposits();
+      if (tab === 'price') loadPrices();
     }
 
     async function loadCustomFields() {
@@ -490,7 +505,76 @@
         alert('请求失败：' + e.message);
       }
     }
-    
+
+    // ============ 价格设置 ============
+    const PRICE_HINT = '金额最多两位小数，范围 0.01 ～ 99999.99 元；改价只影响之后新建的订单，已下的单子金额不变。';
+
+    async function loadPrices() {
+      const meta = document.getElementById('priceMeta');
+      meta.textContent = '加载中...';
+      try {
+        const res = await fetch(API_BASE + '/api/admin/payment-price', {
+          headers: { 'Authorization': 'Bearer ' + token }
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderPrices(data.data || {});
+        } else {
+          meta.textContent = '读取失败：' + (data.message || '未知错误');
+        }
+      } catch (e) {
+        meta.textContent = '请求失败：' + e.message;
+      }
+    }
+
+    function renderPrices(data) {
+      setPriceInput('priceDepositInput', data.deposit);
+      setPriceInput('priceUnlockInput', data.contactUnlock);
+      document.getElementById('priceMeta').innerHTML = escapeHtml(PRICE_HINT) +
+        '<br>当前：保证金 ' + escapeHtml(priceSummary(data.deposit)) +
+        '，查看联系方式 ' + escapeHtml(priceSummary(data.contactUnlock));
+    }
+
+    function setPriceInput(id, item) {
+      const input = document.getElementById(id);
+      input.value = (item && item.amount !== undefined && item.amount !== null) ? String(item.amount) : '';
+    }
+
+    function priceSummary(item) {
+      if (!item) return '未知';
+      const source = item.source === 'db' ? '后台设置' : '默认值';
+      const ts = Number(item.updated_at);
+      const changed = item.updated_at && isFinite(ts) ? new Date(ts).toLocaleString() : '从未改过';
+      return item.amount + ' 元（' + source + '，上次改动：' + changed + '）';
+    }
+
+    async function savePrices() {
+      const dep = document.getElementById('priceDepositInput').value.trim();
+      const unl = document.getElementById('priceUnlockInput').value.trim();
+      const body = {};
+      const summary = [];
+      if (dep) { body.deposit_amount = dep; summary.push('保证金 ' + dep + ' 元'); }
+      if (unl) { body.contact_unlock_amount = unl; summary.push('查看联系方式 ' + unl + ' 元'); }
+      if (summary.length === 0) { alert('请至少填写一个金额'); return; }
+      if (!confirm('确认改为：' + summary.join('、') + '？已下的订单金额不受影响。')) return;
+      try {
+        const res = await fetch(API_BASE + '/api/admin/payment-price', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+          body: JSON.stringify(body)
+        });
+        const data = await res.json();
+        if (data.success) {
+          renderPrices(data.data || {});
+          showToast('价格已保存');
+        } else {
+          alert('保存失败：' + (data.message || '未知错误'));
+        }
+      } catch (e) {
+        alert('请求失败：' + e.message);
+      }
+    }
+
     async function loadAllUsers() {
       const userList = document.getElementById('userList');
       userList.innerHTML = '<div class="loading">加载中...</div>';

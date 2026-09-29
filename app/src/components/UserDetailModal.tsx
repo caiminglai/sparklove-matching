@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router'
 import { CATEGORIES, FIELD_LABELS } from '../data/constants'
 import { normalizeAvatarUrl } from '../api/config'
 import { maskContact } from '../utils/mask'
+import { usePricing } from '../utils/pricing'
 import type { Row, Column, Rating } from '../data/types'
 
 interface UserDetailModalProps {
@@ -36,6 +37,7 @@ export default function UserDetailModal({
 }: UserDetailModalProps) {
   const detailData = row?.data
   const navigate = useNavigate()
+  const unlockPrice = usePricing().contact_unlock_amount
 
   return (
     <div
@@ -242,7 +244,7 @@ export default function UserDetailModal({
                           color: '#fff',
                         }}
                       >
-                        💰 支付 9.9 元查看完整联系方式
+                        💰 支付 {unlockPrice} 元查看完整联系方式
                       </button>
                     </>
                   )}

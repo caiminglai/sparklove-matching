@@ -360,19 +360,17 @@ export const CATEGORIES = [
 // 保证金规则
 export const DEPOSIT_RULES = Object.assign(
   [
-    '发布信息需缴纳 29.9 元保证金',
+    '发布信息需缴纳保证金（金额以下单页显示为准）',
     '信息真实有效，违规将扣除保证金',
     '删除信息后可申请退还保证金',
     '匹配成功后双方确认，保证金自动解冻',
   ] as string[],
   {
-    amount: 29.9,
     platformFee: 9.9,
     emotionalDamage: 10,
     deleteRefund: 10,
   },
 ) as string[] & {
-  amount: number
   platformFee: number
   emotionalDamage: number
   deleteRefund: number

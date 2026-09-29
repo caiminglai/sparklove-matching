@@ -176,6 +176,7 @@ tbody tr:hover{background:#FFF5F8}
     <div class="tab" onclick="switchTab('reports', this)">举报管理</div>
     <div class="tab" onclick="switchTab('unlockRecords', this)">解锁记录</div>
     <div class="tab" onclick="switchTab('customFields', this)">自定义字段</div>
+    <div class="tab" onclick="switchTab('price', this)">价格设置</div>
   </div>
 
   <div class="tab-content active" id="users-tab">
@@ -433,6 +434,32 @@ tbody tr:hover{background:#FFF5F8}
         <thead><tr><th>编号</th><th>字段名称</th><th>字段标识</th><th>创建时间</th><th>操作</th></tr></thead>
         <tbody id="customFieldsTbody"></tbody>
       </table>
+    </div>
+  </div>
+
+  <div class="tab-content" id="price-tab">
+    <div class="stats">
+      <div class="stat"><div class="num" id="priceDepositNow">-</div><div class="label">保证金现价</div></div>
+      <div class="stat"><div class="num" id="priceUnlockNow">-</div><div class="label">查看联系方式现价</div></div>
+    </div>
+
+    <div class="filter-bar">
+      <div class="filter-row">
+        <div class="filter-group" style="flex:1;">
+          <label>保证金（元）</label>
+          <input type="text" id="priceDepositInput" placeholder="例如：29.9">
+        </div>
+        <div class="filter-group" style="flex:1;">
+          <label>查看联系方式（元）</label>
+          <input type="text" id="priceUnlockInput" placeholder="例如：9.9">
+        </div>
+        <button class="filter-btn" onclick="savePrices()">💾 保存</button>
+      </div>
+      <div class="filter-row">
+        <div class="filter-group" style="flex:1;color:#FF85B3;font-size:12px;">
+          <span id="priceMeta"></span>
+        </div>
+      </div>
     </div>
   </div>
 </div>
@@ -2028,6 +2055,7 @@ function switchTab(tabName, tabEl){
   if(tabName==='deposits'){loadDeposits();}
   if(tabName==='customFields'){loadCustomFields();}
   if(tabName==='unlockRecords'){loadUnlockRecords();}
+  if(tabName==='price'){loadPrices();}
 }
 
 // ============ 自定义字段模块 ============
@@ -2145,6 +2173,84 @@ function deleteCustomField(id){
       }
     };
     xhr.send();
+  });
+}
+
+// ============ 价格设置模块 ============
+var PRICE_HINT='金额最多两位小数，范围 0.01 ～ 99999.99 元；改价只影响之后新建的订单，已下的单子金额不变。';
+
+function loadPrices(){
+  var xhr=new XMLHttpRequest();
+  xhr.open('GET',BASE+'/api/admin/payment-price',true);
+  xhr.setRequestHeader('Authorization','Bearer '+(localStorage.getItem('admin_token')||''));
+  xhr.onreadystatechange=function(){
+    if(xhr.readyState!==4) return;
+    if(xhr.status===200){
+      try{
+        var res=JSON.parse(xhr.responseText);
+        renderPrices(res.data||{});
+        return;
+      }catch(e){}
+    }
+    document.getElementById('priceMeta').textContent='价格读取失败（'+(xhr.status||'网络错误')+'）';
+  };
+  xhr.send();
+}
+
+function renderPrices(data){
+  var dep=data.deposit||{};
+  var unl=data.contactUnlock||{};
+  setPriceCard('priceDepositNow','priceDepositInput',dep);
+  setPriceCard('priceUnlockNow','priceUnlockInput',unl);
+  document.getElementById('priceMeta').textContent=PRICE_HINT+
+    '　当前：保证金 '+priceSourceText(dep)+'、查看联系方式 '+priceSourceText(unl)+
+    '；上次改动：'+priceChangeText(dep)+' / '+priceChangeText(unl);
+}
+
+function setPriceCard(nowId,inputId,item){
+  var amount=(item.amount===undefined||item.amount===null)?null:item.amount;
+  document.getElementById(nowId).textContent=amount===null?'-':'¥'+amount;
+  document.getElementById(inputId).value=amount===null?'':String(amount);
+}
+
+function priceSourceText(item){
+  if(item.source==='db') return '后台设置';
+  if(item.source==='env') return '默认值';
+  return '未知';
+}
+
+function priceChangeText(item){
+  var ts=Number(item.updated_at);
+  if(!item.updated_at||!isFinite(ts)) return '从未改过';
+  return new Date(ts).toLocaleString();
+}
+
+function savePrices(){
+  var dep=document.getElementById('priceDepositInput').value.trim();
+  var unl=document.getElementById('priceUnlockInput').value.trim();
+  var body={};
+  var summary=[];
+  if(dep){ body.deposit_amount=dep; summary.push('保证金 '+dep+' 元'); }
+  if(unl){ body.contact_unlock_amount=unl; summary.push('查看联系方式 '+unl+' 元'); }
+  if(summary.length===0){ alert('请至少填写一个金额'); return; }
+  showConfirm('确认改为：'+summary.join('、')+'？已下的订单金额不受影响。',function(){
+    var xhr=new XMLHttpRequest();
+    xhr.open('PUT',BASE+'/api/admin/payment-price',true);
+    xhr.setRequestHeader('Content-Type','application/json');
+    xhr.setRequestHeader('Authorization','Bearer '+(localStorage.getItem('admin_token')||''));
+    xhr.onreadystatechange=function(){
+      if(xhr.readyState!==4) return;
+      if(xhr.status===200){
+        try{
+          var res=JSON.parse(xhr.responseText);
+          if(res.success){ renderPrices(res.data||{}); alert('已保存'); return; }
+          alert('保存失败：'+(res.message||'未知错误'));
+          return;
+        }catch(e){}
+      }
+      alert('保存失败（'+(xhr.status||'网络错误')+'）');
+    };
+    xhr.send(JSON.stringify(body));
   });
 }
 

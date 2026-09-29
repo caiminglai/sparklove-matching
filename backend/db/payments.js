@@ -50,7 +50,7 @@ async function addContactUnlockRequest(viewerId, targetId, proofPath, method, am
         created_at = EXCLUDED.created_at
       RETURNING id
     `);
-    const row = await stmt.get(viewerId, targetId, proofPath, method || 'manual', amount || 9.9, 'pending', now);
+    const row = await stmt.get(viewerId, targetId, proofPath, method || 'manual', amount, 'pending', now);
     return { success: true, id: row.id };
   } catch (e) {
     return { success: false, error: e.message };
@@ -182,7 +182,7 @@ async function addDeposit(userId, amount, proofPath) {
   const stmt = database.prepare(
     'INSERT INTO deposits (user_id, amount, proof_path, status, created_at) VALUES ($1, $2, $3, $4, $5)'
   );
-  await stmt.run(userId, amount, proofPath, 'pending', new Date().toISOString());
+  await stmt.run(userId, amount, proofPath, 'pending', Date.now());
   return true;
 }
 

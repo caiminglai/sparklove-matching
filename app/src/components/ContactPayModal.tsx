@@ -2,20 +2,15 @@ import { useState } from 'react'
 import { ArrowLeft, Zap, Upload, CheckCircle } from 'lucide-react'
 import { API_BASE_URL } from '../api/config'
 import { getAuthToken } from '../utils/auth'
+import { usePricing } from '../utils/pricing'
 
 interface ContactPayModalProps {
   targetUserId: string
-  amount?: number
   onClose: () => void
 }
 
-const DEFAULT_AMOUNT = 9.9
-
-export default function ContactPayModal({
-  targetUserId,
-  amount = DEFAULT_AMOUNT,
-  onClose,
-}: ContactPayModalProps) {
+export default function ContactPayModal({ targetUserId, onClose }: ContactPayModalProps) {
+  const amount = usePricing().contact_unlock_amount
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
   const [method, setMethod] = useState<'alipay' | 'wechat'>('alipay')
   const [proofFile, setProofFile] = useState<File | null>(null)
@@ -36,7 +31,6 @@ export default function ContactPayModal({
         body: JSON.stringify({
           target_user_id: targetUserId,
           method,
-          amount,
         }),
       })
       const data = await res.json()
@@ -66,7 +60,6 @@ export default function ContactPayModal({
       const formData = new FormData()
       formData.append('proof', proofFile)
       formData.append('target_user_id', targetUserId)
-      formData.append('amount', String(amount))
       formData.append('method', method)
 
       const token = getAuthToken()

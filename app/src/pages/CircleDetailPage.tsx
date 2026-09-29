@@ -14,6 +14,7 @@ import { API_BASE_URL, normalizeAvatarUrl } from '../api/config'
 import type { Row } from '../data/types'
 import ImagePreview from '../components/ImagePreview'
 import { maskContact } from '../utils/mask'
+import { usePricing } from '../utils/pricing'
 import { hexToRgba } from '../utils/color'
 import { useToast } from '../components/Toast'
 import { getAuthHeaders } from '../utils/auth'
@@ -39,6 +40,7 @@ export default function CircleDetailPage() {
   const [showPayModal, setShowPayModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const unlockPrice = usePricing().contact_unlock_amount
 
   const decodedTag = decodeURIComponent(tag || '')
   const config = CIRCLE_CONFIGS[circleKey || ''] || CIRCLE_CONFIGS.hobbies
@@ -463,7 +465,7 @@ export default function CircleDetailPage() {
                       color: '#fff',
                     }}
                   >
-                    💰 支付 9.9 元查看完整联系方式
+                    💰 支付 {unlockPrice} 元查看完整联系方式
                   </button>
                 </div>
               )}
@@ -489,7 +491,7 @@ export default function CircleDetailPage() {
               查看联系方式
             </h3>
             <p className="text-sm text-center mb-4" style={{ color: '#666' }}>
-              支付 9.9 元后，即可查看完整联系方式
+              支付 {unlockPrice} 元后，即可查看完整联系方式
               <br />
               <span className="text-xs" style={{ color: '#999' }}>
                 （转账后截图发给客服，客服手动解锁）

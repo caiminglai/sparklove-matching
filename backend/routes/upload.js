@@ -8,9 +8,8 @@ const path = require('path');
 const { ALLOWED_IMAGE_EXTENSIONS, MAGIC_NUMBERS } = require('../utils/multipart');
 const { MAX_UPLOAD_SIZE } = require('../utils/config');
 
-// 修复：原 try { require('../data/table') } catch 永远 MODULE_NOT_FOUND，假装可配置实际恒为默认
-// 改为从环境变量读取（默认 29.9）
-const DEPOSIT_RULES = { amount: parseFloat(process.env.DEPOSIT_AMOUNT) || 29.9 };
+// 保证金金额：后台「价格设置」可改，每次请求现读（原来冻结在进程启动时的环境变量里）
+const pricing = require('../utils/pricing');
 
 // 兼容引用：内部用 ALLOWED_EXTENSIONS / MAGIC_NUMBERS 名称
 const ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS;
@@ -126,7 +125,7 @@ function uploadDepositProof(req, res) {
       }
       let proofData = null;
       let filename = '';
-      let amount = DEPOSIT_RULES.amount;
+      // 🔴 不读表单里的 amount 字段：那是前端传来的，改一个字就能把 29.9 的保证金按 0.01 记账
       for (const part of parts) {
         const headerEnd = part.indexOf('\r\n\r\n');
         if (headerEnd === -1) continue;
@@ -136,8 +135,6 @@ function uploadDepositProof(req, res) {
           const match = header.match(/filename="([^"]+)"/);
           filename = match ? match[1] : 'proof.png';
           proofData = bodyData;
-        } else if (header.includes('name="amount"')) {
-          amount = parseFloat(bodyData.toString()) || DEPOSIT_RULES.amount;
         }
       }
       if (!proofData) { sendJson(res, 400, { success: false, message: '未找到凭证文件' }); return; }
@@ -149,6 +146,7 @@ function uploadDepositProof(req, res) {
         magicValid = magicBytes.every((byte, i) => proofData[i] === byte);
       }
       if (!magicValid) { sendJson(res, 400, { success: false, message: '文件内容不匹配' }); return; }
+      const amount = await pricing.getYuan('deposit');
       const timestamp = Date.now();
       const randomStr = Math.random().toString(36).substring(2, 8);
       const safeFilename = userId + '_' + timestamp + '_' + randomStr + ext;

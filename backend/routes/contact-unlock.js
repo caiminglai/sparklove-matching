@@ -9,6 +9,7 @@ const paymentsDb = require('../db/payments.js');
 const adminDb = require('../db/admin.js');
 const { parseMultipart, collectBody, validateMagicBytes, validateExtension } = require('../utils/multipart');
 const { MAX_BODY_SIZE } = require('../utils/config');
+const pricing = require('../utils/pricing');
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
@@ -37,7 +38,7 @@ function submitUnlockRequest(req, res) {
       let proofPath = null;
       const targetId = parsed.fields.target_user_id || null;
       const method = parsed.fields.method || 'manual';
-      const amount = parsed.fields.amount || '9.9';
+      // 🔴 不读 parsed.fields.amount：那是前端传来的数字，审核时看到的数额就能被提交方自己填
 
       // 处理上传的文件
       for (const [fieldName, file] of Object.entries(parsed.files)) {
@@ -56,7 +57,8 @@ function submitUnlockRequest(req, res) {
         sendJson(res, 400, { success: false, message: '凭证和目标用户信息必填' }); return;
       }
 
-      const result = await paymentsDb.addContactUnlockRequest(String(viewerId), targetId, proofPath, method, parseFloat(amount));
+      const amount = await pricing.getYuan('contactUnlock');
+      const result = await paymentsDb.addContactUnlockRequest(String(viewerId), targetId, proofPath, method, amount);
       if (result.success) {
         sendJson(res, 200, { success: true, message: '凭证提交成功，等待管理员审核', proof_path: proofPath });
       } else {
