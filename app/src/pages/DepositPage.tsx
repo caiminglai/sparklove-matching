@@ -15,7 +15,6 @@ import {
   Upload,
   Zap,
 } from 'lucide-react'
-import { DEPOSIT_RULES } from '../data/constants'
 import { API_BASE_URL } from '../api/config'
 import { useState, useEffect } from 'react'
 import { useToast } from '../components/Toast'
@@ -25,7 +24,12 @@ import QRCode from 'qrcode'
 
 export default function DepositPage() {
   const { toast } = useToast()
-  const depositPrice = usePricing().deposit_amount
+  const pricing = usePricing()
+  const depositPrice = pricing.deposit_amount
+  const platformFee = pricing.platform_fee
+  const emotionalDamage = pricing.emotional_damage
+  const deleteRefund = pricing.delete_refund
+  const refundAfterNoFault = depositPrice - platformFee
   const [showPayment, setShowPayment] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState<'alipay' | 'wechat'>('alipay')
   const [qrError, setQrError] = useState(false)
@@ -322,7 +326,7 @@ export default function DepositPage() {
               <span
                 style={{ color: 'var(--color-text-primary)', fontWeight: 'bold', fontSize: '14px' }}
               >
-                {DEPOSIT_RULES.platformFee} 元
+                {platformFee} 元
               </span>
             </div>
             <div
@@ -331,13 +335,13 @@ export default function DepositPage() {
             >
               <span style={{ color: 'var(--color-text-muted)' }}>甲方感情损失费</span>
               <span style={{ color: 'var(--color-danger)', fontWeight: 'bold', fontSize: '14px' }}>
-                {DEPOSIT_RULES.emotionalDamage} 元
+                {emotionalDamage} 元
               </span>
             </div>
             <div className="flex justify-between items-center py-2">
               <span style={{ color: 'var(--color-text-muted)' }}>乙方删除数据可退还</span>
               <span style={{ color: 'var(--color-success)', fontWeight: 'bold', fontSize: '14px' }}>
-                {DEPOSIT_RULES.deleteRefund} 元
+                {deleteRefund} 元
               </span>
             </div>
           </div>
@@ -372,19 +376,19 @@ export default function DepositPage() {
               <div>
                 •{' '}
                 <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                  甲方获得感情损失费 {DEPOSIT_RULES.emotionalDamage} 元
+                  甲方获得感情损失费 {emotionalDamage} 元
                 </span>
               </div>
               <div>
                 •{' '}
                 <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
-                  平台收取运营费 {DEPOSIT_RULES.platformFee} 元
+                  平台收取运营费 {platformFee} 元
                 </span>
               </div>
               <div>
                 •{' '}
                 <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
-                  乙方删除数据可退还 {DEPOSIT_RULES.deleteRefund} 元
+                  乙方删除数据可退还 {deleteRefund} 元
                 </span>
               </div>
             </div>
@@ -402,13 +406,13 @@ export default function DepositPage() {
               <div>
                 •{' '}
                 <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
-                  平台运营费 {DEPOSIT_RULES.platformFee} 元不变
+                  平台运营费 {platformFee} 元不变
                 </span>
               </div>
               <div>
                 •{' '}
                 <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                  甲方获得退还 20 元
+                  甲方获得退还 {refundAfterNoFault} 元
                 </span>
               </div>
               <div>• 大家好聚好散~</div>
@@ -437,7 +441,7 @@ export default function DepositPage() {
             >
               <span style={{ color: 'var(--color-text-muted)' }}>主动删除自己的数据</span>
               <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                退还 {DEPOSIT_RULES.deleteRefund} 元
+                退还 {deleteRefund} 元
               </span>
             </div>
             <div className="flex items-center justify-between py-2">
@@ -466,15 +470,15 @@ export default function DepositPage() {
           <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
             小王在表格里填"身高180cm"，小李见面后发现他实际只有165cm。小李发起投诉，上传见面照片证据。平台核实后：小李获得
             <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-              {DEPOSIT_RULES.emotionalDamage}元
+              {emotionalDamage}元
             </span>
             感情损失费，平台收取
             <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
-              {DEPOSIT_RULES.platformFee}元
+              {platformFee}元
             </span>
             运营费，小王删除数据后可拿回
             <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
-              {DEPOSIT_RULES.deleteRefund}元
+              {deleteRefund}元
             </span>
             。
           </p>
@@ -557,7 +561,7 @@ export default function DepositPage() {
             </div>
             <div className="pl-4">
               <span style={{ color: 'var(--color-success)' }}>A：</span>
-              <span>删除自己的数据可退回{DEPOSIT_RULES.deleteRefund}元。</span>
+              <span>删除自己的数据可退回{deleteRefund}元。</span>
             </div>
           </div>
         </div>

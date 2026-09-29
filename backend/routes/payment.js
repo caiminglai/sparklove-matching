@@ -369,7 +369,7 @@ async function queryPaymentStatus(req, res, parsedUrl) {
 // 价格配置（金额存 admin_settings，后台「价格设置」直接改，不用动代码）
 // ============================================================
 
-/** GET /api/payment/config：公开，只回前端要展示的两个数 */
+/** GET /api/payment/config：公开，只回前端要展示的那几个数（标价 + 保证金三档拆分） */
 async function publicConfig(req, res) {
   try {
     const view = await pricing.publicView();
@@ -409,19 +409,36 @@ async function adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit) {
     } catch (e) {
       sendJson(res, 400, { success: false, message: '请求格式错误' }); return;
     }
-    const changes = [];
+    const pending = [];
     for (const name of pricing.itemNames()) {
       const raw = data[pricing.ITEMS[name].field];
       if (raw === undefined || raw === null || raw === '') continue;
-      const result = await pricing.setAmountYuan(name, raw);
-      if (!result.ok) {
-        sendJson(res, 400, { success: false, message: pricing.ITEMS[name].label + '：' + result.error });
+      const parsed = pricing.parseAmountYuan(raw);
+      if (!parsed.ok) {
+        sendJson(res, 400, { success: false, message: pricing.ITEMS[name].label + '：' + parsed.error });
         return;
       }
-      changes.push({ field: pricing.ITEMS[name].field, amount_fen: result.fen });
+      pending.push({ name, fen: parsed.fen });
     }
-    if (!changes.length) {
+    if (!pending.length) {
       sendJson(res, 400, { success: false, message: '没有要改的金额' }); return;
+    }
+    // 先整体校验再落库：保证金与它的三档拆分必须对得上账，逐项边校验边写会留下写了一半的不一致状态
+    const overrides = {};
+    for (const p of pending) overrides[p.name] = p.fen;
+    const split = await pricing.splitCheck(overrides);
+    if (!split.ok) {
+      sendJson(res, 400, {
+        success: false,
+        message: `保证金拆分对不上：平台运营费 + 感情损失费 + 删除可退 = ${split.sum / 100} 元，` +
+          `保证金是 ${split.deposit / 100} 元。请把保证金与这三档一起填成能加得上的数。`,
+      });
+      return;
+    }
+    const changes = [];
+    for (const p of pending) {
+      await pricing.setAmountFen(p.name, p.fen);
+      changes.push({ field: pricing.ITEMS[p.name].field, amount_fen: p.fen });
     }
     await adminDb.logAdminAction('update_price', null, { changes });
     console.log('[价格] 标价变更:', JSON.stringify(changes));

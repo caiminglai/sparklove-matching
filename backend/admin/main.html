@@ -438,25 +438,15 @@ tbody tr:hover{background:#FFF5F8}
   </div>
 
   <div class="tab-content" id="price-tab">
-    <div class="stats">
-      <div class="stat"><div class="num" id="priceDepositNow">-</div><div class="label">保证金现价</div></div>
-      <div class="stat"><div class="num" id="priceUnlockNow">-</div><div class="label">查看联系方式现价</div></div>
-    </div>
+    <div class="stats" id="priceStats" style="flex-wrap:wrap;"></div>
 
     <div class="filter-bar">
+      <div class="filter-row" id="priceRows"></div>
       <div class="filter-row">
-        <div class="filter-group" style="flex:1;">
-          <label>保证金（元）</label>
-          <input type="text" id="priceDepositInput" placeholder="例如：29.9">
-        </div>
-        <div class="filter-group" style="flex:1;">
-          <label>查看联系方式（元）</label>
-          <input type="text" id="priceUnlockInput" placeholder="例如：9.9">
-        </div>
         <button class="filter-btn" onclick="savePrices()">💾 保存</button>
       </div>
       <div class="filter-row">
-        <div class="filter-group" style="flex:1;color:#FF85B3;font-size:12px;">
+        <div class="filter-group" style="flex:1;color:#FF85B3;font-size:12px;display:block;line-height:1.7;">
           <span id="priceMeta"></span>
         </div>
       </div>
@@ -2178,6 +2168,8 @@ function deleteCustomField(id){
 
 // ============ 价格设置模块 ============
 var PRICE_HINT='金额最多两位小数，范围 0.01 ～ 99999.99 元；改价只影响之后新建的订单，已下的单子金额不变。';
+var PRICE_SPLIT_HINT='留空的档位不改；保证金与「平台运营费＋感情损失费＋删除可退」必须加得平，对不上则整笔不保存。';
+var priceItems=[];
 
 function loadPrices(){
   var xhr=new XMLHttpRequest();
@@ -2198,19 +2190,26 @@ function loadPrices(){
 }
 
 function renderPrices(data){
-  var dep=data.deposit||{};
-  var unl=data.contactUnlock||{};
-  setPriceCard('priceDepositNow','priceDepositInput',dep);
-  setPriceCard('priceUnlockNow','priceUnlockInput',unl);
-  document.getElementById('priceMeta').textContent=PRICE_HINT+
-    '　当前：保证金 '+priceSourceText(dep)+'、查看联系方式 '+priceSourceText(unl)+
-    '；上次改动：'+priceChangeText(dep)+' / '+priceChangeText(unl);
-}
-
-function setPriceCard(nowId,inputId,item){
-  var amount=(item.amount===undefined||item.amount===null)?null:item.amount;
-  document.getElementById(nowId).textContent=amount===null?'-':'¥'+amount;
-  document.getElementById(inputId).value=amount===null?'':String(amount);
+  priceItems=[];
+  var keys=Object.keys(data||{});
+  for(var i=0;i<keys.length;i++) priceItems.push(data[keys[i]]);
+  document.getElementById('priceStats').innerHTML=priceItems.map(function(it){
+    var amount=(it.amount===undefined||it.amount===null)?'-':('¥'+it.amount);
+    return '<div class="stat" style="min-width:180px;">'+
+      '<div class="num">'+escapeHtml(amount)+'</div>'+
+      '<div class="label">'+escapeHtml(it.label)+'现价</div>'+
+      '<div class="label">'+escapeHtml(priceSourceText(it))+'／'+escapeHtml(priceChangeText(it))+'</div>'+
+      '</div>';
+  }).join('');
+  document.getElementById('priceRows').innerHTML=priceItems.map(function(it){
+    var shown=(it.amount===undefined||it.amount===null)?'':String(it.amount);
+    var ph=(it.default_amount===undefined||it.default_amount===null)?'':String(it.default_amount);
+    return '<div class="filter-group" style="flex:1;min-width:260px;">'+
+      '<label style="min-width:110px;">'+escapeHtml(it.label)+'（元）</label>'+
+      '<input type="text" id="priceInput_'+escapeHtml(it.field)+'" value="'+escapeHtml(shown)+'" placeholder="例如：'+escapeHtml(ph)+'">'+
+      '</div>';
+  }).join('');
+  document.getElementById('priceMeta').innerHTML=escapeHtml(PRICE_HINT)+'<br>'+escapeHtml(PRICE_SPLIT_HINT);
 }
 
 function priceSourceText(item){
@@ -2226,12 +2225,16 @@ function priceChangeText(item){
 }
 
 function savePrices(){
-  var dep=document.getElementById('priceDepositInput').value.trim();
-  var unl=document.getElementById('priceUnlockInput').value.trim();
   var body={};
   var summary=[];
-  if(dep){ body.deposit_amount=dep; summary.push('保证金 '+dep+' 元'); }
-  if(unl){ body.contact_unlock_amount=unl; summary.push('查看联系方式 '+unl+' 元'); }
+  for(var i=0;i<priceItems.length;i++){
+    var it=priceItems[i];
+    var el=document.getElementById('priceInput_'+it.field);
+    var raw=el?el.value.trim():'';
+    if(!raw) continue;
+    body[it.field]=raw;
+    summary.push(it.label+' '+raw+' 元');
+  }
   if(summary.length===0){ alert('请至少填写一个金额'); return; }
   showConfirm('确认改为：'+summary.join('、')+'？已下的订单金额不受影响。',function(){
     var xhr=new XMLHttpRequest();
@@ -2240,15 +2243,14 @@ function savePrices(){
     xhr.setRequestHeader('Authorization','Bearer '+(localStorage.getItem('admin_token')||''));
     xhr.onreadystatechange=function(){
       if(xhr.readyState!==4) return;
-      if(xhr.status===200){
-        try{
-          var res=JSON.parse(xhr.responseText);
-          if(res.success){ renderPrices(res.data||{}); alert('已保存'); return; }
-          alert('保存失败：'+(res.message||'未知错误'));
-          return;
-        }catch(e){}
+      var res=null;
+      try{ res=JSON.parse(xhr.responseText); }catch(e){}
+      if(xhr.status===200&&res&&res.success){
+        renderPrices(res.data||{});
+        alert('已保存');
+        return;
       }
-      alert('保存失败（'+(xhr.status||'网络错误')+'）');
+      alert('保存失败：'+((res&&res.message)||(xhr.status||'网络错误')));
     };
     xhr.send(JSON.stringify(body));
   });

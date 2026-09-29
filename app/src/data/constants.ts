@@ -357,25 +357,6 @@ export const CATEGORIES = [
   { key: '其他', label: '其他' },
 ]
 
-// 保证金规则
-export const DEPOSIT_RULES = Object.assign(
-  [
-    '发布信息需缴纳保证金（金额以下单页显示为准）',
-    '信息真实有效，违规将扣除保证金',
-    '删除信息后可申请退还保证金',
-    '匹配成功后双方确认，保证金自动解冻',
-  ] as string[],
-  {
-    platformFee: 9.9,
-    emotionalDamage: 10,
-    deleteRefund: 10,
-  },
-) as string[] & {
-  platformFee: number
-  emotionalDamage: number
-  deleteRefund: number
-}
-
 // 默认列配置（user.service 和 field-mapping.service 共用）
 export const DEFAULT_COLUMNS: Column[] = [
   { key: 'purpose', label: '目的', type: 'select', options: PURPOSE_OPTIONS, category: '基本' },

@@ -221,10 +221,7 @@
     <div id="priceSection" class="section">
       <div class="search-box">
         <div id="priceMeta" style="font-size:13px;color:#666;line-height:1.7;margin-bottom:12px;"></div>
-        <label>保证金（元）</label>
-        <input type="text" id="priceDepositInput" placeholder="例如：29.9">
-        <label>查看联系方式（元）</label>
-        <input type="text" id="priceUnlockInput" placeholder="例如：9.9">
+        <div id="priceRows"></div>
         <button class="btn-search" onclick="savePrices()">保存价格</button>
       </div>
     </div>
@@ -508,6 +505,7 @@
 
     // ============ 价格设置 ============
     const PRICE_HINT = '金额最多两位小数，范围 0.01 ～ 99999.99 元；改价只影响之后新建的订单，已下的单子金额不变。';
+    const PRICE_SPLIT_HINT = '留空的档位不改；保证金与「平台运营费＋感情损失费＋删除可退」必须加得平，对不上则整笔不保存。';
 
     async function loadPrices() {
       const meta = document.getElementById('priceMeta');
@@ -527,17 +525,20 @@
       }
     }
 
-    function renderPrices(data) {
-      setPriceInput('priceDepositInput', data.deposit);
-      setPriceInput('priceUnlockInput', data.contactUnlock);
-      document.getElementById('priceMeta').innerHTML = escapeHtml(PRICE_HINT) +
-        '<br>当前：保证金 ' + escapeHtml(priceSummary(data.deposit)) +
-        '，查看联系方式 ' + escapeHtml(priceSummary(data.contactUnlock));
-    }
+    let priceItems = [];
 
-    function setPriceInput(id, item) {
-      const input = document.getElementById(id);
-      input.value = (item && item.amount !== undefined && item.amount !== null) ? String(item.amount) : '';
+    function renderPrices(data) {
+      priceItems = Object.keys(data || {}).map((name) => data[name]);
+      document.getElementById('priceRows').innerHTML = priceItems.map((it) => {
+        const shown = (it.amount === undefined || it.amount === null) ? '' : String(it.amount);
+        const ph = (it.default_amount === undefined || it.default_amount === null) ? '' : String(it.default_amount);
+        return '<label>' + escapeHtml(it.label) + '（元）</label>' +
+          '<input type="text" id="priceInput_' + escapeHtml(it.field) + '" value="' + escapeHtml(shown) +
+          '" placeholder="例如：' + escapeHtml(ph) + '">';
+      }).join('');
+      document.getElementById('priceMeta').innerHTML = escapeHtml(PRICE_HINT) +
+        '<br>' + escapeHtml(PRICE_SPLIT_HINT) +
+        (priceItems.length ? '<br>当前：' + priceItems.map((it) => escapeHtml(it.label + ' ' + priceSummary(it))).join('，') : '');
     }
 
     function priceSummary(item) {
@@ -549,12 +550,15 @@
     }
 
     async function savePrices() {
-      const dep = document.getElementById('priceDepositInput').value.trim();
-      const unl = document.getElementById('priceUnlockInput').value.trim();
       const body = {};
       const summary = [];
-      if (dep) { body.deposit_amount = dep; summary.push('保证金 ' + dep + ' 元'); }
-      if (unl) { body.contact_unlock_amount = unl; summary.push('查看联系方式 ' + unl + ' 元'); }
+      priceItems.forEach((it) => {
+        const el = document.getElementById('priceInput_' + it.field);
+        const raw = el ? el.value.trim() : '';
+        if (!raw) return;
+        body[it.field] = raw;
+        summary.push(it.label + ' ' + raw + ' 元');
+      });
       if (summary.length === 0) { alert('请至少填写一个金额'); return; }
       if (!confirm('确认改为：' + summary.join('、') + '？已下的订单金额不受影响。')) return;
       try {

@@ -381,9 +381,9 @@ server: {
 | POST | `/api/payment/notify-wechat` | 微信支付 v3 回调 | 无 Token，AES-256-GCM 解密即认证来源 |
 | POST | `/api/payment/notify-alipay` | 支付宝支付回调 | 无 Token，校验支付宝公钥签名 |
 | POST | `/api/payments/view-contact` | 已停用，恒返回 501（改走手动上传凭证） | - |
-| GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount}`（元），前端展示金额用，不含任何写权限 | 否 |
+| GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount, platform_fee, emotional_damage, delete_refund}`（元），前端展示金额用，不含任何写权限。后三项是「一笔保证金怎么分」，只给保证金规则页展示，不参与下单金额计算 | 否 |
 | GET | `/api/admin/payment-price` | 后台读标价：每项给当前值、分值、环境变量兜底值、来源（`db`/`env`）与最后改动时间 | 管理员 |
-| PUT | `/api/admin/payment-price` | 后台改标价，写进 `admin_settings`（按分存整数）。只影响之后新建的订单，已下单的金额不变 | 管理员 |
+| PUT | `/api/admin/payment-price` | 后台改标价，写进 `admin_settings`（按分存整数）。只影响之后新建的订单，已下单的金额不变。先把本轮提交的每一项都校验完，再校验「平台运营费＋感情损失费＋删除可退 = 保证金」，两项都过了才落库；对不上则整笔不写并回 400 说明 | 管理员 |
 
 回调侧的三条硬约定（改代码前先读）：
 
@@ -395,7 +395,7 @@ server: {
 `WECHAT_APP_ID`、`WECHAT_MCH_ID`、`WECHAT_API_V3_KEY`、`WECHAT_MERCHANT_SERIAL_NO`、`WECHAT_MERCHANT_PRIVATE_KEY`、`WECHAT_NOTIFY_URL`、
 `ALIPAY_APP_ID`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY`、`ALIPAY_NOTIFY_URL`、`ALIPAY_RETURN_URL`。
 某个渠道的键没填全则该渠道不可用；`payment_orders.channel_txn_id`（渠道流水号，对账用）由服务启动时自动补列。
-`DEPOSIT_AMOUNT`、`CONTACT_UNLOCK_AMOUNT` 只是「后台从没改过这个价」时的兜底默认值：日常改价在后台「价格设置」页（桌面 `/admin/`、手机 `/admin/m`）做，写进 `admin_settings` 后即刻生效，不用改代码、不用重新部署。
+`DEPOSIT_AMOUNT`、`CONTACT_UNLOCK_AMOUNT` 只是「后台从没改过这个价」时的兜底默认值：日常改价在后台「价格设置」页（桌面 `/admin/`、手机 `/admin/m`）做，写进 `admin_settings` 后即刻生效，不用改代码、不用重新部署。保证金拆分三档（`platform_fee` / `emotional_damage` / `delete_refund`）**没有** 对应的 `.env` 键，兜底值写死在 `backend/utils/pricing.js` 的 `ITEMS`（9.9 / 10 / 10），要改就走后台。保证金规则页（`app/src/pages/DepositPage.tsx`）展示的五个数字全部来自 `GET /api/payment/config`，「甲方无过错时退还多少」由 `保证金 - 平台运营费` 算出，前端不再硬编码。
 
 ### 5.9 联系方式解锁申请接口
 

@@ -4,11 +4,21 @@ import { API_BASE_URL } from '../api/config'
 export interface PublicPricing {
   deposit_amount: number
   contact_unlock_amount: number
+  platform_fee: number
+  emotional_damage: number
+  delete_refund: number
 }
 
 // 兜底值只在接口不可用时顶一下展示；真实标价以后台「价格设置」写入的 admin_settings 为准，
 // 服务端下单/入账也只看那张表，前端传来的数字一律不被采信。
-const FALLBACK: PublicPricing = { deposit_amount: 29.9, contact_unlock_amount: 9.9 }
+// 后三档是保证金的拆分，保存时服务端已挡下「加起来不等于保证金」的情况，这里同步保持 9.9+10+10=29.9。
+const FALLBACK: PublicPricing = {
+  deposit_amount: 29.9,
+  contact_unlock_amount: 9.9,
+  platform_fee: 9.9,
+  emotional_damage: 10,
+  delete_refund: 10,
+}
 
 let cached: PublicPricing | null = null
 let pending: Promise<PublicPricing> | null = null
@@ -27,13 +37,11 @@ export function fetchPricing(): Promise<PublicPricing> {
     pending = fetch(`${API_BASE_URL}/payment/config`)
       .then((res) => (res.ok ? res.json() : Promise.reject(new Error(`HTTP ${res.status}`))))
       .then((body: { data?: Partial<PublicPricing> }) => {
-        cached = {
-          deposit_amount: pickNumber(body?.data?.deposit_amount, FALLBACK.deposit_amount),
-          contact_unlock_amount: pickNumber(
-            body?.data?.contact_unlock_amount,
-            FALLBACK.contact_unlock_amount,
-          ),
+        const next = { ...FALLBACK }
+        for (const key of Object.keys(FALLBACK) as (keyof PublicPricing)[]) {
+          next[key] = pickNumber(body?.data?.[key], FALLBACK[key])
         }
+        cached = next
         return cached
       })
       .catch(() => FALLBACK)
