@@ -151,7 +151,7 @@ export default function QrPage() {
     ctx.fillStyle = '#6BAF7D'
     ctx.font = '12px sans-serif'
     ctx.textAlign = 'center'
-    ctx.fillText('\u2713 保证金保障真实信息', 180, 515)
+    ctx.fillText('\u2713 人工核验保障真实信息', 180, 515)
 
     // Footer
     ctx.fillStyle = '#8B7B6B'

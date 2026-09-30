@@ -505,7 +505,7 @@
 
     // ============ 价格设置 ============
     const PRICE_HINT = '金额最多两位小数，范围 0.01 ～ 99999.99 元；改价只影响之后新建的订单，已下的单子金额不变。';
-    const PRICE_SPLIT_HINT = '留空的档位不改；保证金与「平台运营费＋虚假信息赔付＋删除可退」必须加得平，对不上则整笔不保存。';
+    const PRICE_NOTE = '留空的档位不改；两项收费各自独立，都是一次性服务费、支付后不予退还，没有必须加得平的约束。';
 
     async function loadPrices() {
       const meta = document.getElementById('priceMeta');
@@ -537,7 +537,7 @@
           '" placeholder="例如：' + escapeHtml(ph) + '">';
       }).join('');
       document.getElementById('priceMeta').innerHTML = escapeHtml(PRICE_HINT) +
-        '<br>' + escapeHtml(PRICE_SPLIT_HINT) +
+        '<br>' + escapeHtml(PRICE_NOTE) +
         (priceItems.length ? '<br>当前：' + priceItems.map((it) => escapeHtml(it.label + ' ' + priceSummary(it))).join('，') : '');
     }
 

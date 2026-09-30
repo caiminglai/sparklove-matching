@@ -48,7 +48,7 @@ export default function DeleteConfirmModal({
           删除确认
         </h3>
         <p className="text-sm mb-5" style={{ color: 'var(--color-text-muted)' }}>
-          确定删除这行数据吗？删除后不可恢复，保证金将原路退回。
+          确定删除这行数据吗？删除后不可恢复，已缴的认证费不予退还。
         </p>
         <div className="flex gap-3">
           <button

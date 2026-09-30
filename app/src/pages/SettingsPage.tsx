@@ -113,8 +113,8 @@ export default function SettingsPage() {
         },
         {
           icon: Shield,
-          label: '保证金管理',
-          desc: '查看保证金状态',
+          label: '认证费管理',
+          desc: '查看认证费状态',
           color: 'var(--color-success)',
           bgColor: 'rgba(var(--color-success-rgb), 0.08)',
           action: () => navigate('/deposit'),

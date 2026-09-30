@@ -174,7 +174,7 @@ export default function MyPostsPage() {
                               color: 'var(--color-success)',
                             }}
                           >
-                            保证金 ¥{row.deposit}
+                            认证费 ¥{row.deposit}
                           </span>
                         )}
                       </div>
@@ -245,7 +245,7 @@ export default function MyPostsPage() {
                     {rows.reduce((s, r) => s + (r.deposit || 0), 0)}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                    保证金(元)
+                    认证费(元)
                   </div>
                 </div>
                 <div>
@@ -311,7 +311,7 @@ export default function MyPostsPage() {
               删除资料
             </h3>
             <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>
-              确定要删除这条资料吗？如果已缴纳保证金，将全额退回。
+              确定要删除这条资料吗？删除后不可恢复，已缴的认证费不予退还。
             </p>
             <div className="flex gap-2">
               <button

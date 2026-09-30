@@ -69,7 +69,7 @@ function generateOrderId() {
 // 一笔订单付完该改什么，全在这里分派。支付宝回调、微信回调、模拟支付三条路共用同一个出口，
 // 免得各写一遍导致"线上通了本地测不到"或反过来。
 const PURPOSES = {
-  deposit: { pricingItem: 'deposit', subject: '保证金缴纳' },
+  deposit: { pricingItem: 'deposit', subject: '诚意认证费' },
   contact_unlock: { pricingItem: 'contactUnlock', subject: '查看联系方式' },
 };
 
@@ -320,7 +320,7 @@ async function mockPay(req, res, parsedUrl) {
   }
   const back = (order.purpose || 'deposit') === 'contact_unlock'
     ? { label: '返回查看联系方式', href: '/' }
-    : { label: '返回保证金页面', href: '/deposit' };
+    : { label: '返回认证费页面', href: '/deposit' };
   res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
   res.end('<html><head><meta charset="utf-8"><title>支付成功</title></head><body style="text-align:center;padding-top:50px;font-family:sans-serif;"><h1>✅ 模拟支付成功</h1><p>订单号：' + orderId + '</p><p><a href="' + back.href + '">' + back.label + '</a></p></body></html>');
 }
@@ -433,7 +433,7 @@ async function queryPaymentStatus(req, res, parsedUrl) {
 // 价格配置（金额存 admin_settings，后台「价格设置」直接改，不用动代码）
 // ============================================================
 
-/** GET /api/payment/config：公开，只回前端要展示的那几个数（标价 + 保证金三档拆分） */
+/** GET /api/payment/config：公开，只回前端要展示的那两个标价（诚意认证费 / 查看联系方式） */
 async function publicConfig(req, res) {
   try {
     const view = await pricing.publicView();
@@ -492,18 +492,6 @@ async function adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit) {
     }
     if (!pending.length) {
       sendJson(res, 400, { success: false, message: '没有要改的金额' }); return;
-    }
-    // 先整体校验再落库：保证金与它的三档拆分必须对得上账，逐项边校验边写会留下写了一半的不一致状态
-    const overrides = {};
-    for (const p of pending) overrides[p.name] = p.fen;
-    const split = await pricing.splitCheck(overrides);
-    if (!split.ok) {
-      sendJson(res, 400, {
-        success: false,
-        message: `保证金拆分对不上：平台运营费 + 虚假信息赔付 + 删除可退 = ${split.sum / 100} 元，` +
-          `保证金是 ${split.deposit / 100} 元。请把保证金与这三档一起填成能加得上的数。`,
-      });
-      return;
     }
     const changes = [];
     for (const p of pending) {

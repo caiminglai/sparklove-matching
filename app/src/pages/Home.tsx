@@ -709,7 +709,7 @@ export default function Home() {
                 border: '1px solid rgba(var(--color-success-rgb), 0.12)',
               }}
             >
-              <Shield size={10} /> 保证金保障
+              <Shield size={10} /> 人工核验
             </span>
             <span
               className="inline-flex items-center gap-1 text-xs px-2.5 py-1 rounded-full"

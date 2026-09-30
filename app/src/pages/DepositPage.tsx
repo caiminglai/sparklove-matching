@@ -8,10 +8,7 @@ import {
   Ban,
   Wallet,
   FileCheck,
-  RefreshCw,
   HelpCircle,
-  Users,
-  AlertOctagon,
   Upload,
   Zap,
 } from 'lucide-react'
@@ -28,11 +25,6 @@ export default function DepositPage() {
   const navigate = useNavigate()
   const pricing = usePricing()
   const depositPrice = pricing.deposit_amount
-  const platformFee = pricing.platform_fee
-  const emotionalDamage = pricing.emotional_damage
-  const deleteRefund = pricing.delete_refund
-  // 元是浮点数，直接相减会露出 0.019999999999999997，一律换成整数「分」再算
-  const refundAfterNoFault = (Math.round(depositPrice * 100) - Math.round(platformFee * 100)) / 100
   const [showPayment, setShowPayment] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState<'alipay' | 'wechat'>('alipay')
   const [qrError, setQrError] = useState(false)
@@ -78,7 +70,7 @@ export default function DepositPage() {
         }
       }
     } catch (err) {
-      console.warn('查询保证金状态失败', err)
+      console.warn('查询认证费状态失败', err)
     } finally {
       setLoadingStatus(false)
     }
@@ -102,7 +94,7 @@ export default function DepositPage() {
           // 支付成功，清除待确认订单
           localStorage.removeItem('pending_order_id')
           setNativeQr(null)
-          // 重新加载保证金状态
+          // 重新加载认证费状态
           await loadDepositStatus()
           return true
         }
@@ -113,7 +105,7 @@ export default function DepositPage() {
     return false
   }
 
-  // 加载用户的保证金状态
+  // 加载用户的认证费状态
   useEffect(() => {
     loadDepositStatus()
 
@@ -262,7 +254,7 @@ export default function DepositPage() {
           </Link>
           <Shield size={16} style={{ color: 'var(--color-success)' }} />
           <h1 className="text-lg font-medium" style={{ color: 'var(--color-text-primary)' }}>
-            保证金制度
+            诚意认证费
           </h1>
         </div>
 
@@ -278,11 +270,11 @@ export default function DepositPage() {
           <div className="flex items-center gap-2 mb-2">
             <AlertTriangle size={15} style={{ color: 'var(--color-primary)' }} />
             <span className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-              为什么需要保证金？
+              这笔钱是干什么的？
             </span>
           </div>
           <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-            防止数据造假。比如有人身高150cm，却填写180cm。没有约束，线上信息就不可信。保证金是一个简单的约束机制——你造假，押金就没了。
+            你提交的资料由平台逐条人工核验，还要处理后续的可能投诉，这笔费用就是这部分服务成本——一次性收取，支付后不予退还。平台提供的是线上信息服务与资料核验，不保证交友结果。
           </p>
         </div>
 
@@ -297,13 +289,13 @@ export default function DepositPage() {
           <div className="flex items-center gap-2 mb-3">
             <Wallet size={15} style={{ color: 'var(--color-success)' }} />
             <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>
-              缴纳规则
+              费用与规则
             </span>
           </div>
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs" style={{ color: 'var(--color-text-muted)' }}>
-                保证金金额
+                认证服务费
               </span>
               <span className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
                 {depositPrice} 元
@@ -316,157 +308,7 @@ export default function DepositPage() {
                 color: 'var(--color-success)',
               }}
             >
-              不到一杯奶茶钱，放心交友
-            </div>
-          </div>
-        </div>
-
-        {/* 分配方案 */}
-        <div
-          className="rounded-xl p-4 mb-4"
-          style={{
-            background: 'var(--color-bg-card)',
-            border: '1px solid var(--color-border-light)',
-          }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <Users size={15} style={{ color: 'var(--color-success)' }} />
-            <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>
-              {depositPrice}元分配方案
-            </span>
-          </div>
-          <div className="space-y-2.5 text-xs">
-            <div
-              className="flex justify-between items-center py-2"
-              style={{ borderBottom: '1px solid var(--color-bg-input)' }}
-            >
-              <span style={{ color: 'var(--color-text-muted)' }}>平台运营费（固定）</span>
-              <span
-                style={{ color: 'var(--color-text-primary)', fontWeight: 'bold', fontSize: '14px' }}
-              >
-                {platformFee} 元
-              </span>
-            </div>
-            <div
-              className="flex justify-between items-center py-2"
-              style={{ borderBottom: '1px solid var(--color-bg-input)' }}
-            >
-              <span style={{ color: 'var(--color-text-muted)' }}>甲方虚假信息赔付</span>
-              <span style={{ color: 'var(--color-danger)', fontWeight: 'bold', fontSize: '14px' }}>
-                {emotionalDamage} 元
-              </span>
-            </div>
-            <div className="flex justify-between items-center py-2">
-              <span style={{ color: 'var(--color-text-muted)' }}>乙方删除数据可退还</span>
-              <span style={{ color: 'var(--color-success)', fontWeight: 'bold', fontSize: '14px' }}>
-                {deleteRefund} 元
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* 两种情况 */}
-        <div
-          className="rounded-xl p-4 mb-4"
-          style={{
-            background: 'var(--color-bg-card)',
-            border: '1px solid var(--color-border-light)',
-          }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <AlertOctagon size={15} style={{ color: 'var(--color-danger)' }} />
-            <span className="text-sm font-medium" style={{ color: 'var(--color-danger)' }}>
-              两种情况
-            </span>
-          </div>
-
-          {/* 情况1：乙方造假 */}
-          <div
-            className="mb-4 p-3 rounded-lg"
-            style={{ background: 'rgba(var(--color-danger-rgb), 0.05)' }}
-          >
-            <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-danger)' }}>
-              👉 情况1：乙方造假
-            </div>
-            <div className="space-y-1.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              <div>• 甲方投诉并上传证据</div>
-              <div>• 平台核实属实后</div>
-              <div>
-                •{' '}
-                <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                  甲方获得虚假信息赔付 {emotionalDamage} 元
-                </span>
-              </div>
-              <div>
-                •{' '}
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
-                  平台收取运营费 {platformFee} 元
-                </span>
-              </div>
-              <div>
-                •{' '}
-                <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
-                  乙方删除数据可退还 {deleteRefund} 元
-                </span>
-              </div>
-            </div>
-          </div>
-
-          {/* 情况2：乙方没欺骗 */}
-          <div
-            className="p-3 rounded-lg"
-            style={{ background: 'rgba(var(--color-success-rgb), 0.05)' }}
-          >
-            <div className="text-xs font-medium mb-2" style={{ color: 'var(--color-success)' }}>
-              ✅ 情况2：乙方没欺骗
-            </div>
-            <div className="space-y-1.5 text-xs" style={{ color: 'var(--color-text-muted)' }}>
-              <div>
-                •{' '}
-                <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
-                  平台运营费 {platformFee} 元不变
-                </span>
-              </div>
-              <div>
-                •{' '}
-                <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                  乙方获得退还 {refundAfterNoFault} 元
-                </span>
-              </div>
-              <div>• 大家好聚好散~</div>
-            </div>
-          </div>
-        </div>
-
-        {/* 退回规则 */}
-        <div
-          className="rounded-xl p-4 mb-4"
-          style={{
-            background: 'var(--color-bg-card)',
-            border: '1px solid var(--color-border-light)',
-          }}
-        >
-          <div className="flex items-center gap-2 mb-3">
-            <RefreshCw size={15} style={{ color: 'var(--color-success)' }} />
-            <span className="text-sm font-medium" style={{ color: 'var(--color-success)' }}>
-              退回规则
-            </span>
-          </div>
-          <div className="space-y-2 text-xs">
-            <div
-              className="flex items-center justify-between py-2"
-              style={{ borderBottom: '1px solid var(--color-bg-input)' }}
-            >
-              <span style={{ color: 'var(--color-text-muted)' }}>主动删除自己的数据</span>
-              <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                退还 {deleteRefund} 元
-              </span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span style={{ color: 'var(--color-text-muted)' }}>未被投诉且数据真实</span>
-              <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                随时可申请全额退还
-              </span>
+              一次性服务费，支付后不予退还
             </div>
           </div>
         </div>
@@ -482,23 +324,15 @@ export default function DepositPage() {
           <div className="flex items-center gap-2 mb-2">
             <FileCheck size={15} style={{ color: 'var(--color-primary)' }} />
             <span className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-              真实案例
+              举个例子
             </span>
           </div>
           <p className="text-xs leading-relaxed" style={{ color: 'var(--color-text-muted)' }}>
-            小王在表格里填"身高180cm"，小李见面后发现他实际只有165cm。小李发起投诉，上传见面照片证据。平台核实后：小李获得
-            <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-              {emotionalDamage}元
+            小王在表格里填"身高180cm"，小李见面后发现他实际只有165cm。小李发起投诉并上传见面照片，平台核实属实后：
+            <span style={{ color: 'var(--color-danger)', fontWeight: 'bold' }}>
+              小王资料下架、认证作废，已缴费用不予退还
             </span>
-            虚假信息赔付，平台收取
-            <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
-              {platformFee}元
-            </span>
-            运营费，小王删除数据后可拿回
-            <span style={{ color: 'var(--color-primary)', fontWeight: 'bold' }}>
-              {deleteRefund}元
-            </span>
-            。
+            ；小李这条投诉在24小时内得到处理结果。
           </p>
         </div>
 
@@ -522,7 +356,7 @@ export default function DepositPage() {
               '在对方资料页点击"投诉"按钮',
               '上传证据（照片/聊天记录等）',
               '平台24小时内核实',
-              '核实属实，押金自动分配',
+              '核实属实，下架对方资料并作废其认证',
             ].map((text, i) => (
               <div key={i} className="flex items-start gap-3">
                 <div
@@ -559,11 +393,13 @@ export default function DepositPage() {
           <div className="space-y-3 text-xs" style={{ color: 'var(--color-text-muted)' }}>
             <div>
               <span style={{ color: 'var(--color-text-primary)', fontWeight: 'medium' }}>Q：</span>
-              <span>保证金多久能退回？</span>
+              <span>这笔费用能退吗？</span>
             </div>
             <div className="pl-4">
               <span style={{ color: 'var(--color-success)' }}>A：</span>
-              <span>删除资料后立即原路退回。</span>
+              <span>
+                不能。它是资料人工核验的服务费，从你提交那一刻起就开始消耗人力，支付后不予退还。
+              </span>
             </div>
             <div>
               <span style={{ color: 'var(--color-text-primary)', fontWeight: 'medium' }}>Q：</span>
@@ -575,11 +411,11 @@ export default function DepositPage() {
             </div>
             <div>
               <span style={{ color: 'var(--color-text-primary)', fontWeight: 'medium' }}>Q：</span>
-              <span>被投诉后还能退钱吗？</span>
+              <span>交了钱就能找到对象吗？</span>
             </div>
             <div className="pl-4">
               <span style={{ color: 'var(--color-success)' }}>A：</span>
-              <span>删除自己的数据可退回{deleteRefund}元。</span>
+              <span>不能保证。平台只负责核验资料与展示，交友结果取决于双方本人。</span>
             </div>
           </div>
         </div>
@@ -603,7 +439,7 @@ export default function DepositPage() {
           </p>
         </div>
 
-        {/* 保证金状态显示 */}
+        {/* 认证费状态显示 */}
         {!loadingStatus && depositStatus && (
           <div
             className="rounded-xl p-4 mb-4"
@@ -642,7 +478,7 @@ export default function DepositPage() {
                 }}
               >
                 {depositStatus.status === 'approved'
-                  ? '保证金已缴纳'
+                  ? '认证费已缴纳'
                   : depositStatus.status === 'rejected'
                     ? '审核未通过'
                     : '审核中'}
@@ -687,11 +523,11 @@ export default function DepositPage() {
           <div className="flex items-center gap-2 mb-3">
             <Zap size={15} style={{ color: 'var(--color-primary)' }} />
             <span className="text-sm font-medium" style={{ color: 'var(--color-primary)' }}>
-              缴纳保证金
+              缴纳认证费
             </span>
           </div>
           <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
-            支付 {depositPrice} 元，支付成功后自动解锁联系方式，无需等待审核
+            支付 {depositPrice} 元完成资料认证，支付后即时生效、无需等待审核
           </p>
           <button
             onClick={() => setShowPayment(true)}
@@ -723,7 +559,7 @@ export default function DepositPage() {
                   className="text-lg font-semibold"
                   style={{ color: 'var(--color-text-primary)' }}
                 >
-                  缴纳保证金
+                  缴纳认证费
                 </h3>
                 <button
                   onClick={() => setShowPayment(false)}
@@ -890,10 +726,10 @@ export default function DepositPage() {
                     <PayQrPanel
                       purpose="deposit"
                       amount={depositPrice}
-                      label="保证金"
+                      label="认证费"
                       onPaid={() => {
                         loadDepositStatus()
-                        toast('支付成功，保证金已到账', 'success')
+                        toast('支付成功，认证费已到账', 'success')
                       }}
                       onUnauthorized={handleUnauthorized}
                     />
