@@ -105,8 +105,8 @@ function checkLoginRateLimit(ip, limit = 100, windowMs = 300000) {
   return checkLimitMap(loginLimitMap, ip, limit, windowMs);
 }
 
-function checkRegisterRateLimit(ip, limit = 5, windowMs = 3600000) {
-  return checkLimitMap(registerLimitMap, ip, limit, windowMs);
+function checkRegisterRateLimit(key, limit = 30, windowMs = 10 * 60 * 1000) {
+  return checkLimitMap(registerLimitMap, key, limit, windowMs);
 }
 
 // ========== 请求体读取 ==========

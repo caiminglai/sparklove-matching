@@ -22,6 +22,13 @@ function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp)
   return readBodyWithLimit(req).then(async body => {
     try {
       const data = JSON.parse(body);
+      // 两个键各管一件事：IP 那一道只挡明显的脚本洪水（宽口径，默认额度见 server.js），
+      // 因为移动网络的出口 IP 被整片用户共享，按 IP 收紧会连带锁死无关访客；
+      // 真正能精准指向滥用的是手机号本身，所以按 phone 再限一道，防止有人拿一个出口批量注册。
+      if (data.phone && !checkRegisterRateLimit('phone:' + data.phone, 10, 3600000)) {
+        sendJson(res, 429, { success: false, message: '该手机号注册过于频繁，请1小时后再试' });
+        return;
+      }
       // 最低路径：跳过验证码校验
       // if (!captchaService.checkCaptchaToken(data.captchaId, data.captchaToken)) {
       //   sendJson(res, 400, { success: false, message: '滑动验证无效或已过期，请重新验证' });
