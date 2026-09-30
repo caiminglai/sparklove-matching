@@ -106,9 +106,12 @@ async function deleteContactUnlockRequest(id) {
 async function addPaymentOrder(order) {
   const database = getDb();
   const stmt = database.prepare(
-    'INSERT INTO payment_orders (order_id, user_id, amount, channel, status, created_at) VALUES ($1, $2, $3, $4, $5, $6)'
+    'INSERT INTO payment_orders (order_id, user_id, amount, channel, status, created_at, purpose, target_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)'
   );
-  await stmt.run(order.order_id, order.user_id, order.amount, order.channel, 'pending', Date.now());
+  await stmt.run(
+    order.order_id, order.user_id, order.amount, order.channel, 'pending', Date.now(),
+    order.purpose || 'deposit', order.target_id || null
+  );
   return true;
 }
 
@@ -132,6 +135,13 @@ async function ensurePaymentColumns() {
   const database = getDb();
   await database.prepare(
     'ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS channel_txn_id text'
+  ).run();
+  // 一笔订单要能回答"付完该解锁什么"，所以用途和被解锁对象都得进库
+  await database.prepare(
+    'ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS purpose text'
+  ).run();
+  await database.prepare(
+    'ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS target_id text'
   ).run();
 }
 

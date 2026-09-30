@@ -260,8 +260,7 @@ const server = http.createServer(async (req, res) => {
 
   // --- 查看联系方式支付 ---
   if (req.method === 'POST' && pathname === '/api/payments/view-contact') {
-    res.writeHead(501, {'Content-Type': 'application/json; charset=utf-8'});
-    res.end(JSON.stringify({success: false, message: '自动支付暂未开通，请使用手动上传凭证'})); return;
+    await paymentRoutes.viewContactPayment(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/unlock-contact/submit') {
     contactUnlockRoutes.submitUnlockRequest(req, res); return;

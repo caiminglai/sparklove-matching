@@ -20,6 +20,7 @@ import { useState, useEffect } from 'react'
 import { useToast } from '../components/Toast'
 import { getAuthToken, clearAuthToken } from '../utils/auth'
 import { usePricing } from '../utils/pricing'
+import PayQrPanel from '../components/PayQrPanel'
 import QRCode from 'qrcode'
 
 export default function DepositPage() {
@@ -884,41 +885,52 @@ export default function DepositPage() {
               {paymentMode === 'manual' && (
                 <>
                   {/* 收款码 */}
-                  <div
-                    className="bg-white rounded-xl p-4 mb-4 border-2 border-dashed"
-                    style={{ borderColor: 'var(--color-border-light)' }}
-                  >
-                    <div className="aspect-square w-full max-w-[280px] mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                      {qrError ? (
-                        <div className="text-center text-gray-400">
-                          <p className="text-sm mb-2">
-                            {selectedMethod === 'alipay' ? '支付宝' : '微信'}收款码加载失败
-                          </p>
-                          <p className="text-xs">请联系管理员获取</p>
-                        </div>
-                      ) : (
-                        <img
-                          src={`/${selectedMethod}-qr.png`}
-                          alt={`${selectedMethod === 'alipay' ? '支付宝' : '微信'}收款码`}
-                          className="w-full h-full object-contain"
-                          onError={() => {
-                            setQrError(true)
-                          }}
-                        />
-                      )}
+                  {selectedMethod === 'alipay' ? (
+                    <PayQrPanel
+                      purpose="deposit"
+                      amount={depositPrice}
+                      label="保证金"
+                      onPaid={() => {
+                        loadDepositStatus()
+                        toast('支付成功，保证金已到账', 'success')
+                      }}
+                      onUnauthorized={handleUnauthorized}
+                    />
+                  ) : (
+                    <div
+                      className="bg-white rounded-xl p-4 mb-4 border-2 border-dashed"
+                      style={{ borderColor: 'var(--color-border-light)' }}
+                    >
+                      <div className="aspect-square w-full max-w-[280px] mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-3">
+                        {qrError ? (
+                          <div className="text-center text-gray-400">
+                            <p className="text-sm mb-2">微信收款码加载失败</p>
+                            <p className="text-xs">请联系管理员获取</p>
+                          </div>
+                        ) : (
+                          <img
+                            src={`/wechat-qr.png`}
+                            alt="微信收款码"
+                            className="w-full h-full object-contain"
+                            onError={() => {
+                              setQrError(true)
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div className="text-center">
+                        <p
+                          className="text-sm font-medium mb-1"
+                          style={{ color: 'var(--color-text-primary)' }}
+                        >
+                          扫码支付 {depositPrice} 元
+                        </p>
+                        <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
+                          使用微信扫一扫
+                        </p>
+                      </div>
                     </div>
-                    <div className="text-center">
-                      <p
-                        className="text-sm font-medium mb-1"
-                        style={{ color: 'var(--color-text-primary)' }}
-                      >
-                        扫码支付 {depositPrice} 元
-                      </p>
-                      <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-                        使用{selectedMethod === 'alipay' ? '支付宝' : '微信'}扫一扫
-                      </p>
-                    </div>
-                  </div>
+                  )}
 
                   {/* 上传凭证 */}
                   <div className="mb-4">

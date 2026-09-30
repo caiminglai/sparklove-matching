@@ -1,15 +1,21 @@
-import { useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Zap, Upload, CheckCircle } from 'lucide-react'
 import { API_BASE_URL } from '../api/config'
-import { getAuthToken } from '../utils/auth'
+import { getAuthToken, clearAuthToken } from '../utils/auth'
 import { usePricing } from '../utils/pricing'
+import PayQrPanel from './PayQrPanel'
 
 interface ContactPayModalProps {
   targetUserId: string
   onClose: () => void
+  onUnlocked?: () => void
 }
 
-export default function ContactPayModal({ targetUserId, onClose }: ContactPayModalProps) {
+export default function ContactPayModal({
+  targetUserId,
+  onClose,
+  onUnlocked,
+}: ContactPayModalProps) {
   const amount = usePricing().contact_unlock_amount
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
   const [method, setMethod] = useState<'alipay' | 'wechat'>('alipay')
@@ -17,6 +23,14 @@ export default function ContactPayModal({ targetUserId, onClose }: ContactPayMod
   const [uploading, setUploading] = useState(false)
   const [status, setStatus] = useState('')
   const [qrError, setQrError] = useState(false)
+  const [paidOrder, setPaidOrder] = useState<string | null>(null)
+
+  // token 过期只弹文案的话，用户会一直卡在"token无效"上，清掉旧 token 送去登录才能恢复
+  const handleUnauthorized = useCallback(() => {
+    clearAuthToken()
+    setStatus('登录已过期，请重新登录')
+    setTimeout(() => window.location.assign('/login'), 1200)
+  }, [])
 
   const handleAutoPay = async () => {
     setStatus('正在创建支付订单...')
@@ -31,21 +45,58 @@ export default function ContactPayModal({ targetUserId, onClose }: ContactPayMod
         body: JSON.stringify({
           target_user_id: targetUserId,
           method,
+          channel: method,
         }),
       })
+      if (res.status === 401) {
+        handleUnauthorized()
+        return
+      }
       const data = await res.json()
-      if (data.success && data.payment_url) {
-        window.open(data.payment_url, '_blank')
-        setStatus('支付完成后将自动解锁，如未解锁请刷新页面')
+      if (data.success && data.payUrl) {
+        window.open(data.payUrl, '_blank')
+        setPaidOrder(data.orderId)
+        setStatus('支付完成后将自动解锁，无需刷新')
       } else {
-        setStatus(data.message || '支付功能暂未开通，请使用手动上传凭证')
+        setStatus(data.message || '下单失败，请改用手动上传凭证')
         setTimeout(() => setStatus(''), 3000)
       }
     } catch {
-      setStatus('网络错误，请使用手动上传凭证')
+      setStatus('网络错误，请改用手动上传凭证')
       setTimeout(() => setStatus(''), 3000)
     }
   }
+
+  // 收银台是新标签页，这边只能靠轮询订单状态判断用户付没付
+  useEffect(() => {
+    if (!paidOrder) return
+    const timer = setInterval(async () => {
+      try {
+        const token = getAuthToken()
+        const res = await fetch(
+          `${API_BASE_URL}/payment/status?orderId=${encodeURIComponent(paidOrder)}`,
+          {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          },
+        )
+        if (res.status === 401) {
+          handleUnauthorized()
+          return
+        }
+        const data = await res.json()
+        if (data.success && data.status === 'paid') {
+          clearInterval(timer)
+          setPaidOrder(null)
+          setStatus('已解锁')
+          onUnlocked?.()
+          setTimeout(onClose, 800)
+        }
+      } catch {
+        // 轮询失败不打断，下一轮再试
+      }
+    }, 3000)
+    return () => clearInterval(timer)
+  }, [paidOrder, onUnlocked, onClose, handleUnauthorized])
 
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null
@@ -236,41 +287,53 @@ export default function ContactPayModal({ targetUserId, onClose }: ContactPayMod
         {mode === 'manual' && (
           <>
             {/* 收款码 */}
-            <div
-              className="bg-white rounded-xl p-4 mb-4 border-2 border-dashed"
-              style={{ borderColor: 'var(--color-border-light)' }}
-            >
-              <div className="aspect-square w-full max-w-[280px] mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-3">
-                {qrError ? (
-                  <div className="text-center text-gray-400">
-                    <p className="text-sm mb-2">
-                      {method === 'alipay' ? '支付宝' : '微信'}收款码加载失败
-                    </p>
-                    <p className="text-xs">请联系管理员获取</p>
-                  </div>
-                ) : (
-                  <img
-                    src={`/${method}-qr.png`}
-                    alt={`${method === 'alipay' ? '支付宝' : '微信'}收款码`}
-                    className="w-full h-full object-contain rounded-lg"
-                    onError={() => {
-                      setQrError(true)
-                    }}
-                  />
-                )}
+            {method === 'alipay' ? (
+              <PayQrPanel
+                purpose="contact_unlock"
+                targetUserId={targetUserId}
+                amount={amount}
+                label="查看联系方式"
+                onPaid={() => {
+                  onUnlocked?.()
+                  setTimeout(onClose, 800)
+                }}
+                onUnauthorized={handleUnauthorized}
+              />
+            ) : (
+              <div
+                className="bg-white rounded-xl p-4 mb-4 border-2 border-dashed"
+                style={{ borderColor: 'var(--color-border-light)' }}
+              >
+                <div className="aspect-square w-full max-w-[280px] mx-auto bg-gray-100 rounded-lg flex items-center justify-center mb-3">
+                  {qrError ? (
+                    <div className="text-center text-gray-400">
+                      <p className="text-sm mb-2">微信收款码加载失败</p>
+                      <p className="text-xs">请联系管理员获取</p>
+                    </div>
+                  ) : (
+                    <img
+                      src={`/wechat-qr.png`}
+                      alt="微信收款码"
+                      className="w-full h-full object-contain rounded-lg"
+                      onError={() => {
+                        setQrError(true)
+                      }}
+                    />
+                  )}
+                </div>
+                <div className="text-center">
+                  <p
+                    className="text-sm font-medium mb-1"
+                    style={{ color: 'var(--color-text-primary)' }}
+                  >
+                    扫码支付 ¥{amount}
+                  </p>
+                  <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
+                    使用微信扫一扫
+                  </p>
+                </div>
               </div>
-              <div className="text-center">
-                <p
-                  className="text-sm font-medium mb-1"
-                  style={{ color: 'var(--color-text-primary)' }}
-                >
-                  扫码支付 ¥{amount}
-                </p>
-                <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
-                  使用{method === 'alipay' ? '支付宝' : '微信'}扫一扫
-                </p>
-              </div>
-            </div>
+            )}
 
             {/* 上传凭证 */}
             <div className="mb-4">

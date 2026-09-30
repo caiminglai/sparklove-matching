@@ -298,6 +298,7 @@ export default function Home() {
   const [averageRating, setAverageRating] = useState<{ avg: number; count: number } | null>(null)
   const [contactUnlocked, setContactUnlocked] = useState(false)
   const [fullContact, setFullContact] = useState<string | null>(null) // 完整联系方式（解锁后从后端获取）
+  const [contactCheckTick, setContactCheckTick] = useState(0)
 
   // 搜索防抖：conditions变化后300ms才更新debouncedConditions
   useEffect(() => {
@@ -344,7 +345,7 @@ export default function Home() {
       setContactUnlocked(false)
       setFullContact(null)
     }
-  }, [showDetail, currentUserId])
+  }, [showDetail, currentUserId, contactCheckTick])
 
   // [AGENT-DO-NOT-MODIFY] ============================================
   // 核心功能：多条件筛选逻辑（关键词 + 目的）
@@ -930,7 +931,11 @@ export default function Home() {
         )}
 
         {showPayModal && payContactTarget && (
-          <ContactPayModal targetUserId={payContactTarget} onClose={() => setShowPayModal(false)} />
+          <ContactPayModal
+            targetUserId={payContactTarget}
+            onClose={() => setShowPayModal(false)}
+            onUnlocked={() => setContactCheckTick((t) => t + 1)}
+          />
         )}
 
         <ImagePreview

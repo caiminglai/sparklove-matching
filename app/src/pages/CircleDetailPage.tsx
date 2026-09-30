@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { Link, useParams, useNavigate } from 'react-router'
 import {
   Heart,
@@ -12,15 +12,12 @@ import {
 } from 'lucide-react'
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config'
 import type { Row } from '../data/types'
+import ContactPayModal from '../components/ContactPayModal'
 import ImagePreview from '../components/ImagePreview'
 import { maskContact } from '../utils/mask'
 import { usePricing } from '../utils/pricing'
 import { hexToRgba } from '../utils/color'
-import { useToast } from '../components/Toast'
 import { getAuthHeaders } from '../utils/auth'
-
-// 客服微信号配置（从环境变量读取，避免硬编码在前端代码）
-const CUSTOMER_SERVICE_WECHAT = import.meta.env.VITE_CUSTOMER_SERVICE_WECHAT || 'chanmiao0430'
 
 const CIRCLE_CONFIGS: Record<string, { label: string; icon: typeof Heart; color: string }> = {
   hobbies: { label: '兴趣圈', icon: Sparkles, color: 'var(--color-primary)' },
@@ -32,7 +29,6 @@ const CIRCLE_CONFIGS: Record<string, { label: string; icon: typeof Heart; color:
 }
 
 export default function CircleDetailPage() {
-  const { toast } = useToast()
   const { circleKey, tag } = useParams()
   const navigate = useNavigate()
   const [rows, setRows] = useState<Row[]>([])
@@ -40,6 +36,7 @@ export default function CircleDetailPage() {
   const [showPayModal, setShowPayModal] = useState(false)
   const [loading, setLoading] = useState(true)
   const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [unlockedContact, setUnlockedContact] = useState<string | null>(null)
   const unlockPrice = usePricing().contact_unlock_amount
 
   const decodedTag = decodeURIComponent(tag || '')
@@ -71,6 +68,25 @@ export default function CircleDetailPage() {
 
   const detailRow = showDetail ? rows.find((r) => r.id === showDetail) : null
   const detailData = detailRow?.data
+
+  const loadUnlockState = useCallback(() => {
+    if (!showDetail) {
+      setUnlockedContact(null)
+      return
+    }
+    fetch(`${API_BASE_URL}/users/${encodeURIComponent(showDetail)}/check-unlock`, {
+      headers: getAuthHeaders(),
+    })
+      .then((res) => res.json())
+      .then((data) => {
+        setUnlockedContact(data.success && data.unlocked ? data.contact || '' : null)
+      })
+      .catch(() => {})
+  }, [showDetail])
+
+  useEffect(() => {
+    loadUnlockState()
+  }, [loadUnlockState])
 
   return (
     <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
@@ -454,19 +470,21 @@ export default function CircleDetailPage() {
                     className="text-sm font-medium"
                     style={{ color: 'var(--color-text-primary)' }}
                   >
-                    {maskContact(detailData.contact)}
+                    {unlockedContact || maskContact(detailData.contact)}
                   </div>
-                  <button
-                    onClick={() => setShowPayModal(true)}
-                    className="mt-2 w-full py-2 rounded-lg text-xs font-medium"
-                    style={{
-                      background:
-                        'linear-gradient(135deg, var(--color-primary), var(--color-star))',
-                      color: '#fff',
-                    }}
-                  >
-                    💰 支付 {unlockPrice} 元查看完整联系方式
-                  </button>
+                  {unlockedContact === null && (
+                    <button
+                      onClick={() => setShowPayModal(true)}
+                      className="mt-2 w-full py-2 rounded-lg text-xs font-medium"
+                      style={{
+                        background:
+                          'linear-gradient(135deg, var(--color-primary), var(--color-star))',
+                        color: '#fff',
+                      }}
+                    >
+                      💰 支付 {unlockPrice} 元查看完整联系方式
+                    </button>
+                  )}
                 </div>
               )}
             </div>
@@ -474,91 +492,12 @@ export default function CircleDetailPage() {
         </div>
       )}
 
-      {showPayModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center"
-          style={{ background: 'rgba(0,0,0,0.5)' }}
-          onClick={() => setShowPayModal(false)}
-        >
-          <div
-            className="bg-white rounded-2xl p-6 w-80 max-w-[90%] mx-4"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3
-              className="text-lg font-bold mb-2 text-center"
-              style={{ color: 'var(--color-primary)' }}
-            >
-              查看联系方式
-            </h3>
-            <p className="text-sm text-center mb-4" style={{ color: '#666' }}>
-              支付 {unlockPrice} 元后，即可查看完整联系方式
-              <br />
-              <span className="text-xs" style={{ color: '#999' }}>
-                （转账后截图发给客服，客服手动解锁）
-              </span>
-            </p>
-            <div className="flex flex-col gap-3">
-              <div
-                className="p-3 rounded-xl text-center cursor-pointer"
-                style={{ background: '#f8f9fa' }}
-                onClick={() => setPreviewImage(`/wechat-qr.png`)}
-              >
-                <div className="text-xs mb-1 font-medium" style={{ color: '#666' }}>
-                  微信支付
-                </div>
-                <img
-                  src={`/wechat-qr.png`}
-                  alt="微信收款码"
-                  className="w-40 h-40 mx-auto rounded-lg"
-                  style={{ objectFit: 'cover' }}
-                />
-              </div>
-              <div
-                className="p-3 rounded-xl text-center cursor-pointer"
-                style={{ background: '#f8f9fa' }}
-                onClick={() => setPreviewImage(`/alipay-qr.png`)}
-              >
-                <div className="text-xs mb-1 font-medium" style={{ color: '#666' }}>
-                  支付宝
-                </div>
-                <img
-                  src={`/alipay-qr.png`}
-                  alt="支付宝收款码"
-                  className="w-40 h-40 mx-auto rounded-lg"
-                  style={{ objectFit: 'cover' }}
-                />
-              </div>
-            </div>
-            <p
-              className="text-xs text-center mt-3"
-              style={{ color: 'var(--color-text-secondary)' }}
-            >
-              支付完成后截图发给客服解锁
-            </p>
-            <button
-              onClick={() => {
-                navigator.clipboard
-                  .writeText(CUSTOMER_SERVICE_WECHAT)
-                  .then(() => toast(`客服微信号已复制: ${CUSTOMER_SERVICE_WECHAT}`, 'success'))
-              }}
-              className="mt-2 w-full py-2 rounded-xl text-xs font-medium"
-              style={{
-                background: '#FFF5E8',
-                color: 'var(--color-primary)',
-                border: '1px solid #F5D4C0',
-              }}
-            >
-              联系客服微信：{CUSTOMER_SERVICE_WECHAT}（点击复制）
-            </button>
-            <button
-              onClick={() => setShowPayModal(false)}
-              className="mt-3 w-full py-2.5 rounded-xl text-sm font-medium"
-              style={{ background: '#f0f0f0', color: '#666' }}
-            >
-              关闭
-            </button>
-          </div>
-        </div>
+      {showPayModal && showDetail && (
+        <ContactPayModal
+          targetUserId={showDetail}
+          onClose={() => setShowPayModal(false)}
+          onUnlocked={loadUnlockState}
+        />
       )}
 
       <ImagePreview
