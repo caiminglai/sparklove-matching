@@ -2,7 +2,13 @@ import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Zap, Upload, CheckCircle } from 'lucide-react'
 import { API_BASE_URL } from '../api/config'
 import { getAuthToken, clearAuthToken } from '../utils/auth'
-import { CONTACT_PACKS, usePricing, type ContactTier } from '../utils/pricing'
+import {
+  CONTACT_PACKS,
+  CONTACT_PACKS_ON_SALE,
+  usePricing,
+  type ContactTier,
+} from '../utils/pricing'
+import { formatYuan } from '../utils/money'
 import PayQrPanel from './PayQrPanel'
 
 interface ContactPayModalProps {
@@ -37,12 +43,14 @@ export default function ContactPayModal({
       price: pricing.contact_unlock_amount,
       note: '看一个人',
     },
-    ...CONTACT_PACKS.map((p) => ({
-      key: p.purpose as ContactTier,
-      label: `${p.credits} 次包`,
-      price: pricing[p.field],
-      note: `折合 ¥${(pricing[p.field] / p.credits).toFixed(1)}/次`,
-    })),
+    ...(CONTACT_PACKS_ON_SALE
+      ? CONTACT_PACKS.map((p) => ({
+          key: p.purpose as ContactTier,
+          label: `${p.credits} 次包`,
+          price: pricing[p.field],
+          note: `折合 ¥${formatYuan(pricing[p.field] / p.credits)}/次`,
+        }))
+      : []),
   ]
 
   // 余额由服务端推导（已购次数 − 已用次数），前端只是把它显示出来
@@ -259,8 +267,10 @@ export default function ContactPayModal({
           </button>
         </div>
 
-        {/* 档位选择：单次 / 3 次包 / 5 次包 */}
-        <div className="grid grid-cols-3 gap-2 mb-3">
+        {/* 档位选择：次数包未上架时只有单次 */}
+        <div
+          className={`grid gap-2 mb-3 ${tierOptions.length === 1 ? 'grid-cols-1' : 'grid-cols-3'}`}
+        >
           {tierOptions.map((opt) => (
             <button
               key={opt.key}
@@ -280,7 +290,7 @@ export default function ContactPayModal({
               }
             >
               <div className="text-xs font-medium">{opt.label}</div>
-              <div className="text-sm font-bold">¥{opt.price}</div>
+              <div className="text-sm font-bold">¥{formatYuan(opt.price)}</div>
               <div className="text-[10px] opacity-80">{opt.note}</div>
             </button>
           ))}
@@ -348,7 +358,7 @@ export default function ContactPayModal({
                 点击下方按钮，跳转到{method === 'alipay' ? '支付宝' : '微信'}完成支付
               </p>
               <p className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                {pack ? `${pack.credits} 次 · ` : '单次 · '}¥{amount}
+                {pack ? `${pack.credits} 次 · ` : '单次 · '}¥{formatYuan(amount)}
               </p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)' }}>
                 {tier === 'contact_unlock' && credits > 0
@@ -369,7 +379,7 @@ export default function ContactPayModal({
               <Zap size={16} />
               {tier === 'contact_unlock' && credits > 0
                 ? `立即使用 1 次（剩 ${credits} 次）`
-                : `立即支付 ¥${amount}`}
+                : `立即支付 ¥${formatYuan(amount)}`}
             </button>
             {status && (
               <p className="text-xs text-center mt-3" style={{ color: 'var(--color-primary)' }}>
@@ -423,7 +433,7 @@ export default function ContactPayModal({
                     className="text-sm font-medium mb-1"
                     style={{ color: 'var(--color-text-primary)' }}
                   >
-                    扫码支付 ¥{amount}
+                    扫码支付 ¥{formatYuan(amount)}
                   </p>
                   <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                     使用微信扫一扫

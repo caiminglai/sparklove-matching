@@ -1432,7 +1432,7 @@ function renderDepositsTable(){
     td1.appendChild(userWrap);
     
     var td2=document.createElement('td');
-    td2.innerHTML='<span style="color:#E87A5D; font-weight:bold;">¥'+deposit.amount+'</span>';
+    td2.innerHTML='<span style="color:#E87A5D; font-weight:bold;">¥'+Number(deposit.amount || 0).toFixed(2)+'</span>';
     
     var td3=document.createElement('td');
     if(deposit.proof_path){
@@ -2194,7 +2194,7 @@ function renderPrices(data){
   var keys=Object.keys(data||{});
   for(var i=0;i<keys.length;i++) priceItems.push(data[keys[i]]);
   document.getElementById('priceStats').innerHTML=priceItems.map(function(it){
-    var amount=(it.amount===undefined||it.amount===null)?'-':('¥'+it.amount);
+    var amount=(it.amount===undefined||it.amount===null)?'-':('¥'+Number(it.amount).toFixed(2));
     return '<div class="stat" style="min-width:180px;">'+
       '<div class="num">'+escapeHtml(amount)+'</div>'+
       '<div class="label">'+escapeHtml(it.label)+'现价</div>'+

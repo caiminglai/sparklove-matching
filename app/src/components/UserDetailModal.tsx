@@ -4,6 +4,7 @@ import { CATEGORIES, FIELD_LABELS } from '../data/constants'
 import { normalizeAvatarUrl } from '../api/config'
 import { maskContact } from '../utils/mask'
 import { usePricing } from '../utils/pricing'
+import { formatYuan } from '../utils/money'
 import type { Row, Column, Rating } from '../data/types'
 
 interface UserDetailModalProps {
@@ -244,7 +245,7 @@ export default function UserDetailModal({
                           color: '#fff',
                         }}
                       >
-                        💰 支付 {unlockPrice} 元查看完整联系方式
+                        💰 支付 {formatYuan(unlockPrice)} 元查看完整联系方式
                       </button>
                     </>
                   )}

@@ -15,6 +15,9 @@ export const CONTACT_PACKS = [
   { purpose: 'contact_pack_5', field: 'contact_pack_5_amount', credits: 5 },
 ] as const
 
+// 次数包的代码与后端入账都已就绪，但定案是等站内有真人流量再上架售卖；要上架只改这一个开关。
+export const CONTACT_PACKS_ON_SALE = false
+
 export type ContactTier = 'contact_unlock' | (typeof CONTACT_PACKS)[number]['purpose']
 
 // 兜底值只在接口不可用时顶一下展示；真实标价以后台「价格设置」写入的 admin_settings 为准，

@@ -546,7 +546,7 @@
       const source = item.source === 'db' ? '后台设置' : '默认值';
       const ts = Number(item.updated_at);
       const changed = item.updated_at && isFinite(ts) ? new Date(ts).toLocaleString() : '从未改过';
-      return item.amount + ' 元（' + source + '，上次改动：' + changed + '）';
+      return Number(item.amount || 0).toFixed(2) + ' 元（' + source + '，上次改动：' + changed + '）';
     }
 
     async function savePrices() {

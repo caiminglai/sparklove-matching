@@ -17,6 +17,7 @@ import { useState, useEffect } from 'react'
 import { useToast } from '../components/Toast'
 import { getAuthToken, clearAuthToken } from '../utils/auth'
 import { usePricing } from '../utils/pricing'
+import { formatYuan } from '../utils/money'
 import PayQrPanel from '../components/PayQrPanel'
 import QRCode from 'qrcode'
 
@@ -25,6 +26,7 @@ export default function DepositPage() {
   const navigate = useNavigate()
   const pricing = usePricing()
   const depositPrice = pricing.deposit_amount
+  const depositPriceText = formatYuan(depositPrice)
   const [showPayment, setShowPayment] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState<'alipay' | 'wechat'>('alipay')
   const [qrError, setQrError] = useState(false)
@@ -298,7 +300,7 @@ export default function DepositPage() {
                 认证服务费
               </span>
               <span className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                {depositPrice} 元
+                {depositPriceText} 元
               </span>
             </div>
             <div
@@ -527,7 +529,7 @@ export default function DepositPage() {
             </span>
           </div>
           <p className="text-xs mb-3" style={{ color: 'var(--color-text-muted)' }}>
-            支付 {depositPrice} 元完成资料认证，支付后即时生效、无需等待审核
+            支付 {depositPriceText} 元完成资料认证，支付后即时生效、无需等待审核
           </p>
           <button
             onClick={() => setShowPayment(true)}
@@ -668,7 +670,7 @@ export default function DepositPage() {
                       点击下方按钮，跳转到{selectedMethod === 'alipay' ? '支付宝' : '微信'}完成支付
                     </p>
                     <p className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                      ¥{depositPrice}
+                      ¥{depositPriceText}
                     </p>
                     <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)' }}>
                       支付成功后自动解锁，无需等待审核
@@ -711,7 +713,7 @@ export default function DepositPage() {
                       </>
                     ) : (
                       <>
-                        <Zap size={16} /> 立即支付 ¥{depositPrice}
+                        <Zap size={16} /> 立即支付 ¥{depositPriceText}
                       </>
                     )}
                   </button>
@@ -760,7 +762,7 @@ export default function DepositPage() {
                           className="text-sm font-medium mb-1"
                           style={{ color: 'var(--color-text-primary)' }}
                         >
-                          扫码支付 {depositPrice} 元
+                          扫码支付 {depositPriceText} 元
                         </p>
                         <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
                           使用微信扫一扫

@@ -16,6 +16,7 @@ import ContactPayModal from '../components/ContactPayModal'
 import ImagePreview from '../components/ImagePreview'
 import { maskContact } from '../utils/mask'
 import { usePricing } from '../utils/pricing'
+import { formatYuan } from '../utils/money'
 import { hexToRgba } from '../utils/color'
 import { getAuthHeaders } from '../utils/auth'
 
@@ -482,7 +483,7 @@ export default function CircleDetailPage() {
                         color: '#fff',
                       }}
                     >
-                      💰 支付 {unlockPrice} 元查看完整联系方式
+                      💰 支付 {formatYuan(unlockPrice)} 元查看完整联系方式
                     </button>
                   )}
                 </div>

@@ -20,6 +20,7 @@ import { loadColumns } from '../services/user.service'
 import { fetchFieldMappings } from '../services/field-mapping.service'
 import type { Column, Row } from '../data/types'
 import { getAuthToken } from '../utils/auth'
+import { formatYuan } from '../utils/money'
 import { useToast } from '../components/Toast'
 import { computeProfileCompleteness } from '../utils/profile-completeness'
 import { formatDraftAge } from '../services/draft.service'
@@ -536,7 +537,7 @@ export default function ProfilePage() {
                   style={{ background: '#FDF8F1', border: '1px solid var(--color-border-light)' }}
                 >
                   <div className="text-lg font-semibold" style={{ color: 'var(--color-primary)' }}>
-                    {userData.deposit || 0}
+                    {formatYuan(userData.deposit || 0)}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                     认证费(元)

@@ -4,6 +4,7 @@ import QRCode from 'qrcode'
 import { API_BASE_URL } from '../api/config'
 import { getAuthToken } from '../utils/auth'
 import type { ContactTier } from '../utils/pricing'
+import { formatYuan } from '../utils/money'
 
 interface PayQrPanelProps {
   purpose: 'deposit' | ContactTier
@@ -124,7 +125,7 @@ export default function PayQrPanel({
       </div>
       <div className="text-center">
         <p className="text-sm font-medium mb-1" style={{ color: 'var(--color-text-primary)' }}>
-          扫码支付 ¥{amount}
+          扫码支付 ¥{formatYuan(amount)}
         </p>
         <p className="text-xs" style={{ color: 'var(--color-text-light)' }}>
           使用支付宝扫一扫，支付后本页自动生效

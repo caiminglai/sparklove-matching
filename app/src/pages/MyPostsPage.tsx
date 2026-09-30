@@ -6,6 +6,7 @@ import { loadColumns } from '../services/user.service'
 import type { Row } from '../data/types'
 import { useToast } from '../components/Toast'
 import { getAuthToken } from '../utils/auth'
+import { formatYuan } from '../utils/money'
 
 export default function MyPostsPage() {
   const { toast } = useToast()
@@ -31,7 +32,7 @@ export default function MyPostsPage() {
           const myRow: Row = {
             id: data.user.id,
             data: data.user.data || {},
-            deposit: data.user.deposit || 0,
+            deposit: Number(data.user.deposit) || 0,
             createdAt: data.user.createdAt,
             user_id: data.user.user_id,
           }
@@ -174,7 +175,7 @@ export default function MyPostsPage() {
                               color: 'var(--color-success)',
                             }}
                           >
-                            认证费 ¥{row.deposit}
+                            认证费 ¥{formatYuan(row.deposit)}
                           </span>
                         )}
                       </div>
@@ -242,7 +243,7 @@ export default function MyPostsPage() {
                 </div>
                 <div>
                   <div className="text-lg font-semibold" style={{ color: 'var(--color-success)' }}>
-                    {rows.reduce((s, r) => s + (r.deposit || 0), 0)}
+                    {formatYuan(rows.reduce((s, r) => s + Number(r.deposit || 0), 0))}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                     认证费(元)
