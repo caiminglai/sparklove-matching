@@ -31,7 +31,8 @@ export default function DepositPage() {
   const platformFee = pricing.platform_fee
   const emotionalDamage = pricing.emotional_damage
   const deleteRefund = pricing.delete_refund
-  const refundAfterNoFault = depositPrice - platformFee
+  // 元是浮点数，直接相减会露出 0.019999999999999997，一律换成整数「分」再算
+  const refundAfterNoFault = (Math.round(depositPrice * 100) - Math.round(platformFee * 100)) / 100
   const [showPayment, setShowPayment] = useState(false)
   const [selectedMethod, setSelectedMethod] = useState<'alipay' | 'wechat'>('alipay')
   const [qrError, setQrError] = useState(false)
