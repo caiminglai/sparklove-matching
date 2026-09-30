@@ -27,3 +27,11 @@ export function getAuthHeaders(): Record<string, string> {
   const token = getAuthToken()
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
+
+/**
+ * 清除本地 token（后端回 401 时调用）
+ * 过期 token 不清掉的话，用户每次点都会被顶回"token无效"，永远进不了登录页
+ */
+export function clearAuthToken(): void {
+  localStorage.removeItem(AUTH_TOKEN_KEY)
+}

@@ -1,4 +1,4 @@
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import {
   ArrowLeft,
   Shield,
@@ -18,12 +18,13 @@ import {
 import { API_BASE_URL } from '../api/config'
 import { useState, useEffect } from 'react'
 import { useToast } from '../components/Toast'
-import { getAuthToken } from '../utils/auth'
+import { getAuthToken, clearAuthToken } from '../utils/auth'
 import { usePricing } from '../utils/pricing'
 import QRCode from 'qrcode'
 
 export default function DepositPage() {
   const { toast } = useToast()
+  const navigate = useNavigate()
   const pricing = usePricing()
   const depositPrice = pricing.deposit_amount
   const platformFee = pricing.platform_fee
@@ -43,6 +44,13 @@ export default function DepositPage() {
   const [loadingStatus, setLoadingStatus] = useState(true)
   const [creatingOrder, setCreatingOrder] = useState(false) // 新增：创建订单中
   const [nativeQr, setNativeQr] = useState<string | null>(null) // 微信 Native 下单返回的支付二维码
+
+  // token 过期后端回 401，只弹文案的话用户会一直卡在"token无效"，清掉旧 token 送去登录才能恢复
+  const handleUnauthorized = () => {
+    clearAuthToken()
+    toast('登录已过期，请重新登录', 'error')
+    navigate('/login')
+  }
 
   const loadDepositStatus = async () => {
     try {
@@ -181,6 +189,10 @@ export default function DepositPage() {
           toast(result.message || '提交失败', 'error')
         }
       } else {
+        if (res.status === 401) {
+          handleUnauthorized()
+          return
+        }
         toast('提交失败，请重试', 'error')
       }
     } catch (err) {
@@ -221,6 +233,10 @@ export default function DepositPage() {
           toast(result.message || '创建订单失败', 'error')
         }
       } else {
+        if (res.status === 401) {
+          handleUnauthorized()
+          return
+        }
         const error = await res.json()
         toast(error.message || '创建订单失败', 'error')
       }
