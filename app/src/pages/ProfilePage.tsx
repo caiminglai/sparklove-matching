@@ -143,7 +143,9 @@ export default function ProfilePage() {
         setEditMode(false)
         loadMyData()
       } else {
-        toast('保存失败', 'error')
+        const err = await res.json().catch(() => null)
+        toast(err?.message || '保存失败', 'error')
+        if (err?.code === 'need_certification') navigate('/deposit')
       }
     } catch (e) {
       toast('网络错误', 'error')
@@ -537,7 +539,7 @@ export default function ProfilePage() {
                     {userData.deposit || 0}
                   </div>
                   <div className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                    保证金(元)
+                    认证费(元)
                   </div>
                 </button>
                 <div
@@ -1012,7 +1014,7 @@ export default function ProfilePage() {
               删除账号
             </h3>
             <p className="text-xs mb-4" style={{ color: 'var(--color-text-muted)' }}>
-              确定要删除您的账号吗？此操作不可恢复，保证金将原路退回。
+              确定要删除您的账号吗？此操作不可恢复，已缴的认证费不予退还。
             </p>
             <div className="flex gap-2">
               <button

@@ -114,11 +114,18 @@ function dbRowToJson(row) {
   };
 }
 
-async function getAllUsers(page = 1, limit = 20) {
+// 「缴过诚意认证费」是访客能否看到这条资料的唯一判据，两条路任一成立即可：
+// ①本行 deposit>0（线下/后台代收，革命公园那种代录资料走这条，它们没有挂靠账号）
+// ②该行所属账号有 approved 的缴费记录（线上下单，一次缴费覆盖该账号名下所有资料行）
+// 管理员端不过这个滤网，否则后台看不到待缴的人。整个表达式带括号：它会被 AND 拼进搜索条件
+const CERTIFIED_SQL = `(COALESCE(users.deposit, 0) > 0 OR EXISTS (SELECT 1 FROM deposits d WHERE d.user_id = users.user_id AND d.status = 'approved'))`;
+
+async function getAllUsers(page = 1, limit = 20, onlyCertified = false) {
   const database = getDb();
   const offset = (page - 1) * limit;
+  const whereClause = onlyCertified ? `WHERE ${CERTIFIED_SQL}` : '';
   const stmt = database.prepare(
-    `SELECT ${ALL_FIELDS.join(', ')}, status FROM users ORDER BY created_at DESC LIMIT $1 OFFSET $2`
+    `SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${whereClause} ORDER BY created_at DESC LIMIT $1 OFFSET $2`
   );
   return (await stmt.all(limit, offset)).map(dbRowToJson);
 }
@@ -261,6 +268,7 @@ async function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
   }
   // 非管理员不能按联系方式搜索；若只把条件丢弃，会退化成无条件分支返回整张表，故直接判空
   if (!isAdmin && criteria.contact) return { data: [], count: 0 };
+  if (!isAdmin) conditions.push(CERTIFIED_SQL);
   const contactFilter = criteria.contact || null;
   let keywordContactFilter = null;
 
@@ -378,9 +386,10 @@ async function getUserStats() {
   };
 }
 
-async function countUsers() {
+async function countUsers(onlyCertified = false) {
   const database = getDb();
-  return parseInt((await database.prepare('SELECT COUNT(*) as count FROM users').get()).count) || 0;
+  const whereClause = onlyCertified ? `WHERE ${CERTIFIED_SQL}` : '';
+  return parseInt((await database.prepare(`SELECT COUNT(*) as count FROM users ${whereClause}`).get()).count) || 0;
 }
 
 async function getUserCustomFields(userId) {

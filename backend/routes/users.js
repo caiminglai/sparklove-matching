@@ -55,7 +55,7 @@ async function getUsers(req, res, _, parsedUrl) {
       limit = 50;
     }
     result = await userService.getUserList(page, limit, authInfo.isAdmin);
-    total = await userService.countUsers();
+    total = await userService.countUsers(!authInfo.isAdmin);
   }
 
   sendJson(res, 200, { success: true, data: result, total });
@@ -66,7 +66,7 @@ async function getUsers(req, res, _, parsedUrl) {
 async function getCircleMembers(req, res) {
   try {
     const result = await userService.getCircleMembers();
-    const total = await userService.countUsers();
+    const total = await userService.countUsers(true);
     sendJson(res, 200, { success: true, data: result, total });
   } catch (err) {
     console.error('圈子成员查询失败:', err.message);
@@ -94,6 +94,8 @@ function addUser(req, res, readBodyWithLimit) {
         const result = await userService.createUser(data, authInfo.userId);
         if (result.success) {
           sendJson(res, 200, result);
+        } else if (result.code === 'need_certification') {
+          sendJson(res, 403, result);
         } else {
           sendJson(res, 400, result);
         }
@@ -169,6 +171,8 @@ function updateMyUser(req, res, readBodyWithLimit) {
       const result = await userService.updateMyUser(userId, data);
       if (result.success) {
         sendJson(res, 200, result);
+      } else if (result.code === 'need_certification') {
+        sendJson(res, 403, result);
       } else {
         sendJson(res, 404, result);
       }

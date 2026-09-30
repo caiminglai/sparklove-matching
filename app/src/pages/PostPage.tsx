@@ -78,7 +78,13 @@ export default function PostPage() {
           afterSubmit() // 已发布成功，草稿作废
           navigate('/profile')
         } else {
-          toast('发布失败', 'error')
+          const err = await res.json().catch(() => null)
+          if (err?.code === 'need_certification') {
+            toast(err.message, 'error')
+            navigate('/deposit')
+          } else {
+            toast(err?.message || '发布失败', 'error')
+          }
         }
       } catch (e) {
         toast('网络错误', 'error')

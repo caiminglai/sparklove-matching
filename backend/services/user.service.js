@@ -7,6 +7,7 @@
 const userDb = require('../db/users');
 const authDb = require('../db/auth');
 const adminDb = require('../db/admin');
+const paymentsDb = require('../db/payments');
 const { verifyToken, generateToken } = require('../db/index');
 
 // ========== 脱敏工具（业务规则：联系方式需要脱敏后返回给前端） ==========
@@ -76,16 +77,16 @@ function authenticateUser(token) {
 // ========== 用户列表（带分页和脱敏） ==========
 
 async function getUserList(page = 1, limit = 20, isAdmin = false) {
-  const users = await userDb.getAllUsers(page, limit);
+  const users = await userDb.getAllUsers(page, limit, !isAdmin);
   return isAdmin ? users : maskUsers(users);
 }
 
 // 圈子页按标签在前端分组，需要一次拿全成员：走 /api/users 逐页翻（非管理员被夹到 20/50）
-// 会打出几十次请求。触顶不静默截断——调用方用 total（全表计数）与 data 条数对表即可发现
+// 会打出几十次请求。触顶不静默截断——调用方用 total（同判据计数）与 data 条数对表即可发现
 const CIRCLE_MEMBER_LIMIT = 2000;
 
 async function getCircleMembers() {
-  const users = await userDb.getAllUsers(1, CIRCLE_MEMBER_LIMIT);
+  const users = await userDb.getAllUsers(1, CIRCLE_MEMBER_LIMIT, true);
   return maskUsers(users);
 }
 
@@ -93,8 +94,8 @@ async function getUserStats() {
   return await userDb.getUserStats();
 }
 
-async function countUsers() {
-  return await userDb.countUsers();
+async function countUsers(onlyCertified = false) {
+  return await userDb.countUsers(onlyCertified);
 }
 
 async function getPendingUsers() {
@@ -118,6 +119,13 @@ async function createUser(userData, ownerUserId, isPrivileged = false) {
   const errors = validateUserData(userData);
   if (errors.length > 0) {
     return { success: false, message: errors.join(', ') };
+  }
+  // 认证费是发布的唯一门票：没缴过就写不进库，访客侧也就永远搜不到这条资料
+  if (!isPrivileged) {
+    const deposit = ownerUserId ? await paymentsDb.getMyDeposit(ownerUserId) : null;
+    if (!deposit || deposit.status !== 'approved') {
+      return { success: false, code: 'need_certification', message: '请先缴纳诚意认证费，资料才能发布并对外展示' };
+    }
   }
   const newUser = {
     id: userData.id || 'user_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6),
