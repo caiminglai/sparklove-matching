@@ -47,6 +47,12 @@ function isPaymentConfigured() {
   return { wechat: wechatReady, alipay: alipayReady, any: wechatReady || alipayReady };
 }
 
+// 假支付（直接置 paid）必须显式开闸：线上容器 NODE_ENV 是 development，只靠它拦不住；
+// 微信渠道若不配就会一直落到 mock 分支，登录用户点一下就能把保证金标成已付。
+function mockPayAllowed() {
+  return process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_PAY === '1';
+}
+
 function generateNonceStr(length = 32) {
   // 修复：原用 Math.random() 密码学不安全，可被预测重放。改用 crypto.randomBytes
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -185,9 +191,11 @@ async function createAlipayOrder(userId, amount) {
   if (!alipayConfig.appId || !alipayConfig.privateKey) throw new Error('支付宝配置不完整');
   const orderId = generateOrderId();
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
-  const bizContent = { out_trade_no: orderId, total_amount: amount.toFixed(2), subject: '保证金缴纳', product_code: 'QUICK_WAP_WAY' };
+  // method 与 product_code 必须成对：后台开通的是「电脑网站支付」(page.pay / FAST_INSTANT_TRADE_PAY)，
+  // 换回手机网站支付要先在后台开通那件产品，否则支付宝回 sub_code 报错。
+  const bizContent = { out_trade_no: orderId, total_amount: amount.toFixed(2), subject: '保证金缴纳', product_code: 'FAST_INSTANT_TRADE_PAY' };
   const params = {
-    app_id: alipayConfig.appId, method: 'alipay.trade.wap.pay', format: 'JSON',
+    app_id: alipayConfig.appId, method: 'alipay.trade.page.pay', format: 'JSON',
     return_url: alipayConfig.returnUrl, charset: 'utf-8', sign_type: 'RSA2',
     timestamp: timestamp, version: '1.0', notify_url: alipayConfig.notifyUrl,
     biz_content: JSON.stringify(bizContent),
@@ -242,8 +250,8 @@ async function createMockOrder(userId, amount, channel) {
 }
 
 async function mockPay(req, res, parsedUrl) {
-  // 仅开发环境可用
-  if (process.env.NODE_ENV === 'production') {
+  // 仅开发环境且显式开闸时可用
+  if (!mockPayAllowed()) {
     res.writeHead(404, {'Content-Type': 'application/json; charset=utf-8'});
     res.end(JSON.stringify({success: false, message: 'Not Found'}));
     return;
@@ -303,12 +311,12 @@ async function createPayment(req, res, readBodyWithLimit) {
     const amount = await pricing.getYuan('deposit');
     let result;
     const config = isPaymentConfigured();
-    const isProd = process.env.NODE_ENV === 'production';
+    const allowMock = mockPayAllowed();
     if (channel === 'wechat') {
-      if (!config.wechat && !isProd) result = await createMockOrder(userId, amount, 'wechat');
+      if (!config.wechat && allowMock) result = await createMockOrder(userId, amount, 'wechat');
       else result = await createWechatOrder(userId, amount);
     } else if (channel === 'alipay') {
-      if (!config.alipay && !isProd) result = await createMockOrder(userId, amount, 'alipay');
+      if (!config.alipay && allowMock) result = await createMockOrder(userId, amount, 'alipay');
       else result = await createAlipayOrder(userId, amount);
     } else { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '不支持的支付渠道' })); return; }
     res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
@@ -373,7 +381,13 @@ async function queryPaymentStatus(req, res, parsedUrl) {
 async function publicConfig(req, res) {
   try {
     const view = await pricing.publicView();
-    sendJson(res, 200, { success: true, data: view });
+    const cfg = isPaymentConfigured();
+    sendJson(res, 200, {
+      success: true,
+      data: view,
+      alipay_online: cfg.alipay,
+      wechat_online: cfg.wechat,
+    });
   } catch (e) {
     console.error('[价格] 读取公开配置失败:', e.message);
     sendJson(res, 500, { success: false, message: '读取价格配置失败' });

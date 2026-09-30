@@ -377,11 +377,11 @@ server: {
 |------|------|------|------|
 | POST | `/api/payment/create` | 创建支付订单。微信返回 `codeUrl`（前端本地生成二维码），支付宝返回 `payUrl`（跳转） | Token |
 | GET | `/api/payment/status` | 查询订单状态 | Token |
-| GET | `/api/payment/mock-pay` | 模拟支付，生产环境返回 404 | Token |
+| GET | `/api/payment/mock-pay` | 模拟支付（点一下就把订单标成已付），默认 404；只有 `ALLOW_MOCK_PAY=1` 且非 production 时才可用，本机调试专用 | Token |
 | POST | `/api/payment/notify-wechat` | 微信支付 v3 回调 | 无 Token，AES-256-GCM 解密即认证来源 |
 | POST | `/api/payment/notify-alipay` | 支付宝支付回调 | 无 Token，校验支付宝公钥签名 |
 | POST | `/api/payments/view-contact` | 已停用，恒返回 501（改走手动上传凭证） | - |
-| GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount, platform_fee, emotional_damage, delete_refund}`（元），前端展示金额用，不含任何写权限。后三项是「一笔保证金怎么分」，只给保证金规则页展示，不参与下单金额计算 | 否 |
+| GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount, platform_fee, emotional_damage, delete_refund}`（元），前端展示金额用，不含任何写权限。后三项是「一笔保证金怎么分」，只给保证金规则页展示，不参与下单金额计算。响应顶层另并列 `alipay_online` / `wechat_online` 两个只读布尔（取自 `isPaymentConfigured()`，密钥配齐才为 `true`）——本站没有 `/api/health`，接没接通就看这两个数，前端多出的字段会自然忽略 | 否 |
 | GET | `/api/admin/payment-price` | 后台读标价：每项给当前值、分值、环境变量兜底值、来源（`db`/`env`）与最后改动时间 | 管理员 |
 | PUT | `/api/admin/payment-price` | 后台改标价，写进 `admin_settings`（按分存整数）。只影响之后新建的订单，已下单的金额不变。先把本轮提交的每一项都校验完，再校验「平台运营费＋虚假信息赔付＋删除可退 = 保证金」，两项都过了才落库；对不上则整笔不写并回 400 说明 | 管理员 |
 
