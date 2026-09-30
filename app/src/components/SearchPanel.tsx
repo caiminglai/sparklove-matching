@@ -98,18 +98,18 @@ function normalizeLabel(label: unknown): string {
 }
 
 const PURPOSE_ICONS: Record<string, typeof Users> = {
-  相亲交友: Heart,
+  同频交友: Heart,
   拓展圈子: Users,
   兴趣交流: Sparkles,
   运动伙伴: Target,
   学习搭子: Users2,
   同城活动: Users,
   寻找知己: Sparkles,
-  人生伴侣: Heart,
-  恋爱结婚: Heart,
+  同频共振: Sparkles,
+  异次元航行: Sparkles,
   先交朋友: Users,
-  找个伴: Users,
-  同城约会: Heart,
+  找个搭子: Users,
+  同城相聚: MapPin,
   周末玩伴: Users,
   一起旅行: MapPin,
   一起运动: Target,

@@ -333,7 +333,7 @@ export default function DepositPage() {
               className="flex justify-between items-center py-2"
               style={{ borderBottom: '1px solid var(--color-bg-input)' }}
             >
-              <span style={{ color: 'var(--color-text-muted)' }}>甲方感情损失费</span>
+              <span style={{ color: 'var(--color-text-muted)' }}>甲方虚假信息赔付</span>
               <span style={{ color: 'var(--color-danger)', fontWeight: 'bold', fontSize: '14px' }}>
                 {emotionalDamage} 元
               </span>
@@ -376,7 +376,7 @@ export default function DepositPage() {
               <div>
                 •{' '}
                 <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
-                  甲方获得感情损失费 {emotionalDamage} 元
+                  甲方获得虚假信息赔付 {emotionalDamage} 元
                 </span>
               </div>
               <div>
@@ -472,7 +472,7 @@ export default function DepositPage() {
             <span style={{ color: 'var(--color-success)', fontWeight: 'bold' }}>
               {emotionalDamage}元
             </span>
-            感情损失费，平台收取
+            虚假信息赔付，平台收取
             <span style={{ color: 'var(--color-text-primary)', fontWeight: 'bold' }}>
               {platformFee}元
             </span>

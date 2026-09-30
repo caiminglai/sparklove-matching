@@ -16,7 +16,7 @@ const ITEMS = {
   // 下面三档是「一笔保证金怎么分」，只在保证金规则页展示，不参与下单金额计算。
   // 三档之和必须等于保证金（默认 9.9 + 10 + 10 = 29.9），这条由 splitCheck 在保存时挡。
   platformFee: { key: 'platform_fee_fen', field: 'platform_fee', label: '平台运营费', defaultFen: 990 },
-  emotionalDamage: { key: 'emotional_damage_fen', field: 'emotional_damage', label: '感情损失费', defaultFen: 1000 },
+  emotionalDamage: { key: 'emotional_damage_fen', field: 'emotional_damage', label: '虚假信息赔付', defaultFen: 1000 },
   deleteRefund: { key: 'delete_refund_fen', field: 'delete_refund', label: '删除可退', defaultFen: 1000 },
 };
 

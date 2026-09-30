@@ -430,7 +430,7 @@ async function adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit) {
     if (!split.ok) {
       sendJson(res, 400, {
         success: false,
-        message: `保证金拆分对不上：平台运营费 + 感情损失费 + 删除可退 = ${split.sum / 100} 元，` +
+        message: `保证金拆分对不上：平台运营费 + 虚假信息赔付 + 删除可退 = ${split.sum / 100} 元，` +
           `保证金是 ${split.deposit / 100} 元。请把保证金与这三档一起填成能加得上的数。`,
       });
       return;
