@@ -3,9 +3,10 @@ import { RefreshCw } from 'lucide-react'
 import QRCode from 'qrcode'
 import { API_BASE_URL } from '../api/config'
 import { getAuthToken } from '../utils/auth'
+import type { ContactTier } from '../utils/pricing'
 
 interface PayQrPanelProps {
-  purpose: 'deposit' | 'contact_unlock'
+  purpose: 'deposit' | ContactTier
   targetUserId?: string
   amount: number
   label: string

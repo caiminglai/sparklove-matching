@@ -48,7 +48,7 @@ function isPaymentConfigured() {
 }
 
 // 假支付（直接置 paid）必须显式开闸：线上容器 NODE_ENV 是 development，只靠它拦不住；
-// 微信渠道若不配就会一直落到 mock 分支，登录用户点一下就能把保证金标成已付。
+// 微信渠道若不配就会一直落到 mock 分支，登录用户点一下就能把认证费标成已付。
 function mockPayAllowed() {
   return process.env.NODE_ENV !== 'production' && process.env.ALLOW_MOCK_PAY === '1';
 }
@@ -71,6 +71,8 @@ function generateOrderId() {
 const PURPOSES = {
   deposit: { pricingItem: 'deposit', subject: '诚意认证费' },
   contact_unlock: { pricingItem: 'contactUnlock', subject: '查看联系方式' },
+  contact_pack_3: { pricingItem: 'contactPack3', subject: '查看联系方式·3次包', credits: 3, isPack: true },
+  contact_pack_5: { pricingItem: 'contactPack5', subject: '查看联系方式·5次包', credits: 5, isPack: true },
 };
 
 function resolvePurpose(raw) {
@@ -79,7 +81,8 @@ function resolvePurpose(raw) {
 }
 
 async function applyOrderEffect(order) {
-  if ((order.purpose || 'deposit') === 'contact_unlock') {
+  const purpose = order.purpose || 'deposit';
+  if (purpose === 'contact_unlock') {
     if (!order.target_id) {
       console.warn('[payment] 解锁订单缺 target_id，钱已入账但没解锁：', order.order_id);
       return false;
@@ -87,6 +90,9 @@ async function applyOrderEffect(order) {
     await paymentsDb.unlockContact(order.user_id, order.target_id, '支付自动解锁');
     return true;
   }
+  // 次数包不需要"改什么状态"：买到的次数已经写在这一行的 credits 上，余额是查出来的不是攒出来的。
+  // 这一句绝不能省，否则买一包就会掉进下面的认证费入账，把没交认证费的人标成已认证
+  if (PURPOSES[purpose] && PURPOSES[purpose].isPack) return true;
   await paymentsDb.approveDepositByUserId(order.user_id, Number(order.amount));
   return true;
 }
@@ -148,7 +154,7 @@ async function createWechatOrder(userId, amount, opts) {
     amount: { total: Math.round(amount * 100), currency: 'CNY' }
   }, wechatConfig);
   if (!data.code_url) throw new Error('微信未返回 code_url');
-  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'wechat', status: 'pending', purpose: purpose, target_id: opts && opts.targetId });
+  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'wechat', status: 'pending', purpose: purpose, target_id: opts && opts.targetId, credits: opts && opts.credits });
   return { success: true, orderId: orderId, codeUrl: data.code_url };
 }
 
@@ -230,7 +236,7 @@ async function createAlipayOrder(userId, amount, opts) {
   params.sign = alipaySign(params, alipayConfig.privateKey);
   const queryString = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
   const payUrl = 'https://openapi.alipay.com/gateway.do?' + queryString;
-  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'alipay', status: 'pending', purpose: purpose, target_id: opts && opts.targetId });
+  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'alipay', status: 'pending', purpose: purpose, target_id: opts && opts.targetId, credits: opts && opts.credits });
   return { success: true, orderId: orderId, payUrl: payUrl };
 }
 
@@ -268,7 +274,7 @@ async function handleAlipayNotify(params) {
 
 async function createMockOrder(userId, amount, channel, opts) {
   const orderId = generateOrderId();
-  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: channel || 'mock', status: 'pending', purpose: (opts && opts.purpose) || 'deposit', target_id: opts && opts.targetId });
+  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: channel || 'mock', status: 'pending', purpose: (opts && opts.purpose) || 'deposit', target_id: opts && opts.targetId, credits: opts && opts.credits });
   return {
     success: true,
     orderId: orderId,
@@ -318,9 +324,12 @@ async function mockPay(req, res, parsedUrl) {
     await paymentsDb.updatePaymentOrder(orderId, 'paid');
     await applyOrderEffect(order);
   }
-  const back = (order.purpose || 'deposit') === 'contact_unlock'
+  const purpose = order.purpose || 'deposit';
+  const back = purpose === 'contact_unlock'
     ? { label: '返回查看联系方式', href: '/' }
-    : { label: '返回认证费页面', href: '/deposit' };
+    : (PURPOSES[purpose] && PURPOSES[purpose].isPack)
+      ? { label: '返回继续查看联系方式', href: '/' }
+      : { label: '返回认证费页面', href: '/deposit' };
   res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
   res.end('<html><head><meta charset="utf-8"><title>支付成功</title></head><body style="text-align:center;padding-top:50px;font-family:sans-serif;"><h1>✅ 模拟支付成功</h1><p>订单号：' + orderId + '</p><p><a href="' + back.href + '">' + back.label + '</a></p></body></html>');
 }
@@ -346,11 +355,18 @@ async function createOrderFor(req, res, readBodyWithLimit, forcedPurpose) {
       const targetRow = await dbIndex.getDb().prepare('SELECT 1 AS hit FROM users WHERE id = $1 OR user_id = $2 LIMIT 1').get(targetId, targetId);
       if (!targetRow) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '要解锁的用户不存在' })); return; }
       if (await paymentsDb.checkContactUnlocked(userId, targetId)) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '该联系方式已解锁，无需重复支付' })); return; }
+      // 手里还有次数就先花次数：买过包的人不该再看到一次收银台。
+      // 余额校验和扣减是同一条 SQL，余额不够时一行也写不进去，才会往下走去下单
+      const spent = await paymentsDb.trySpendContactCredit(userId, targetId);
+      if (spent.success) {
+        sendJson(res, 200, { success: true, unlocked: true, via: 'credit', remaining: spent.available, targetId: targetId });
+        return;
+      }
     }
     // 🔴 金额只认服务端配置。请求体里的 amount 可被任意改写，前端那个数只是展示值；
     // 具体数字在后台「价格设置」里改，读的是 admin_settings
     const amount = await pricing.getYuan(PURPOSES[purpose].pricingItem);
-    const opts = { purpose: purpose, targetId: targetId };
+    const opts = { purpose: purpose, targetId: targetId, credits: PURPOSES[purpose].credits || 0 };
     const config = isPaymentConfigured();
     const allowMock = mockPayAllowed();
     let result;
@@ -378,6 +394,25 @@ async function createPayment(req, res, readBodyWithLimit) {
 // 这个入口只干"付钱解锁某个人的联系方式"这一件事。返回体与 /api/payment/create 同形。
 async function viewContactPayment(req, res, readBodyWithLimit) {
   return createOrderFor(req, res, readBodyWithLimit, 'contact_unlock');
+}
+
+// GET /api/payments/contact-credits：只回当前登录账号还剩几次，余额由服务端推导，不接受前端传值
+async function contactCredits(req, res) {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    sendJson(res, 401, { success: false, message: '未登录' }); return;
+  }
+  const userId = dbIndex.verifyToken(authHeader.slice(7));
+  if (!userId) {
+    sendJson(res, 401, { success: false, message: 'token无效' }); return;
+  }
+  try {
+    const balance = await paymentsDb.getContactCreditBalance(userId);
+    sendJson(res, 200, { success: true, ...balance });
+  } catch (e) {
+    console.error('[次数包] 余额读取失败:', e.message);
+    sendJson(res, 500, { success: false, message: '余额读取失败' });
+  }
 }
 
 async function wechatNotify(req, res, readBodyWithLimit) {
@@ -510,6 +545,7 @@ module.exports = {
   initConfig,
   createPayment,
   viewContactPayment,
+  contactCredits,
   mockPay,
   wechatNotify,
   alipayNotify,

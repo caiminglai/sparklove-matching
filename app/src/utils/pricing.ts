@@ -4,13 +4,26 @@ import { API_BASE_URL } from '../api/config'
 export interface PublicPricing {
   deposit_amount: number
   contact_unlock_amount: number
+  contact_pack_3_amount: number
+  contact_pack_5_amount: number
 }
+
+// 查看联系方式的三档：单次、3 次包、5 次包。purpose 就是后端 PURPOSES 的键，
+// 标价走 /api/payment/config，包容量（credits）写死在这里与后端各一份，两边不一致算配置错误
+export const CONTACT_PACKS = [
+  { purpose: 'contact_pack_3', field: 'contact_pack_3_amount', credits: 3 },
+  { purpose: 'contact_pack_5', field: 'contact_pack_5_amount', credits: 5 },
+] as const
+
+export type ContactTier = 'contact_unlock' | (typeof CONTACT_PACKS)[number]['purpose']
 
 // 兜底值只在接口不可用时顶一下展示；真实标价以后台「价格设置」写入的 admin_settings 为准，
 // 服务端下单/入账也只看那张表，前端传来的数字一律不被采信。
 const FALLBACK: PublicPricing = {
   deposit_amount: 29.9,
   contact_unlock_amount: 9.9,
+  contact_pack_3_amount: 25.9,
+  contact_pack_5_amount: 39.9,
 }
 
 let cached: PublicPricing | null = null

@@ -172,7 +172,7 @@ tbody tr:hover{background:#FFF5F8}
 
   <div class="tabs">
     <div class="tab active" onclick="switchTab('users', this)">用户管理</div>
-    <div class="tab" onclick="switchTab('deposits', this)">保证金审核</div>
+    <div class="tab" onclick="switchTab('deposits', this)">认证费审核</div>
     <div class="tab" onclick="switchTab('reports', this)">举报管理</div>
     <div class="tab" onclick="switchTab('unlockRecords', this)">解锁记录</div>
     <div class="tab" onclick="switchTab('customFields', this)">自定义字段</div>
@@ -1305,7 +1305,7 @@ var allReports=[];
 var filteredReports=[];
 var selectedReportIds=new Set();
 
-// 保证金管理相关变量
+// 认证费管理相关变量
 var allDeposits=[];
 var filteredDeposits=[];
 var selectedDepositIds=new Set();
@@ -1399,7 +1399,7 @@ function renderDepositsTable(){
   var selectAllCheckbox=document.getElementById('selectAllDeposits');
   tbody.innerHTML='';
   if(filteredDeposits.length===0){
-    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#FF85B3;padding:30px">暂无保证金记录</td></tr>';
+    tbody.innerHTML='<tr><td colspan="8" style="text-align:center;color:#FF85B3;padding:30px">暂无认证费记录</td></tr>';
     if(selectAllCheckbox) selectAllCheckbox.checked=false;
     return;
   }
@@ -1601,7 +1601,7 @@ function rejectDeposit(id){
 }
 
 function deleteDeposit(id){
-  showConfirm('确定删除这条保证金记录吗？',function(){
+  showConfirm('确定删除这条认证费记录吗？',function(){
     var xhr=new XMLHttpRequest();
     xhr.open('DELETE',BASE+'/api/admin/deposits/'+id,true);
     xhr.setRequestHeader('Authorization','Bearer '+(localStorage.getItem('admin_token')||''));
@@ -1653,8 +1653,8 @@ function updateDepositsSelectAllState(){
 
 function batchApproveDeposits(){
   var ids=Array.from(selectedDepositIds);
-  if(ids.length===0){ alert('请先选择保证金记录'); return; }
-  showConfirm('确认批量通过 '+ids.length+' 条保证金记录？',function(){
+  if(ids.length===0){ alert('请先选择认证费记录'); return; }
+  showConfirm('确认批量通过 '+ids.length+' 条认证费记录？',function(){
     var completed=0;
     var failed=0;
     ids.forEach(function(id){
@@ -2168,7 +2168,7 @@ function deleteCustomField(id){
 
 // ============ 价格设置模块 ============
 var PRICE_HINT='金额最多两位小数，范围 0.01 ～ 99999.99 元；改价只影响之后新建的订单，已下的单子金额不变。';
-var PRICE_NOTE='留空的档位不改；两项收费各自独立，都是一次性服务费、支付后不予退还，没有必须加得平的约束。';
+var PRICE_NOTE='留空的档位不改；四档价格各自独立，都是一次性服务费、支付后不予退还，没有必须加得平的约束。';
 var priceItems=[];
 
 function loadPrices(){
@@ -2579,7 +2579,7 @@ function batchApproveUnlockRecords(){
   });
 }
 
-// 自动刷新保证金列表（每60秒）
+// 自动刷新认证费列表（每60秒）
 var depositRefreshTimer=null;
 function startDepositAutoRefresh(){
   if(depositRefreshTimer) clearInterval(depositRefreshTimer);

@@ -106,11 +106,11 @@ async function deleteContactUnlockRequest(id) {
 async function addPaymentOrder(order) {
   const database = getDb();
   const stmt = database.prepare(
-    'INSERT INTO payment_orders (order_id, user_id, amount, channel, status, created_at, purpose, target_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)'
+    'INSERT INTO payment_orders (order_id, user_id, amount, channel, status, created_at, purpose, target_id, credits) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)'
   );
   await stmt.run(
     order.order_id, order.user_id, order.amount, order.channel, 'pending', Date.now(),
-    order.purpose || 'deposit', order.target_id || null
+    order.purpose || 'deposit', order.target_id || null, order.credits || 0
   );
   return true;
 }
@@ -143,6 +143,50 @@ async function ensurePaymentColumns() {
   await database.prepare(
     'ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS target_id text'
   ).run();
+  // 次数包买到的次数记在下单那一刻，后台以后改包容量也不会追改已购用户的次数
+  await database.prepare(
+    'ALTER TABLE payment_orders ADD COLUMN IF NOT EXISTS credits integer'
+  ).run();
+}
+
+// 余额只由两张现成表推导：已付次数包给了多少、用次数解锁过多少人。
+// 不另建余额表，就不会出现"余额表和解锁记录对不上"这种没人发现得了的账
+async function getContactCreditBalance(userId) {
+  const database = getDb();
+  const row = await database.prepare(`
+    SELECT
+      COALESCE((SELECT SUM(credits) FROM payment_orders
+                WHERE user_id = $1 AND status = 'paid' AND COALESCE(credits, 0) > 0), 0) AS granted,
+      COALESCE((SELECT COUNT(*) FROM contact_unlocks
+                WHERE viewer_id = $1 AND status = 'unlocked' AND method = 'pack'), 0) AS spent
+  `).get(userId);
+  const granted = Number(row && row.granted) || 0;
+  const spent = Number(row && row.spent) || 0;
+  return { granted, spent, available: Math.max(granted - spent, 0) };
+}
+
+/** 花一次次数解锁一个人；余额不够就一行都写不进去，回 { success: false } */
+async function trySpendContactCredit(viewerId, targetId) {
+  const database = getDb();
+  const now = Date.now();
+  // 占位符显式带类型：同一参数既进 INSERT 列表又进 WHERE 子查询时，PG 会报
+  // "inconsistent types deduced for parameter"，整条语句根本执行不了
+  const row = await database.prepare(`
+    INSERT INTO contact_unlocks (viewer_id, target_id, method, status, created_at, unlocked_at)
+    SELECT $1::text, $2::text, 'pack', 'unlocked', $3::bigint, $3::bigint
+    WHERE (
+      SELECT COALESCE(SUM(credits), 0)::bigint FROM payment_orders
+      WHERE user_id = $1::text AND status = 'paid' AND COALESCE(credits, 0) > 0
+    ) > (
+      SELECT COUNT(*)::bigint FROM contact_unlocks
+      WHERE viewer_id = $1::text AND status = 'unlocked' AND method = 'pack'
+    )
+    ON CONFLICT (viewer_id, target_id) DO NOTHING
+    RETURNING id
+  `).get(viewerId, targetId, now);
+  if (!row) return { success: false };
+  const balance = await getContactCreditBalance(viewerId);
+  return { success: true, id: row.id, ...balance };
 }
 
 async function approveDepositByUserId(userId, amount) {
@@ -215,6 +259,8 @@ module.exports = {
   getPaymentOrder,
   updatePaymentOrder,
   ensurePaymentColumns,
+  getContactCreditBalance,
+  trySpendContactCredit,
   approveDepositByUserId,
   getAllDeposits,
   updateDepositStatus,

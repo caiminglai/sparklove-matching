@@ -134,7 +134,7 @@
 <body>
   <div class="header">
     <h1>精准匹配 · 管理后台</h1>
-    <p>用户管理 · 举报审核 · 保证金审核</p>
+    <p>用户管理 · 举报审核 · 认证费审核</p>
   </div>
   
   <div class="container">
@@ -142,7 +142,7 @@
       <div class="tab active" onclick="switchTab('users')">用户管理</div>
       <div class="tab" onclick="switchTab('records')">解锁记录</div>
       <div class="tab" onclick="switchTab('reports')">举报管理</div>
-      <div class="tab" onclick="switchTab('deposits')">保证金</div>
+      <div class="tab" onclick="switchTab('deposits')">认证费</div>
       <div class="tab" onclick="switchTab('fields')">自定义筛选</div>
       <div class="tab" onclick="switchTab('price')">价格</div>
     </div>
@@ -181,17 +181,17 @@
       <div id="reportsList"></div>
     </div>
 
-    <!-- 保证金审核 -->
+    <!-- 认证费审核 -->
     <div id="depositsSection" class="section">
       <div class="search-box">
-        <label>筛选保证金状态</label>
+        <label>筛选认证费状态</label>
         <select id="depositStatusInput">
           <option value="">全部</option>
           <option value="pending">待审核</option>
           <option value="approved">已通过</option>
           <option value="rejected">已驳回</option>
         </select>
-        <button class="btn-search" onclick="loadDeposits()">刷新保证金列表</button>
+        <button class="btn-search" onclick="loadDeposits()">刷新认证费列表</button>
       </div>
       <div id="depositsList"></div>
     </div>
@@ -294,10 +294,10 @@
     </div>
   </div>
 
-  <!-- 保证金处理弹窗 -->
+  <!-- 认证费处理弹窗 -->
   <div class="modal-overlay" id="depositModal" onclick="closeModal('depositModal')">
     <div class="modal" onclick="event.stopPropagation()">
-      <h3 id="depositModalTitle">审核保证金</h3>
+      <h3 id="depositModalTitle">审核认证费</h3>
       <label>审核备注（可选）</label>
       <textarea id="depositModalNote" placeholder="输入审核说明"></textarea>
       <div class="modal-btns">
@@ -505,7 +505,7 @@
 
     // ============ 价格设置 ============
     const PRICE_HINT = '金额最多两位小数，范围 0.01 ～ 99999.99 元；改价只影响之后新建的订单，已下的单子金额不变。';
-    const PRICE_NOTE = '留空的档位不改；两项收费各自独立，都是一次性服务费、支付后不予退还，没有必须加得平的约束。';
+    const PRICE_NOTE = '留空的档位不改；四档价格各自独立，都是一次性服务费、支付后不予退还，没有必须加得平的约束。';
 
     async function loadPrices() {
       const meta = document.getElementById('priceMeta');
@@ -1028,7 +1028,7 @@
       }
     }
 
-    // ========== 保证金审核 ==========
+    // ========== 认证费审核 ==========
     
     async function loadDeposits() {
       const list = document.getElementById('depositsList');
@@ -1084,7 +1084,7 @@
             `;
           }).join('');
         } else {
-          list.innerHTML = '<div class="empty">暂无保证金记录</div>';
+          list.innerHTML = '<div class="empty">暂无认证费记录</div>';
         }
       } catch (e) {
         list.innerHTML = '<div class="empty">加载失败</div>';
@@ -1093,7 +1093,7 @@
     
     function openDepositModal(depositId, status) {
       currentDepositId = depositId;
-      document.getElementById('depositModalTitle').textContent = status === 'approved' ? '通过保证金审核' : '驳回保证金审核';
+      document.getElementById('depositModalTitle').textContent = status === 'approved' ? '通过认证费审核' : '驳回认证费审核';
       document.getElementById('depositModalNote').value = '';
       document.getElementById('depositModalConfirm').textContent = status === 'approved' ? '确认通过' : '确认驳回';
       document.getElementById('depositModal').setAttribute('data-status', status);

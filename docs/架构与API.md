@@ -47,7 +47,7 @@
 │   ├── utils/                    # 通用工具（config.js / cookie工具.js / extractId.js / multipart.js / sendJson.js）
 │   ├── uploads/                  # 用户上传文件目录（compose 挂载到容器内 /uploads）
 │   │   ├── avatars/              # 用户头像
-│   │   ├── deposits/             # 保证金凭证
+│   │   ├── deposits/             # 认证费凭证
 │   │   ├── contact-unlock/       # 联系方式解锁凭证（运行时创建）
 │   │   └── reports/              # 举报凭证
 │   ├── server.js                 # 服务器入口
@@ -101,7 +101,7 @@ backend/
 │   ├── auth.js                     # 账号注册 / 密码校验 / 密码修改
 │   ├── reports.js                  # 举报：新增 / 列表 / 状态更新 / 删除
 │   ├── ratings.js                  # 评价：新增 / 列表 / 平均分
-│   ├── payments.js                 # 支付/保证金/解锁：订单 / 保证金 / 解锁请求
+│   ├── payments.js                 # 支付/认证费/解锁：订单 / 认证费 / 解锁请求
 │   ├── admin.js                    # 管理员：日志 / 自定义筛选字段
 │   ├── vector.js                   # 向量数据库：向量 CRUD / 相似搜索 / 双向匹配
 │   └── field-mappings.js           # 字段映射工具
@@ -219,8 +219,8 @@ server: {
 | `users` | 用户资料（姓名、年龄、联系方式等 40+ 字段） |
 | `user_ratings` | 用户评价 |
 | `user_reports` | 用户举报 |
-| `contact_unlocks` | 联系方式解锁记录 |
-| `deposits` | 保证金记录 |
+| `contact_unlocks` | 联系方式解锁记录（`method='pack'` 的行是次数包扣掉的次数） |
+| `deposits` | 认证费记录（表名沿用 deposits，钱不退） |
 | `payment_orders` | 支付订单 |
 | `user_custom_fields` | 用户自定义字段（EAV 键值表） |
 | `field_mappings` | 字段中文标签与类型映射（前端动态取字段定义） |
@@ -326,8 +326,8 @@ server: {
 | 方法 | 路径 | 描述 | 认证 |
 |------|------|------|------|
 | POST | `/api/upload/avatar` | 上传头像 | Token |
-| POST | `/api/deposit/upload-proof` | 上传保证金凭证 | Token |
-| GET | `/api/users/my-deposit` | 我的保证金状态 | Token |
+| POST | `/api/deposit/upload-proof` | 上传认证费凭证 | Token |
+| GET | `/api/users/my-deposit` | 我的认证费状态 | Token |
 
 ### 5.4 评价接口
 
@@ -350,11 +350,11 @@ server: {
 | 方法 | 路径 | 描述 | 认证 |
 |------|------|------|------|
 | GET | `/api/admin/stats` | 统计数据 | 管理员 |
-| GET | `/api/admin/deposits` | 保证金列表 | 管理员 |
-| PUT | `/api/admin/deposits/:id/approve` | 审核通过保证金 | 管理员 |
-| PUT | `/api/admin/deposits/:id/reject` | 拒绝保证金 | 管理员 |
-| GET | `/api/admin/deposits/proof/:id` | 读取保证金凭证图片 | 管理员 |
-| DELETE | `/api/admin/deposits/:id` | 删除保证金记录 | 管理员 |
+| GET | `/api/admin/deposits` | 认证费记录列表 | 管理员 |
+| PUT | `/api/admin/deposits/:id/approve` | 审核通过认证费凭证 | 管理员 |
+| PUT | `/api/admin/deposits/:id/reject` | 驳回认证费凭证 | 管理员 |
+| GET | `/api/admin/deposits/proof/:id` | 读取认证费凭证图片 | 管理员 |
+| DELETE | `/api/admin/deposits/:id` | 删除认证费记录 | 管理员 |
 | GET | `/api/admin/unlock-records` | 解锁记录 | 管理员 |
 
 ### 5.7 向量搜索接口
@@ -385,22 +385,23 @@ server: {
 | GET | `/api/payment/mock-pay` | 模拟支付（点一下就把订单标成已付），默认 404；只有 `ALLOW_MOCK_PAY=1` 且非 production 时才可用，本机调试专用 | Token |
 | POST | `/api/payment/notify-wechat` | 微信支付 v3 回调 | 无 Token，AES-256-GCM 解密即认证来源 |
 | POST | `/api/payment/notify-alipay` | 支付宝支付回调 | 无 Token，校验支付宝公钥签名 |
-| POST | `/api/payments/view-contact` | 已停用，恒返回 501（改走手动上传凭证） | - |
-| GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount}`（元），前端展示金额用，不含任何写权限。两项都是一次性服务费、支付后不予退还，之间没有必须相等的关系。响应顶层另并列 `alipay_online` / `wechat_online` 两个只读布尔（取自 `isPaymentConfigured()`，密钥配齐才为 `true`）——本站没有 `/api/health`，接没接通就看这两个数，前端多出的字段会自然忽略 | 否 |
+| POST | `/api/payments/view-contact` | 查看某人的联系方式。用途写死成 `contact_unlock`，不接受前端传 purpose。手里还有次数包余额时先扣次数、直接回 `{unlocked:true, via:'credit', remaining}` 且不再收银台；余额不足才下单，返回体与 `/api/payment/create` 同形 | Token |
+| GET | `/api/payments/contact-credits` | 还剩几次查看次数：`{granted, spent, available}`。不落库存计数列——`granted` 是已付订单 `payment_orders.credits` 之和，`spent` 是 `contact_unlocks` 里 `method='pack'` 且 `status='unlocked'` 的条数 | Token |
+| GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount, contact_pack_3_amount, contact_pack_5_amount}`（元），前端展示金额用，不含任何写权限。四项都是一次性服务费、支付后不予退还，各自独立，没有「几档之和等于另一档」的约束。响应顶层另并列 `alipay_online` / `wechat_online` 两个只读布尔（取自 `isPaymentConfigured()`，密钥配齐才为 `true`）——本站没有 `/api/health`，接没接通就看这两个数，前端多出的字段会自然忽略 | 否 |
 | GET | `/api/admin/payment-price` | 后台读标价：每项给当前值、分值、环境变量兜底值、来源（`db`/`env`）与最后改动时间 | 管理员 |
 | PUT | `/api/admin/payment-price` | 后台改标价，写进 `admin_settings`（按分存整数）。只影响之后新建的订单，已下单的金额不变。先把本轮提交的每一项都校验完（最多两位小数、0.01 ～ 99999.99 元），全部通过才逐项落库，避免留下写了一半的状态 | 管理员 |
 
 回调侧的三条硬约定（改代码前先读）：
 
-- 金额与身份只认逐笔比对：下单时请求体里的 `amount` 被忽略，一律取服务端标价（`backend/utils/pricing.js` 读 `admin_settings`，后台「价格设置」没写过的项才退回 `DEPOSIT_AMOUNT` / `CONTACT_UNLOCK_AMOUNT`）；入账前还要把通知的 `amount.total`（分）与订单应收、通知的 `appid`/`mchid` 与 `backend/.env` 的配置、`trade_state` 与 `SUCCESS` 三项同时对齐，缺任何一个都能被"付一分钱解锁保证金"、或被同一把 APIv3 密钥下别的应用发来的通知绕过。这几项判定是纯函数，写在 `backend/utils/payment-verify.js`，单测在 `app/src/utils/payment-verify.test.ts`（`cd app && npx vitest run`）。
+- 金额与身份只认逐笔比对：下单时请求体里的 `amount` 被忽略，一律取服务端标价（`backend/utils/pricing.js` 读 `admin_settings`，后台「价格设置」没写过的项才退回 `DEPOSIT_AMOUNT` / `CONTACT_UNLOCK_AMOUNT`）；入账前还要把通知的 `amount.total`（分）与订单应收、通知的 `appid`/`mchid` 与 `backend/.env` 的配置、`trade_state` 与 `SUCCESS` 三项同时对齐，缺任何一个都能被"付一分钱把认证费标成已付"、或被同一把 APIv3 密钥下别的应用发来的通知绕过。这几项判定是纯函数，写在 `backend/utils/payment-verify.js`，单测在 `app/src/utils/payment-verify.test.ts`（`cd app && npx vitest run`）。
 - 微信 v3 靠 HTTP 状态码决定是否重推，失败分两类回：暂时处理不了的（解密失败、订单暂时查不到、本站支付键没配齐）回 500——回 2xx 等于告诉微信"已送达"，那一次没落库就是永久丢单，且全程无报错；而重推多少次也不会变好的伪通知（金额不符、appid/mchid 不符、交易状态非 SUCCESS、非支付成功事件）回 204 空响应收口，否则会被按退避策略重推约一天，把重推队列和日志刷满。
-- 回调地址只能填 `https://sparklove.cn/api/payment/notify-wechat` 与 `.../notify-alipay`，**不能带 `/jzxr` 前缀**。带前缀会被前端单页应用兜底成 200 的 index.html，症状与上一条相同：钱扣了、保证金不解锁、全程零报错。
+- 回调地址只能填 `https://sparklove.cn/api/payment/notify-wechat` 与 `.../notify-alipay`，**不能带 `/jzxr` 前缀**。带前缀会被前端单页应用兜底成 200 的 index.html，症状与上一条相同：钱扣了、订单不落账、全程零报错。
 
 开通支付需要在 `backend/.env` 填的键（模板见 `.env.example`）：
 `WECHAT_APP_ID`、`WECHAT_MCH_ID`、`WECHAT_API_V3_KEY`、`WECHAT_MERCHANT_SERIAL_NO`、`WECHAT_MERCHANT_PRIVATE_KEY`、`WECHAT_NOTIFY_URL`、
 `ALIPAY_APP_ID`、`ALIPAY_PRIVATE_KEY`、`ALIPAY_PUBLIC_KEY`、`ALIPAY_NOTIFY_URL`、`ALIPAY_RETURN_URL`。
 某个渠道的键没填全则该渠道不可用；`payment_orders.channel_txn_id`（渠道流水号，对账用）由服务启动时自动补列。
-`DEPOSIT_AMOUNT`、`CONTACT_UNLOCK_AMOUNT` 只是「后台从没改过这个价」时的兜底默认值：日常改价在后台「价格设置」页（桌面 `/admin/`、手机 `/admin/m`）做，写进 `admin_settings` 后即刻生效，不用改代码、不用重新部署。收费只有这两项，都是一次性服务费、支付后不退，所以 `backend/utils/pricing.js` 的 `ITEMS` 里只有「收多少」，没有「怎么分」。诚意认证费页（`app/src/pages/DepositPage.tsx`）展示的金额来自 `GET /api/payment/config`，前端不再硬编码。
+`DEPOSIT_AMOUNT`、`CONTACT_UNLOCK_AMOUNT` 只是「后台从没改过这个价」时的兜底默认值：日常改价在后台「价格设置」页（桌面 `/admin/`、手机 `/admin/m`）做，写进 `admin_settings` 后即刻生效，不用改代码、不用重新部署。收费只有这四项，都是一次性服务费、支付后不退，所以 `backend/utils/pricing.js` 的 `ITEMS` 里只有「收多少」，没有「怎么分」。两个次数包在 `ITEMS` 里多带一个 `credits`（3／5），下单那一刻抄进 `payment_orders.credits`：余额只由这列推导，之后改价、改包容量都不会动到已购用户的次数。**买包的钱绝不是认证费**——`applyOrderEffect` 对 `contact_pack_*` 直接 return，省掉这一句会把没交认证费的人标成已认证、当场进搜索列表。诚意认证费页（`app/src/pages/DepositPage.tsx`）展示的金额来自 `GET /api/payment/config`，前端不再硬编码。
 
 ### 5.9 联系方式解锁申请接口
 

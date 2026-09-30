@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { ArrowLeft, Zap, Upload, CheckCircle } from 'lucide-react'
 import { API_BASE_URL } from '../api/config'
 import { getAuthToken, clearAuthToken } from '../utils/auth'
-import { usePricing } from '../utils/pricing'
+import { CONTACT_PACKS, usePricing, type ContactTier } from '../utils/pricing'
 import PayQrPanel from './PayQrPanel'
 
 interface ContactPayModalProps {
@@ -16,7 +16,9 @@ export default function ContactPayModal({
   onClose,
   onUnlocked,
 }: ContactPayModalProps) {
-  const amount = usePricing().contact_unlock_amount
+  const pricing = usePricing()
+  const [tier, setTier] = useState<ContactTier>('contact_unlock')
+  const [credits, setCredits] = useState(0)
   const [mode, setMode] = useState<'auto' | 'manual'>('auto')
   const [method, setMethod] = useState<'alipay' | 'wechat'>('alipay')
   const [proofFile, setProofFile] = useState<File | null>(null)
@@ -24,6 +26,44 @@ export default function ContactPayModal({
   const [status, setStatus] = useState('')
   const [qrError, setQrError] = useState(false)
   const [paidOrder, setPaidOrder] = useState<string | null>(null)
+  const [paidDoneText, setPaidDoneText] = useState('已解锁')
+
+  const pack = CONTACT_PACKS.find((p) => p.purpose === tier)
+  const amount = pack ? pricing[pack.field] : pricing.contact_unlock_amount
+  const tierOptions: { key: ContactTier; label: string; price: number; note: string }[] = [
+    {
+      key: 'contact_unlock',
+      label: '单次',
+      price: pricing.contact_unlock_amount,
+      note: '看一个人',
+    },
+    ...CONTACT_PACKS.map((p) => ({
+      key: p.purpose as ContactTier,
+      label: `${p.credits} 次包`,
+      price: pricing[p.field],
+      note: `折合 ¥${(pricing[p.field] / p.credits).toFixed(1)}/次`,
+    })),
+  ]
+
+  // 余额由服务端推导（已购次数 − 已用次数），前端只是把它显示出来
+  const refreshCredits = useCallback(async () => {
+    try {
+      const token = getAuthToken()
+      if (!token) return
+      const res = await fetch(`${API_BASE_URL}/payments/contact-credits`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) return
+      const data = await res.json()
+      if (data.success) setCredits(Number(data.available) || 0)
+    } catch {
+      // 读不到余额就按"没有次数"显示，宁可多显示一次付款也不要少收钱
+    }
+  }, [])
+
+  useEffect(() => {
+    refreshCredits()
+  }, [refreshCredits])
 
   // token 过期只弹文案的话，用户会一直卡在"token无效"上，清掉旧 token 送去登录才能恢复
   const handleUnauthorized = useCallback(() => {
@@ -36,27 +76,45 @@ export default function ContactPayModal({
     setStatus('正在创建支付订单...')
     try {
       const token = getAuthToken()
-      const res = await fetch(`${API_BASE_URL}/payments/view-contact`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      // 单次走 /payments/view-contact（用途由后端写死），次数包走通用下单口带 purpose。
+      // 后端在单次那条路上会先扣已有次数，够就不生成订单，所以这里可能压根没有收银台链接
+      const isPack = Boolean(pack)
+      const res = await fetch(
+        `${API_BASE_URL}${isPack ? '/payment/create' : '/payments/view-contact'}`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify(
+            isPack
+              ? { channel: method, purpose: tier }
+              : { target_user_id: targetUserId, method, channel: method },
+          ),
         },
-        body: JSON.stringify({
-          target_user_id: targetUserId,
-          method,
-          channel: method,
-        }),
-      })
+      )
       if (res.status === 401) {
         handleUnauthorized()
         return
       }
       const data = await res.json()
+      if (data.success && data.unlocked && data.via === 'credit') {
+        setCredits(Number(data.remaining) || 0)
+        setStatus('已用掉 1 次查看次数')
+        onUnlocked?.()
+        setTimeout(onClose, 800)
+        return
+      }
       if (data.success && data.payUrl) {
         window.open(data.payUrl, '_blank')
         setPaidOrder(data.orderId)
-        setStatus('支付完成后将自动解锁，无需刷新')
+        setPaidDoneText(isPack ? `${pack?.credits} 次查看权限已到账` : '已解锁')
+        setStatus(
+          isPack
+            ? `支付完成后 ${pack?.credits} 次查看权限会自动到账`
+            : '支付完成后将自动解锁，无需刷新',
+        )
       } else {
         setStatus(data.message || '下单失败，请改用手动上传凭证')
         setTimeout(() => setStatus(''), 3000)
@@ -87,7 +145,8 @@ export default function ContactPayModal({
         if (data.success && data.status === 'paid') {
           clearInterval(timer)
           setPaidOrder(null)
-          setStatus('已解锁')
+          setStatus(paidDoneText)
+          refreshCredits()
           onUnlocked?.()
           setTimeout(onClose, 800)
         }
@@ -96,7 +155,7 @@ export default function ContactPayModal({
       }
     }, 3000)
     return () => clearInterval(timer)
-  }, [paidOrder, onUnlocked, onClose, handleUnauthorized])
+  }, [paidOrder, onUnlocked, onClose, handleUnauthorized, paidDoneText, refreshCredits])
 
   const handleProofUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0] || null
@@ -200,6 +259,38 @@ export default function ContactPayModal({
           </button>
         </div>
 
+        {/* 档位选择：单次 / 3 次包 / 5 次包 */}
+        <div className="grid grid-cols-3 gap-2 mb-3">
+          {tierOptions.map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setTier(opt.key)}
+              className={`rounded-xl px-2 py-2.5 text-center transition-all border ${
+                tier === opt.key
+                  ? 'text-white border-transparent shadow-lg'
+                  : 'bg-white text-gray-600 hover:bg-gray-50'
+              }`}
+              style={
+                tier === opt.key
+                  ? {
+                      background:
+                        'linear-gradient(135deg, var(--color-primary), var(--color-primary-dark))',
+                    }
+                  : { borderColor: 'var(--color-border-light)' }
+              }
+            >
+              <div className="text-xs font-medium">{opt.label}</div>
+              <div className="text-sm font-bold">¥{opt.price}</div>
+              <div className="text-[10px] opacity-80">{opt.note}</div>
+            </button>
+          ))}
+        </div>
+        {credits > 0 && (
+          <p className="text-xs mb-3 text-center" style={{ color: 'var(--color-success)' }}>
+            你还有 {credits} 次查看次数，选「单次」会先用次数，不再收钱
+          </p>
+        )}
+
         {/* 支付方式选择 */}
         <div className="flex gap-3 mb-4">
           <button
@@ -257,10 +348,12 @@ export default function ContactPayModal({
                 点击下方按钮，跳转到{method === 'alipay' ? '支付宝' : '微信'}完成支付
               </p>
               <p className="text-lg font-bold" style={{ color: 'var(--color-primary)' }}>
-                ¥{amount}
+                {pack ? `${pack.credits} 次 · ` : '单次 · '}¥{amount}
               </p>
               <p className="text-xs mt-1" style={{ color: 'var(--color-text-light)' }}>
-                支付成功后自动解锁，无需等待审核
+                {tier === 'contact_unlock' && credits > 0
+                  ? `本次直接消耗 1 次余额（剩 ${credits} 次），不再收款`
+                  : '支付成功后自动到账，无需等待审核'}
               </p>
             </div>
             <button
@@ -273,7 +366,10 @@ export default function ContactPayModal({
                     : 'linear-gradient(135deg, var(--color-wechat), var(--color-wechat-dark))',
               }}
             >
-              <Zap size={16} /> 立即支付 ¥{amount}
+              <Zap size={16} />
+              {tier === 'contact_unlock' && credits > 0
+                ? `立即使用 1 次（剩 ${credits} 次）`
+                : `立即支付 ¥${amount}`}
             </button>
             {status && (
               <p className="text-xs text-center mt-3" style={{ color: 'var(--color-primary)' }}>
@@ -289,11 +385,12 @@ export default function ContactPayModal({
             {/* 收款码 */}
             {method === 'alipay' ? (
               <PayQrPanel
-                purpose="contact_unlock"
-                targetUserId={targetUserId}
+                purpose={tier}
+                targetUserId={pack ? undefined : targetUserId}
                 amount={amount}
-                label="查看联系方式"
+                label={pack ? `查看联系方式·${pack.credits} 次包` : '查看联系方式'}
                 onPaid={() => {
+                  refreshCredits()
                   onUnlocked?.()
                   setTimeout(onClose, 800)
                 }}

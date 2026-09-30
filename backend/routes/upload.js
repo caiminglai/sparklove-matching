@@ -8,7 +8,7 @@ const path = require('path');
 const { ALLOWED_IMAGE_EXTENSIONS, MAGIC_NUMBERS } = require('../utils/multipart');
 const { MAX_UPLOAD_SIZE } = require('../utils/config');
 
-// 保证金金额：后台「价格设置」可改，每次请求现读（原来冻结在进程启动时的环境变量里）
+// 认证费金额：后台「价格设置」可改，每次请求现读（原来冻结在进程启动时的环境变量里）
 const pricing = require('../utils/pricing');
 
 // 兼容引用：内部用 ALLOWED_EXTENSIONS / MAGIC_NUMBERS 名称
@@ -125,7 +125,7 @@ function uploadDepositProof(req, res) {
       }
       let proofData = null;
       let filename = '';
-      // 🔴 不读表单里的 amount 字段：那是前端传来的，改一个字就能把 29.9 的保证金按 0.01 记账
+      // 🔴 不读表单里的 amount 字段：那是前端传来的，改一个字就能把 29.9 的认证费按 0.01 记账
       for (const part of parts) {
         const headerEnd = part.indexOf('\r\n\r\n');
         if (headerEnd === -1) continue;

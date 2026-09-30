@@ -262,6 +262,9 @@ const server = http.createServer(async (req, res) => {
   if (req.method === 'POST' && pathname === '/api/payments/view-contact') {
     await paymentRoutes.viewContactPayment(req, res, readBodyWithLimit); return;
   }
+  if (req.method === 'GET' && pathname === '/api/payments/contact-credits') {
+    await paymentRoutes.contactCredits(req, res); return;
+  }
   if (req.method === 'POST' && pathname === '/api/unlock-contact/submit') {
     contactUnlockRoutes.submitUnlockRequest(req, res); return;
   }

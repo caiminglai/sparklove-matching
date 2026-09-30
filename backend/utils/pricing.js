@@ -3,10 +3,12 @@
 // ============================================================
 //
 // 一律以「分」为单位存整数字符串、读出来再换算成元，避免用浮点存钱。
-// 下单用的两档默认值取自环境变量（或 29.9 / 9.9 的硬编码兜底）。这些默认只在那张表
-// 还没有对应记录时生效 —— 后台改过一次之后，环境变量就不再是权威来源了。
+// 默认值：认证费与查看联系方式可被环境变量覆盖（见下两行键名），两个次数包只认硬编码。
+// 这些默认只在 admin_settings 还没有对应记录时生效 —— 后台改过一次之后，环境变量就不再是权威来源了。
 //
-// 两项收费都是一次性服务费，付了不退，所以这里只有「收多少」，没有「怎么分」。
+// 四项收费都是一次性服务费，付了不退，所以这里只有「收多少」，没有「怎么分」。
+// 两个次数包带的 credits 是「这一笔买到几次查看联系方式」，下单时抄进 payment_orders.credits，
+// 之后余额只认那列的和，改价或改包容量都不会动到已购用户的次数。
 
 const adminDb = require('../db/admin.js');
 const { yuanToFen } = require('./payment-verify.js');
@@ -14,6 +16,8 @@ const { yuanToFen } = require('./payment-verify.js');
 const ITEMS = {
   deposit: { key: 'deposit_amount_fen', field: 'deposit_amount', label: '诚意认证费', defaultFen: yuanToFen(process.env.DEPOSIT_AMOUNT) || 2990 },
   contactUnlock: { key: 'contact_unlock_amount_fen', field: 'contact_unlock_amount', label: '查看联系方式', defaultFen: yuanToFen(process.env.CONTACT_UNLOCK_AMOUNT) || 990 },
+  contactPack3: { key: 'contact_pack_3_amount_fen', field: 'contact_pack_3_amount', label: '查看联系方式·3 次包', defaultFen: 2590, credits: 3 },
+  contactPack5: { key: 'contact_pack_5_amount_fen', field: 'contact_pack_5_amount', label: '查看联系方式·5 次包', defaultFen: 3990, credits: 5 },
 };
 
 const MIN_FEN = 1;
