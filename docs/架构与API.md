@@ -383,7 +383,7 @@ server: {
 | POST | `/api/payments/view-contact` | 已停用，恒返回 501（改走手动上传凭证） | - |
 | GET | `/api/payment/config` | 公开标价 `{deposit_amount, contact_unlock_amount, platform_fee, emotional_damage, delete_refund}`（元），前端展示金额用，不含任何写权限。后三项是「一笔保证金怎么分」，只给保证金规则页展示，不参与下单金额计算 | 否 |
 | GET | `/api/admin/payment-price` | 后台读标价：每项给当前值、分值、环境变量兜底值、来源（`db`/`env`）与最后改动时间 | 管理员 |
-| PUT | `/api/admin/payment-price` | 后台改标价，写进 `admin_settings`（按分存整数）。只影响之后新建的订单，已下单的金额不变。先把本轮提交的每一项都校验完，再校验「平台运营费＋感情损失费＋删除可退 = 保证金」，两项都过了才落库；对不上则整笔不写并回 400 说明 | 管理员 |
+| PUT | `/api/admin/payment-price` | 后台改标价，写进 `admin_settings`（按分存整数）。只影响之后新建的订单，已下单的金额不变。先把本轮提交的每一项都校验完，再校验「平台运营费＋虚假信息赔付＋删除可退 = 保证金」，两项都过了才落库；对不上则整笔不写并回 400 说明 | 管理员 |
 
 回调侧的三条硬约定（改代码前先读）：
 
