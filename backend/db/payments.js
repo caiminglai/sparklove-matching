@@ -123,11 +123,14 @@ async function getPaymentOrder(orderId) {
 
 async function updatePaymentOrder(orderId, status, channelTxnId = null) {
   const database = getDb();
+  // 状态守卫必须写进 UPDATE 本身：调用方先 SELECT 再 UPDATE 不是原子的，
+  // 渠道重推或并发通知两条都能读到 pending，于是各发一次货。
+  // 带上 status <> $1 后同一笔只有一个请求能拿到 rowCount=1，其余回 0。
   const stmt = database.prepare(
-    'UPDATE payment_orders SET status = $1, paid_at = $2, channel_txn_id = COALESCE($3, channel_txn_id) WHERE order_id = $4'
+    'UPDATE payment_orders SET status = $1, paid_at = $2, channel_txn_id = COALESCE($3, channel_txn_id) WHERE order_id = $4 AND status <> $1'
   );
-  await stmt.run(status, status === 'paid' ? Date.now() : null, channelTxnId, orderId);
-  return true;
+  const result = await stmt.run(status, status === 'paid' ? Date.now() : null, channelTxnId, orderId);
+  return result.changes === 1;
 }
 
 // 种子库里的 payment_orders 没有渠道流水号列，启动期幂等补上，老库不用手工迁移

@@ -203,7 +203,8 @@ async function handleWechatNotify(rawBody) {
   }
   // 微信会重复通知同一笔；已是 paid 就直接回成功，避免重复写 deposits
   if (order.status === 'paid') return { success: true, orderId: orderId };
-  await paymentsDb.updatePaymentOrder(orderId, 'paid', payload.transaction_id);
+  const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid', payload.transaction_id);
+  if (!flipped) return { success: true, orderId: orderId };
   await applyOrderEffect(order);
   return { success: true, orderId: orderId };
 }
@@ -267,7 +268,8 @@ async function handleAlipayNotify(params) {
   // 🔴 签名只证明"出自支付宝"，不证明金额对得上。少这一步，一笔小额真实支付就能把大额订单标成已付
   if (Number(params.total_amount).toFixed(2) !== Number(order.amount).toFixed(2)) return { success: false, message: '回调金额与订单不符' };
   if (order.status === 'paid') return { success: true, orderId: orderId };
-  await paymentsDb.updatePaymentOrder(orderId, 'paid', params.trade_no);
+  const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid', params.trade_no);
+  if (!flipped) return { success: true, orderId: orderId };
   await applyOrderEffect(order);
   return { success: true, orderId: orderId };
 }
@@ -321,8 +323,8 @@ async function mockPay(req, res, parsedUrl) {
     return;
   }
   if (order.status === 'pending') {
-    await paymentsDb.updatePaymentOrder(orderId, 'paid');
-    await applyOrderEffect(order);
+    const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid');
+    if (flipped) await applyOrderEffect(order);
   }
   const purpose = order.purpose || 'deposit';
   const back = purpose === 'contact_unlock'
