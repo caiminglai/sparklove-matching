@@ -48,9 +48,14 @@ async function addContactUnlockRequest(viewerId, targetId, proofPath, method, am
         amount = EXCLUDED.amount,
         status = EXCLUDED.status,
         created_at = EXCLUDED.created_at
+      WHERE contact_unlocks.status <> 'unlocked'
       RETURNING id
     `);
     const row = await stmt.get(viewerId, targetId, proofPath, method || 'manual', amount, 'pending', now);
+    // 已解锁的那行被上面的 WHERE 拦住，不会被覆写回 pending；此时语句一行也没改，
+    // RETURNING 自然为空 —— 次数包的余额是按 unlocked 行数推导的，一旦覆写就等于把
+    // 用户已经花掉的次数白送回去，所以这里只报"已解锁"，绝不返回一个假成功
+    if (!row) return { success: false, alreadyUnlocked: true };
     return { success: true, id: row.id };
   } catch (e) {
     return { success: false, error: e.message };

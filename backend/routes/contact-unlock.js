@@ -40,6 +40,14 @@ function submitUnlockRequest(req, res) {
       const method = parsed.fields.method || 'manual';
       // 🔴 不读 parsed.fields.amount：那是前端传来的数字，审核时看到的数额就能被提交方自己填
 
+      // 已经解锁过的人不再收第二次凭证：重复提交会把 unlocked 那行覆写回 pending，
+      // 而次数包余额正是按 unlocked 行数算的，覆写一次就等于白送回一次额度；
+      // 顺带也不再往盘上多堆一张用不上的凭证图
+      if (targetId && await paymentsDb.checkContactUnlocked(viewerId, targetId)) {
+        sendJson(res, 200, { success: true, alreadyUnlocked: true, message: '你已解锁该联系方式，可直接查看' });
+        return;
+      }
+
       // 处理上传的文件
       for (const [fieldName, file] of Object.entries(parsed.files)) {
         const { valid, ext } = validateExtension(file.filename);
@@ -61,6 +69,9 @@ function submitUnlockRequest(req, res) {
       const result = await paymentsDb.addContactUnlockRequest(String(viewerId), targetId, proofPath, method, amount);
       if (result.success) {
         sendJson(res, 200, { success: true, message: '凭证提交成功，等待管理员审核', proof_path: proofPath });
+      } else if (result.alreadyUnlocked) {
+        // 并发下两条提交可能同时越过上面的入口检查，被库里的 WHERE 拦住的那条走这里
+        sendJson(res, 200, { success: true, alreadyUnlocked: true, message: '你已解锁该联系方式，可直接查看' });
       } else {
         sendJson(res, 400, { success: false, message: result.error || '提交失败' });
       }

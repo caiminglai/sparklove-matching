@@ -10,6 +10,10 @@ backend/.env.production
 app/node_modules
 app/dist
 
+# 用户上传件不进镜像：运行时读的是挂载点 /uploads（server.js:181 从 /app 向上跳两级），
+# 镜像里那份 COPY 进来的副本既用不上，又把真实凭证图留在了镜像层
+backend/uploads
+
 # 废弃的历史文件，不进镜像
 data/*.db
 data/*.db-wal
