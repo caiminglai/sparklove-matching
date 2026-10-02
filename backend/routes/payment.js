@@ -254,6 +254,101 @@ function verifyAlipaySign(params, publicKey) {
   return check(true) || check(false);
 }
 
+// 通知体是 application/x-www-form-urlencoded，按规范空格编码成 '+'，
+// 而 decodeURIComponent 不认 '+'：gmt_payment（"2026-10-02 20:04:04"）这类带空格的字段
+// 解出来会留一个加号，待签串就和原文不等，于是每一次真实回调都验签失败。
+function decodeFormBody(body) {
+  const params = {};
+  for (const pair of String(body).split('&')) {
+    if (!pair) continue;
+    const idx = pair.indexOf('=');
+    const rawKey = idx < 0 ? pair : pair.substring(0, idx);
+    const rawValue = idx < 0 ? '' : pair.substring(idx + 1);
+    try {
+      params[decodeURIComponent(String(rawKey).replace(/\+/g, ' '))] = decodeURIComponent(String(rawValue).replace(/\+/g, ' '));
+    } catch {
+      return null; // 非法百分号转义：整个通知按不可信处理，交给调用方回 fail
+    }
+  }
+  return params;
+}
+
+// ===== 查单：异步通知万一没到（验签失败、URL 被兜底吃掉、支付宝重试耗尽），这是第二条到账路径 =====
+
+const ALIPAY_GATEWAY = 'https://openapi.alipay.com/gateway.do';
+const ALIPAY_PAID_STATUSES = new Set(['TRADE_SUCCESS', 'TRADE_FINISHED']);
+// 前端每 3 秒轮一次状态，不打节流就是每 3 秒问一次支付宝网关
+const lastAlipayQueryAt = new Map();
+
+// 支付宝的 timestamp 口径是本地时间，不是 ISO/UTC
+function alipayTimestamp() {
+  const d = new Date();
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+}
+
+// 应答的签名对象是 "alipay_trade_query_response":{...} 那段 JSON 原文，
+// 键序或空白一变就对不上，所以只能从原文切，不能 parse 之后再 stringify 回去。
+function extractResponseNode(raw, nodeKey) {
+  const key = `"${nodeKey}":`;
+  const at = raw.indexOf(key);
+  if (at < 0) return null;
+  let i = at + key.length;
+  while (i < raw.length && /\s/.test(raw[i])) i++;
+  if (raw[i] !== '{') return null;
+  const from = i;
+  let depth = 0, inStr = false, escaped = false;
+  for (; i < raw.length; i++) {
+    const ch = raw[i];
+    if (inStr) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inStr = false;
+      continue;
+    }
+    if (ch === '"') inStr = true;
+    else if (ch === '{') depth++;
+    else if (ch === '}') {
+      depth--;
+      if (depth === 0) return raw.slice(from, i + 1);
+    }
+  }
+  return null;
+}
+
+function verifyAlipayContent(content, signature) {
+  return crypto.createVerify('RSA-SHA256').update(content, 'utf8').verify(alipayConfig.alipayPublicKey, signature, 'base64');
+}
+
+/** 按商户订单号查单；配置不全或应答不可信时返回 null，调用方保持原状态 */
+async function queryAlipayOrder(orderId) {
+  if (!alipayConfig || !alipayConfig.appId || !alipayConfig.privateKey || !alipayConfig.alipayPublicKey) return null;
+  const params = {
+    app_id: alipayConfig.appId, method: 'alipay.trade.query', format: 'JSON',
+    charset: 'utf-8', sign_type: 'RSA2', timestamp: alipayTimestamp(), version: '1.0',
+    biz_content: JSON.stringify({ out_trade_no: orderId }),
+  };
+  params.sign = alipaySign(params, alipayConfig.privateKey);
+  const body = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+  const res = await fetch(ALIPAY_GATEWAY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8', Accept: 'application/json' },
+    body,
+  });
+  const text = await res.text();
+  const nodeRaw = extractResponseNode(text, 'alipay_trade_query_response');
+  if (nodeRaw === null) {
+    // 签名错、参数错这类网关级错误回的是 error_response，没有业务节点也没有 sign
+    console.warn('[payment] 支付宝查单无业务节点: HTTP=' + res.status + ' ' + text.slice(0, 200));
+    return null;
+  }
+  let envelope;
+  try { envelope = JSON.parse(text); } catch { console.warn('[payment] 支付宝查单应答不是合法 JSON'); return null; }
+  if (!envelope.sign) { console.warn('[payment] 支付宝查单应答缺 sign'); return null; }
+  if (!verifyAlipayContent(nodeRaw, envelope.sign)) { console.warn('[payment] 支付宝查单应答验签失败'); return null; }
+  return JSON.parse(nodeRaw);
+}
+
 async function handleAlipayNotify(params) {
   if (!alipayConfig.alipayPublicKey) return { success: false, message: '未配置支付宝公钥' };
   const sign = params.sign;
@@ -442,14 +537,25 @@ async function wechatNotify(req, res, readBodyWithLimit) {
 }
 
 async function alipayNotify(req, res, readBodyWithLimit) {
+  const replyFail = () => { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('fail'); };
   try {
     const body = await readBodyWithLimit(req);
-    const params = {};
-    body.split('&').forEach(pair => { const idx = pair.indexOf('='); const key = pair.substring(0, idx); const value = pair.substring(idx + 1); params[key] = decodeURIComponent(value || ''); });
+    const params = decodeFormBody(body);
+    if (!params) { console.warn('[payment] 支付宝通知体含非法百分号转义，已拒'); replyFail(); return; }
     const result = await handleAlipayNotify(params);
-    if (result.success) { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('success'); }
-    else { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('fail'); }
-  } catch (e) { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('fail'); }
+    if (result.success) {
+      res.writeHead(200, {'Content-Type': 'text/plain'});
+      res.end('success');
+      return;
+    }
+    // 支付宝只认应答里的 'success'：回 fail 它就会按阶梯重试，所以原因必须留痕，
+    // 否则线上只能看见"钱付了订单还 pending"，谁也说不清是哪一个门拦的。
+    console.warn(`[payment] 支付宝通知被拒: ${result.message} order=${params.out_trade_no || '-'} trade_status=${params.trade_status || '-'} amount=${params.total_amount || '-'}`);
+    replyFail();
+  } catch (e) {
+    console.warn('[payment] 支付宝通知处理异常:', (e && e.message) || e);
+    replyFail();
+  }
 }
 
 async function queryPaymentStatus(req, res, parsedUrl) {
@@ -460,8 +566,30 @@ async function queryPaymentStatus(req, res, parsedUrl) {
   if (!userId) { res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: 'token无效' })); return; }
   const orderId = parsedUrl.query.orderId;
   if (!orderId) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '缺少订单号' })); return; }
-  const order = await paymentsDb.getPaymentOrder(orderId);
+  let order = await paymentsDb.getPaymentOrder(orderId);
   if (!order || order.user_id !== userId) { res.writeHead(404, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '订单不存在' })); return; }
+  // 异步通知只是其中一条路：它验签失败或重试耗尽时，用户已经付过的钱会一直卡在 pending。
+  // 这里主动查一次单，钱就能落账，不必再付一遍。
+  if (order.status !== 'paid' && order.channel === 'alipay') {
+    const lastQueryAt = lastAlipayQueryAt.get(orderId) || 0;
+    if (Date.now() - lastQueryAt >= 10000) {
+      lastAlipayQueryAt.set(orderId, Date.now());
+      try {
+        const remote = await queryAlipayOrder(orderId);
+        // code 10000 只代表接口调通，到账只看 trade_status；金额再卡一道，
+        // 因为置 paid 会直接发货（认证费入账 / 解锁联系方式）
+        const amountMatches = remote && remote.total_amount !== undefined
+          && Number(remote.total_amount).toFixed(2) === Number(order.amount).toFixed(2);
+        if (remote && remote.code === '10000' && amountMatches && ALIPAY_PAID_STATUSES.has(remote.trade_status)) {
+          const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid', remote.trade_no);
+          if (flipped) await applyOrderEffect(order);
+          order = await paymentsDb.getPaymentOrder(orderId);
+        }
+      } catch (e) {
+        console.warn('[payment] 支付宝查单异常:', (e && e.message) || e);
+      }
+    }
+  }
   res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
   res.end(JSON.stringify({ success: true, status: order.status, purpose: order.purpose || 'deposit', targetId: order.target_id || null }));
 }
@@ -555,4 +683,8 @@ module.exports = {
   publicConfig,
   adminGetPrice,
   adminSavePrice,
+  // 下面三个是给离线断言用的，业务代码不要直接调
+  decodeFormBody,
+  verifyAlipaySign,
+  extractResponseNode,
 };
