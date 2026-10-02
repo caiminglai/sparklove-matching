@@ -8,6 +8,7 @@ import { useToast } from '../components/Toast'
 import { getAuthToken } from '../utils/auth'
 import { formatDraftAge } from '../services/draft.service'
 import { useFormDraft } from '../utils/useFormDraft'
+import { applyTagToggle, FORM_HIDDEN_KEYS } from '../utils/form-fields'
 
 export default function PostPage() {
   const { toast } = useToast()
@@ -15,6 +16,9 @@ export default function PostPage() {
   const [columns] = useState(() => loadColumns())
   const [data, setData] = useState<Record<string, string | number>>({})
   const [selectedTags, setSelectedTags] = useState<Record<string, string[]>>({})
+
+  // 年龄/星座/婚姻/兴趣标签由后端从生日、感情状态、兴趣+运动推导，表单不再追问
+  const formColumns = columns.filter((col) => !FORM_HIDDEN_KEYS.has(col.key))
 
   const userId = localStorage.getItem('user_id')
   const authToken = getAuthToken()
@@ -39,10 +43,7 @@ export default function PostPage() {
   const setVal = (key: string, val: string) => setData((p) => ({ ...p, [key]: val }))
 
   const toggleTag = (key: string, tag: string) => {
-    setSelectedTags((p) => {
-      const cur = p[key] || []
-      return { ...p, [key]: cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag] }
-    })
+    setSelectedTags((p) => ({ ...p, [key]: applyTagToggle(p[key] || [], key, tag) }))
   }
 
   const handleSubmit = async () => {
@@ -221,7 +222,7 @@ export default function PostPage() {
 
         {/* Form */}
         <div className="space-y-3">
-          {columns.map((col) => {
+          {formColumns.map((col) => {
             if (col.type === 'tags') {
               return (
                 <div key={col.key}>

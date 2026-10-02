@@ -44,7 +44,7 @@
 │   ├── routes/                   # API 路由层（10 个文件）
 │   ├── services/                 # 业务逻辑层（8 个文件）
 │   ├── middleware/              # 中间件（安全.js / 日志.js）
-│   ├── utils/                    # 通用工具（config.js / cookie工具.js / extractId.js / multipart.js / sendJson.js）
+│   ├── utils/                    # 零依赖纯函数（9 个文件：config.js / clientIp.js / cookie工具.js / extractId.js / multipart.js / sendJson.js / pricing.js / payment-verify.js / profile-derive.js）
 │   ├── uploads/                  # 用户上传文件目录（compose 挂载到容器内 /uploads）
 │   │   ├── avatars/              # 用户头像
 │   │   ├── deposits/             # 认证费凭证
@@ -320,6 +320,12 @@ server: {
 > 访客侧只返回「本行 `deposit > 0`（线下/后台代收）」或「所属账号在 `deposits` 里有 `approved` 记录（线上下单）」的资料行，
 > `total` 用同一判据计数，不会和 `data` 条数打架；管理员端与 `/api/users/batch` 导入不过这个门。
 > 未过门的账号调发布/首次填写（`POST /api/users`、`PUT /api/users/my`）直接 403 `need_certification`，资料根本不入库。
+>
+> **派生字段**（`utils/profile-derive.js`，只在 `db/users.js` 的 `jsonToDbRow()` 里生效 —— 这是 `addUser`／`updateUser`／`batchSaveUsers`
+> 三条写路径唯一的共同闸门）：`age`←`birthday` 周岁、`zodiac`←生日的月+日、`marriage`←`relationship_status`、`interestTags`=`hobbies`∪`sport`。
+> 这四项在表单里已被隐藏（前端 `app/src/utils/form-fields.ts` 的 `FORM_HIDDEN_KEYS`）但**字段定义与库列都保留**，因为 `age` 列正被首页年龄区间筛选
+> （`CAST(age AS INTEGER)`）与匹配向量文本读取，删列会把这些功能一起掏空。算不出来（缺来源）时**不覆盖**，保留提交上来的原值，
+> 免得老用户没填生日就把已有的年龄抹成空。详见运维记录 §2.16。
 
 ### 5.3 上传接口
 

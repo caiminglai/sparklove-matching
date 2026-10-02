@@ -25,6 +25,7 @@ import { useToast } from '../components/Toast'
 import { computeProfileCompleteness } from '../utils/profile-completeness'
 import { formatDraftAge } from '../services/draft.service'
 import { useFormDraft } from '../utils/useFormDraft'
+import { applyTagToggle, FORM_HIDDEN_KEYS } from '../utils/form-fields'
 
 export default function ProfilePage() {
   const { toast } = useToast()
@@ -173,10 +174,7 @@ export default function ProfilePage() {
   const setVal = (key: string, val: string) => setFormData((p) => ({ ...p, [key]: val }))
 
   const toggleTag = (key: string, tag: string) => {
-    setSelectedTags((p) => {
-      const cur = p[key] || []
-      return { ...p, [key]: cur.includes(tag) ? cur.filter((t) => t !== tag) : [...cur, tag] }
-    })
+    setSelectedTags((p) => ({ ...p, [key]: applyTagToggle(p[key] || [], key, tag) }))
   }
 
   const addCustomField = async () => {
@@ -345,6 +343,9 @@ export default function ProfilePage() {
 
   // 编辑态下 formData 会随输入变化，完整度条实时跟着走
   const completeness = computeProfileCompleteness(formData)
+
+  // 年龄/星座/婚姻/兴趣标签由后端从生日、感情状态、兴趣+运动推导，表单不再追问
+  const formColumns = columns.filter((col) => !FORM_HIDDEN_KEYS.has(col.key))
 
   return (
     <div className="min-h-screen pb-8" style={{ background: 'var(--color-bg-main)' }}>
@@ -573,7 +574,7 @@ export default function ProfilePage() {
 
             {editMode ? (
               <div className="space-y-3">
-                {columns.map((col) => {
+                {formColumns.map((col) => {
                   if (col.type === 'tags') {
                     return (
                       <div key={col.key}>

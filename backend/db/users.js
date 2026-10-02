@@ -1,4 +1,5 @@
 const { getDb, encrypt, decrypt } = require('./index');
+const { deriveProfileFields } = require('../utils/profile-derive');
 
 const ALL_FIELDS = [
   'id', 'user_id', 'deposit', 'created_at', 'name', 'gender', 'age', 'height', 'weight',
@@ -10,7 +11,8 @@ const ALL_FIELDS = [
 ];
 
 function jsonToDbRow(jsonRow) {
-  const data = jsonRow.data || {};
+  // 表单不再追问年龄/星座/婚姻/兴趣标签，这几项在这里由生日、感情状态、兴趣+运动算出来
+  const data = deriveProfileFields(jsonRow.data || {});
   const extraData = {};
   for (const key of Object.keys(data)) {
     const snakeKey = key.replace(/([A-Z])/g, '_$1').replace(/^_/, '').toLowerCase();
