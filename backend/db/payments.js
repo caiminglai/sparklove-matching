@@ -204,9 +204,9 @@ async function approveDepositByUserId(userId, amount) {
   const existing = await existingStmt.get(userId);
   if (existing) {
     const updateStmt = database.prepare(
-      'UPDATE deposits SET status = $1, approved_at = $2, admin_note = $3 WHERE id = $4'
+      'UPDATE deposits SET status = $1, approved_at = $2, admin_note = $3, amount = $5 WHERE id = $4'
     );
-    await updateStmt.run('approved', Date.now(), '自动支付通过', existing.id);
+    await updateStmt.run('approved', Date.now(), '自动支付通过', existing.id, amount);
   } else {
     const insertStmt = database.prepare(
       'INSERT INTO deposits (user_id, amount, status, created_at, approved_at, admin_note) VALUES ($1, $2, $3, $4, $5, $6)'

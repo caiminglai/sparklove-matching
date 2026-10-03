@@ -110,6 +110,9 @@ async function getMyUser(userId) {
   if (users.length === 0) return null;
   const user = users[0];
   user.custom_fields = await userDb.getUserCustomFields(userId);
+  // users.deposit 只有后台代录会填，线上支付只写 deposits 表，所以展示以 deposits 表的 approved 金额为准
+  const depositRow = await paymentsDb.getMyDeposit(userId);
+  user.deposit = Number(depositRow && depositRow.status === 'approved' ? depositRow.amount : user.deposit) || 0;
   return user;
 }
 
