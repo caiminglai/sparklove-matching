@@ -2,9 +2,11 @@ import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import { loadColumns, loadRows, addRow } from '../services/user.service'
-import type { Row } from '../data/types'
+import { fetchFieldMappings } from '../services/field-mapping.service'
+import type { Column, Row } from '../data/types'
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config'
 import { useToast } from '../components/Toast'
+import BirthdayPicker from '../components/BirthdayPicker'
 import { getAuthToken } from '../utils/auth'
 import { formatDraftAge } from '../services/draft.service'
 import { useFormDraft } from '../utils/useFormDraft'
@@ -13,7 +15,15 @@ import { applyTagToggle, FORM_HIDDEN_KEYS } from '../utils/form-fields'
 export default function PostPage() {
   const { toast } = useToast()
   const navigate = useNavigate()
-  const [columns] = useState(() => loadColumns())
+  const [columns, setColumns] = useState<Column[]>(loadColumns)
+  // 列集合与标签的权威在后端 field_mappings，本地缓存只当首屏兜底
+  useEffect(() => {
+    fetchFieldMappings()
+      .then((apiCols) =>
+        setColumns((prev) => [...apiCols, ...prev.filter((c) => c.category === 'custom')]),
+      )
+      .catch(() => {})
+  }, [])
   const [data, setData] = useState<Record<string, string | number>>({})
   const [selectedTags, setSelectedTags] = useState<Record<string, string[]>>({})
 
@@ -252,6 +262,17 @@ export default function PostPage() {
                     })}
                   </div>
                 </div>
+              )
+            }
+
+            if (col.key === 'birthday') {
+              return (
+                <BirthdayPicker
+                  key={col.key}
+                  label={col.label}
+                  value={data[col.key] ?? ''}
+                  onChange={(v) => setVal(col.key, v)}
+                />
               )
             }
 

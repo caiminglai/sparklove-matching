@@ -150,7 +150,9 @@ const server = http.createServer(async (req, res) => {
   res.setHeader('Access-Control-Allow-Origin', allowOrigin);
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-None-Match');
+  // 跨源时浏览器默认不把 ETag 交给 JS，前端拿不到就退化成 Date.now() 当版本号、协商缓存永不命中。
+  res.setHeader('Access-Control-Expose-Headers', 'ETag');
 
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 

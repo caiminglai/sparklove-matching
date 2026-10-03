@@ -22,6 +22,7 @@ import type { Column, Row } from '../data/types'
 import { getAuthToken } from '../utils/auth'
 import { formatYuan } from '../utils/money'
 import { useToast } from '../components/Toast'
+import BirthdayPicker from '../components/BirthdayPicker'
 import { computeProfileCompleteness } from '../utils/profile-completeness'
 import { formatDraftAge } from '../services/draft.service'
 import { useFormDraft } from '../utils/useFormDraft'
@@ -608,6 +609,17 @@ export default function ProfilePage() {
                           })}
                         </div>
                       </div>
+                    )
+                  }
+
+                  if (col.key === 'birthday') {
+                    return (
+                      <BirthdayPicker
+                        key={col.key}
+                        label={col.label}
+                        value={formData[col.key] ?? ''}
+                        onChange={(v) => setVal(col.key, v)}
+                      />
                     )
                   }
 

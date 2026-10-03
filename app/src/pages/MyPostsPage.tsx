@@ -3,16 +3,23 @@ import { Link } from 'react-router'
 import { ArrowLeft, FileText, Trash2, Clock, Plus } from 'lucide-react'
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config'
 import { loadColumns } from '../services/user.service'
-import type { Row } from '../data/types'
+import { fetchFieldMappings } from '../services/field-mapping.service'
+import type { Column, Row } from '../data/types'
 import { useToast } from '../components/Toast'
 import { getAuthToken } from '../utils/auth'
 import { formatYuan } from '../utils/money'
 
 export default function MyPostsPage() {
   const { toast } = useToast()
-  // 修复：原 const columns = loadColumns() 在函数体内直接调用，每次渲染都重读 localStorage + JSON.parse
-  // 改为 useState 初始化器，仅在首次挂载时执行一次
-  const [columns] = useState(loadColumns)
+  const [columns, setColumns] = useState<Column[]>(loadColumns)
+  // 标签与列集合的权威在后端 field_mappings，本地缓存只当首屏兜底
+  useEffect(() => {
+    fetchFieldMappings()
+      .then((apiCols) =>
+        setColumns((prev) => [...apiCols, ...prev.filter((c) => c.category === 'custom')]),
+      )
+      .catch(() => {})
+  }, [])
   const [rows, setRows] = useState<Row[]>([])
   const [loading, setLoading] = useState(true)
   const [showDelModal, setShowDelModal] = useState<string | null>(null)

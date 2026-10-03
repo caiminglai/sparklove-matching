@@ -112,14 +112,24 @@ function deriveInterestTags(hobbies, sport) {
 /**
  * 只覆盖"算得出来"的那几项：算不出（缺来源）时保留提交上来的原值，
  * 免得老用户没填生日就把已有的年龄抹成空。
+ * 唯一例外是 age/zodiac —— 提交里带了 birthday 时按生日整体重算，算不出就写空。
  */
 function deriveProfileFields(data, nowMs = Date.now()) {
   const out = { ...(data || {}) };
   const setIfDerived = (key, value) => {
     if (value !== '' && value != null) out[key] = value;
   };
-  setIfDerived('age', deriveAgeFromBirthday(out.birthday, nowMs));
-  setIfDerived('zodiac', deriveZodiacFromBirthday(out.birthday));
+  // 生日栏由表单下拉直接控制，所以提交里带了它就完全以它为准：
+  // 把 1995-06-22 改成 1995-06（日留空）时星座算不出来，必须把旧的巨蟹座抹掉，
+  // 否则页面上会留下一个对不上生日的星座，而这栏已从表单里隐藏、用户自己清不掉。
+  // 没带 birthday 的提交保持原来的"算得出才覆盖"，免得把只写了年龄的老数据抹成空。
+  if (Object.prototype.hasOwnProperty.call(out, 'birthday')) {
+    out.age = deriveAgeFromBirthday(out.birthday, nowMs);
+    out.zodiac = deriveZodiacFromBirthday(out.birthday);
+  } else {
+    setIfDerived('age', deriveAgeFromBirthday(out.birthday, nowMs));
+    setIfDerived('zodiac', deriveZodiacFromBirthday(out.birthday));
+  }
   setIfDerived('marriage', deriveMarriageFromRelationshipStatus(out.relationship_status));
   const tags = deriveInterestTags(out.hobbies, out.sport);
   if (tags !== '') out.interestTags = tags;

@@ -172,6 +172,22 @@ describe('deriveProfileFields', () => {
     expect(withoutSource.interestTags).toBe('钓鱼')
   })
 
+  it('带了 birthday 就按它重算：只到月时清空星座，不留对不上的旧值', () => {
+    const monthOnly = derive.deriveProfileFields(
+      { birthday: '1995-07', age: '99', zodiac: '白羊座' },
+      NOW,
+    )
+    expect(monthOnly.age).toBe('31')
+    expect(monthOnly.zodiac).toBe('')
+
+    const fullDate = derive.deriveProfileFields({ birthday: '1995-07-05', zodiac: '白羊座' }, NOW)
+    expect(fullDate.zodiac).toBe('巨蟹座')
+
+    const cleared = derive.deriveProfileFields({ birthday: '', age: '30', zodiac: '白羊座' }, NOW)
+    expect(cleared.age).toBe('')
+    expect(cleared.zodiac).toBe('')
+  })
+
   it('不碰其它键，也不改动传入对象', () => {
     const input = { name: '小满', city: '西安', birthday: '1995-06-22', extra: '保持' }
     const out = derive.deriveProfileFields(input, NOW)
