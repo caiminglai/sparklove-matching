@@ -514,7 +514,7 @@ export default function ProfilePage() {
                     {userData.data?.name || userNickname}
                   </div>
                   <div className="text-xs mt-1" style={{ color: 'var(--color-text-secondary)' }}>
-                    注册时间: {new Date(userData.createdAt).toLocaleDateString('zh-CN')}
+                    注册时间: {new Date(Number(userData.createdAt)).toLocaleDateString('zh-CN')}
                   </div>
                 </div>
                 {!editMode && (

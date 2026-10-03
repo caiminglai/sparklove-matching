@@ -20,7 +20,6 @@ export const ZODIAC_OPTIONS = [
   '水瓶座',
   '双鱼座',
 ]
-export const BLOOD_TYPE_OPTIONS = ['A型', 'B型', 'AB型', 'O型']
 export const GENDER_OPTIONS = ['男', '女']
 export const MARRIAGE_OPTIONS = ['未婚', '离异', '丧偶']
 export const CHILDREN_OPTIONS = ['无', '1个', '2个', '2个以上']
@@ -319,7 +318,6 @@ export const FIELD_LABELS: Record<string, string> = {
   weight: '体重',
   skinTone: '肤色',
   zodiac: '星座',
-  bloodType: '血型',
   city: '城市',
   marriage: '婚姻',
   children: '子女',
@@ -363,6 +361,7 @@ export const DEFAULT_COLUMNS: Column[] = [
   { key: 'name', label: '昵称', type: 'text', category: '基本' },
   { key: 'gender', label: '性别', type: 'select', options: GENDER_OPTIONS, category: '基本' },
   { key: 'age', label: '年龄', type: 'text', category: '基本' },
+  { key: 'birthday', label: '出生年月', type: 'text', category: '基本' },
   { key: 'height', label: '身高', type: 'text', category: '基本' },
   { key: 'weight', label: '体重', type: 'text', category: '基本' },
   { key: 'city', label: '城市', type: 'select', options: CITY_OPTIONS, category: '基本' },
@@ -378,13 +377,6 @@ export const DEFAULT_COLUMNS: Column[] = [
   },
   { key: 'bodyType', label: '身材', type: 'select', options: BODY_TYPE_OPTIONS, category: '外貌' },
   { key: 'zodiac', label: '星座', type: 'select', options: ZODIAC_OPTIONS, category: '属性' },
-  {
-    key: 'bloodType',
-    label: '血型',
-    type: 'select',
-    options: BLOOD_TYPE_OPTIONS,
-    category: '属性',
-  },
   { key: 'marriage', label: '婚姻', type: 'select', options: MARRIAGE_OPTIONS, category: '属性' },
   { key: 'children', label: '子女', type: 'select', options: CHILDREN_OPTIONS, category: '属性' },
   { key: 'education', label: '学历', type: 'select', options: EDUCATION_OPTIONS, category: '属性' },

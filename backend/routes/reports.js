@@ -82,13 +82,14 @@ function addReport(req, res, readBodyWithLimit) {
   });
 }
 
-// ========== GET /api/admin/reports
+// ========== GET /api/reports
 async function getAllReports(req, res, checkAdminAuth) {
   if (!(await checkAdminAuth(req))) {
     sendJson(res, 401, { success: false, message: '需要管理员权限' });
     return;
   }
-  const reports = await reportsService.getAllReportsForAdmin();
+  const status = new URL(req.url, 'http://localhost').searchParams.get('status');
+  const reports = await reportsService.getAllReportsForAdmin(status || null);
   sendJson(res, 200, reports);
 }
 

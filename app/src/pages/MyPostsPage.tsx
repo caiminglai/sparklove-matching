@@ -165,7 +165,7 @@ export default function MyPostsPage() {
                       <div className="flex items-center gap-2 mt-0.5">
                         <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
                           <Clock size={10} className="inline mr-1" />
-                          {new Date(row.createdAt).toLocaleDateString('zh-CN')}
+                          {new Date(Number(row.createdAt)).toLocaleDateString('zh-CN')}
                         </span>
                         {row.deposit > 0 && (
                           <span

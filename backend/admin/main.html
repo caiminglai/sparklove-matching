@@ -1469,9 +1469,11 @@ function renderDepositsTable(){
     
     var td5=document.createElement('td');
     var dateStr='-';
-    if(deposit.created_at){
+    // pg 把 bigint 列按数字字符串回传，不先 Number() 的话 new Date("1783...") 恒为 Invalid Date
+    var ts=Number(deposit.created_at);
+    if(deposit.created_at&&isFinite(ts)){
       try{
-        var d=new Date(deposit.created_at);
+        var d=new Date(ts);
         if(!isNaN(d.getTime())) dateStr=d.toLocaleString('zh-CN');
       }catch(e){}
     }
@@ -1858,9 +1860,10 @@ function renderReportsTable(){
     // 举报时间
     var td6=document.createElement('td');
     var dateStr = '-';
-    if (report.createdAt || report.created_at) {
+    var ts = Number(report.createdAt || report.created_at);
+    if ((report.createdAt || report.created_at) && isFinite(ts)) {
       try {
-        var d = new Date(report.createdAt || report.created_at);
+        var d = new Date(ts);
         if (!isNaN(d.getTime())) dateStr = d.toLocaleString('zh-CN');
       } catch (e) {}
     }
@@ -2098,9 +2101,10 @@ function renderCustomFieldsTable(){
     var td4=document.createElement('td');
     var dateStr='-';
     var createdDate=field.created_at||field.createdAt||'';
-    if(createdDate){
+    var createdTs=Number(createdDate);
+    if(createdDate&&isFinite(createdTs)){
       try{
-        var d=new Date(createdDate);
+        var d=new Date(createdTs);
         if(!isNaN(d.getTime())) dateStr=d.toLocaleString('zh-CN');
       }catch(e){}
     }
@@ -2323,9 +2327,9 @@ function renderUnlockRecordsTable(){
     }
     tr.appendChild(td0);
 
-    // 查看者（来自 auth_users 表：nickname + avatar）
+    // 查看者：优先资料昵称（users.name，改资料会跟着变），回退注册时的账号昵称（auth_users.nickname 只写一次）
     var displayViewerId=record.viewer_id||'';
-    var viewerName=record.viewer_name||'用户 '+(displayViewerId.substring(displayViewerId.length-4)||'');
+    var viewerName=record.viewer_profile_name||record.viewer_name||'用户 '+(displayViewerId.substring(displayViewerId.length-4)||'');
     var viewerAvatar=record.viewer_avatar||'';
     var td1=document.createElement('td');
     td1.style.paddingLeft='4px';
@@ -2427,9 +2431,10 @@ function renderUnlockRecordsTable(){
     var td6=document.createElement('td');
     var dateStr='-';
     var timeValue=record.unlocked_at||record.created_at||'';
-    if(timeValue){
+    var ts=Number(timeValue);
+    if(timeValue&&isFinite(ts)){
       try{
-        var d=new Date(timeValue);
+        var d=new Date(ts);
         if(!isNaN(d.getTime())) dateStr=d.toLocaleString('zh-CN');
       }catch(e){}
     }

@@ -69,7 +69,8 @@ async function getAllContactUnlockRequests() {
       au.nickname as viewer_name, au.phone as viewer_phone,
       u.name as target_name, u.contact as target_contact, u.avatar as target_avatar,
       u.user_id as target_user_id,
-      uv.avatar as viewer_avatar
+      uv.avatar as viewer_avatar,
+      uv.name as viewer_profile_name
     FROM contact_unlocks cu
     LEFT JOIN auth_users au ON cu.viewer_id = au.id
     LEFT JOIN users u ON cu.target_id = u.id OR cu.target_id = u.user_id

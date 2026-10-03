@@ -173,7 +173,7 @@
         <select id="reportStatusInput">
           <option value="">全部</option>
           <option value="pending">待处理</option>
-          <option value="approved">已通过</option>
+          <option value="resolved">已解决</option>
           <option value="rejected">已驳回</option>
         </select>
         <button class="btn-search" onclick="loadReports()">刷新举报列表</button>
@@ -854,7 +854,7 @@
                   </div>
                   <span class="status unlocked">已解锁</span>
                 </div>
-                <div class="time">${new Date(record.created_at).toLocaleString('zh-CN')}</div>
+                <div class="time">${new Date(Number(record.created_at)).toLocaleString('zh-CN')}</div>
               </div>
             `;
           }).join('');
@@ -892,7 +892,7 @@
         
         if (reports && reports.length > 0) {
           list.innerHTML = reports.map(report => {
-            const statusText = report.status === 'pending' ? '待处理' : report.status === 'approved' ? '已通过' : report.status === 'rejected' ? '已驳回' : report.status || '未知';
+            const statusText = report.status === 'pending' ? '待处理' : report.status === 'resolved' ? '已解决' : report.status === 'rejected' ? '已驳回' : report.status || '未知';
             
             // 被举报用户信息（从 allUsers 中查找或使用返回的数据）
             const reportedUser = report.reported_user_data || report.user_data || findUserById(report.reported_id);
@@ -946,15 +946,15 @@
                     </div>
                     <div class="report-meta">类型: ${escapeHtml(report.report_type || '未填写')}</div>
                   </div>
-                  <span class="status ${report.status === 'pending' ? 'pending' : report.status === 'approved' ? 'approved' : 'rejected'}">${statusText}</span>
+                  <span class="status ${report.status === 'pending' ? 'pending' : report.status === 'rejected' ? 'rejected' : 'approved'}">${statusText}</span>
                 </div>
                 <div class="report-content">${escapeHtml(report.description || '未填写描述')}</div>
                 ${report.admin_note ? `<div class="report-content" style="background:#E3F2FD;color:#1565C0;">管理员备注: ${escapeHtml(report.admin_note)}</div>` : ''}
                 ${proofBtn}
-                <div class="time">提交时间: ${new Date(report.created_at).toLocaleString('zh-CN')}</div>
+                <div class="time">提交时间: ${new Date(Number(report.created_at)).toLocaleString('zh-CN')}</div>
                 ${report.status === 'pending' ? `
                   <div class="action-row">
-                    <button class="btn-approve" onclick="openReportModal(${report.id}, 'approved')">通过</button>
+                    <button class="btn-approve" onclick="openReportModal(${report.id}, 'resolved')">解决</button>
                     <button class="btn-reject" onclick="openReportModal(${report.id}, 'rejected')">驳回</button>
                     <button class="btn-delete" onclick="deleteReport(${report.id})">删除</button>
                   </div>
@@ -976,9 +976,9 @@
     
     function openReportModal(reportId, status) {
       currentReportId = reportId;
-      document.getElementById('reportModalTitle').textContent = status === 'approved' ? '通过该举报' : '驳回该举报';
+      document.getElementById('reportModalTitle').textContent = status === 'resolved' ? '标记该举报为已解决' : '驳回该举报';
       document.getElementById('reportModalNote').value = '';
-      document.getElementById('reportModalConfirm').textContent = status === 'approved' ? '确认通过' : '确认驳回';
+      document.getElementById('reportModalConfirm').textContent = status === 'resolved' ? '确认解决' : '确认驳回';
       document.getElementById('reportModal').setAttribute('data-status', status);
       document.getElementById('reportModal').classList.add('show');
     }
@@ -991,7 +991,7 @@
         const response = await fetch(API_BASE + '/api/reports/' + currentReportId + '/status', {
           method: 'PUT',
           headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: status, admin_note: adminNote })
+          body: JSON.stringify({ status: status, admin_note: adminNote, adminNote: adminNote })
         });
         const data = await response.json();
         
@@ -1069,7 +1069,7 @@
                 <div class="deposit-amount">¥${Number(deposit.amount || 0).toFixed(2)}</div>
                 ${proofHtml}
                 ${deposit.admin_note ? `<div class="report-content" style="background:#E3F2FD;color:#1565C0;">审核备注: ${escapeHtml(deposit.admin_note)}</div>` : ''}
-                <div class="time">提交时间: ${new Date(deposit.created_at).toLocaleString('zh-CN')}</div>
+                <div class="time">提交时间: ${new Date(Number(deposit.created_at)).toLocaleString('zh-CN')}</div>
                 ${deposit.status === 'pending' ? `
                   <div class="action-row">
                     <button class="btn-approve" onclick="openDepositModal(${deposit.id}, 'approved')">通过</button>

@@ -36,6 +36,8 @@ async function submitReport(token, reportedId, reportType, description, proofPat
 async function getAllReportsForAdmin(status) {
   const reports = await reportsDb.getAllReports(status);
   const mappedReports = reports.map(r => ({
+    // 后台两份页面取的命名不一样（main.html 用 camelCase、m.html 用列名），这里两种都留着
+    ...r,
     id: r.id,
     reporterId: r.reporter_id,
     reportedId: r.reported_id,
