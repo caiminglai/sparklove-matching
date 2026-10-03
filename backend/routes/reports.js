@@ -11,6 +11,7 @@ const { MAX_BODY_SIZE } = require('../utils/config');
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
+const { buildUploadName } = require('../utils/uploadedFiles');
 
 // ========== POST /api/reports（含 multipart 文件上传）
 function addReport(req, res, readBodyWithLimit) {
@@ -50,7 +51,7 @@ function addReport(req, res, readBodyWithLimit) {
             sendJson(res, 400, { success: false, message: '文件内容与扩展名不匹配' });
             return;
           }
-          const fileName = 'report_' + Date.now() + ext;
+          const fileName = buildUploadName('report', ext);
           fs.writeFileSync(path.join(uploadsDir, fileName), file.data);
           proofPath = '/uploads/reports/' + fileName;
         }

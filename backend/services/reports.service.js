@@ -5,6 +5,7 @@
 const reportsDb = require('../db/reports');
 const userDb = require('../db/users');
 const { verifyToken } = require('../db/index');
+const { deleteUploadedFile } = require('../utils/uploadedFiles');
 
 async function submitReport(token, reportedId, reportType, description, proofPath) {
   const userId = verifyToken(token);
@@ -60,7 +61,8 @@ async function updateStatus(reportId, status, adminNote) {
 }
 
 async function removeReport(reportId) {
-  await reportsDb.deleteReport(reportId);
+  const proofPath = await reportsDb.deleteReport(reportId);
+  deleteUploadedFile(proofPath);
   return { success: true };
 }
 

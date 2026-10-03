@@ -13,6 +13,7 @@ const pricing = require('../utils/pricing');
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
+const { buildUploadName, deleteUploadedFile } = require('../utils/uploadedFiles');
 
 // ========== POST /api/unlock-contact/submit（用户提交解锁凭证）==========
 function submitUnlockRequest(req, res) {
@@ -56,7 +57,7 @@ function submitUnlockRequest(req, res) {
         if (!validateMagicBytes(file.data, ext)) {
           sendJson(res, 400, { success: false, message: '文件内容与扩展名不匹配' }); return;
         }
-        const fileName = `contact_${viewerId}_${Date.now()}${ext}`;
+        const fileName = buildUploadName(`contact_${viewerId}`, ext);
         fs.writeFileSync(path.join(uploadsDir, fileName), file.data);
         proofPath = `/uploads/contact-unlock/${fileName}`;
       }
@@ -141,7 +142,9 @@ async function deleteUnlockRequest(req, res, checkAdminAuth, pathname) {
   const idMatch = pathname.match(/\/(\d+)$/);
   if (!idMatch) { sendJson(res, 400, { success: false, message: '无效的请求路径' }); return; }
   const id = parseInt(idMatch[1]);
-  await paymentsDb.deleteContactUnlockRequest(id);
+  // 驳回不删图（要留证据），只有显式删除记录才把盘上那张凭证图一起清掉
+  const proofPath = await paymentsDb.deleteContactUnlockRequest(id);
+  deleteUploadedFile(proofPath);
   await adminDb.logAdminAction('delete_contact_unlock', String(id), {});
   sendJson(res, 200, { success: true, message: '已删除' });
 }

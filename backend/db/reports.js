@@ -3,7 +3,8 @@
 // 导出 addReport / getAllReports / updateReportStatus / deleteReport
 // addReport 固定写入 status='pending'，处理进度全靠 updateReportStatus 改这一列
 // getAllReports 会把被举报人的 contact（本站付费解锁字段）一并 JOIN 出来，所以只能给带 checkAdminAuth 的后台路由用，别拿到公开接口上
-// deleteReport 是物理 DELETE，不是软删；删掉举报记录就查不到原始描述和证据图路径了
+// deleteReport 是物理 DELETE，不是软删；删掉举报记录就查不到原始描述和证据图了。
+// 它把被删行的 proof_path 当返回值带出去，调用方（services/reports.service.js）必须拿它删掉盘上那张证据图
 // ============================================================
 
 const { getDb } = require('./index');
@@ -42,9 +43,9 @@ async function updateReportStatus(reportId, status, adminNote) {
 
 async function deleteReport(reportId) {
   const database = getDb();
-  const stmt = database.prepare('DELETE FROM user_reports WHERE id = $1');
-  await stmt.run(reportId);
-  return true;
+  // RETURNING 把证据图路径带出去给调用方删盘上文件（db 层不碰 fs）
+  const row = await database.prepare('DELETE FROM user_reports WHERE id = $1 RETURNING proof_path').get(reportId);
+  return row ? row.proof_path : null;
 }
 
 module.exports = {

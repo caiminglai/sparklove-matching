@@ -16,6 +16,7 @@ const ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS;
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
+const { deleteUploadedFile } = require('../utils/uploadedFiles');
 
 async function uploadAvatar(req, res) {
   const authHeader = req.headers.authorization;
@@ -270,6 +271,8 @@ async function deleteDeposit(req, res, checkAdminAuth, pathname) {
     if (!record) { sendJson(res, 404, { success: false, message: '记录不存在' }); return; }
     const result = await database.prepare('DELETE FROM deposits WHERE id = $1').run(id);
     if (result.changes > 0) {
+      // 记录删了就必须把盘上那张付款截图一起删掉：/uploads/* 匿名可下
+      deleteUploadedFile(record.proof_path);
       sendJson(res, 200, { success: true, message: '删除成功' });
     } else {
       sendJson(res, 500, { success: false, message: '删除失败' });

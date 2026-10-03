@@ -9,6 +9,7 @@ const authDb = require('../db/auth');
 const adminDb = require('../db/admin');
 const paymentsDb = require('../db/payments');
 const { verifyToken, generateToken } = require('../db/index');
+const { deleteUploadedFile } = require('../utils/uploadedFiles');
 
 // ========== 脱敏工具（业务规则：联系方式需要脱敏后返回给前端） ==========
 
@@ -191,7 +192,10 @@ async function editUserById(id, userData) {
 // ========== 用户删除 ==========
 
 async function removeUser(id, ownerUserId, isAdmin = false) {
+  // 头像路径必须在删行之前取，删完就查不到了
+  const target = await userDb.getUserById(id);
   const success = await userDb.deleteUser(id, ownerUserId, isAdmin);
+  if (success && target) deleteUploadedFile(target.data && target.data.avatar);
   return { success, message: success ? '删除成功' : '无权限或用户不存在' };
 }
 
@@ -200,7 +204,8 @@ async function removeMyUser(userId) {
   const users = await userDb.getUsersByUserId(userId);
   if (users.length === 0) return { success: false, message: '未找到关联用户' };
   const target = users[0];
-  await userDb.deleteUser(target.id, userId, false);
+  const success = await userDb.deleteUser(target.id, userId, false);
+  if (success) deleteUploadedFile(target.data && target.data.avatar);
   return { success: true, message: '已删除' };
 }
 

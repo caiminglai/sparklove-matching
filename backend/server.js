@@ -17,6 +17,7 @@ const { parseMultipart, collectBody, validateMagicBytes, validateExtension } = r
 const { getAuthTokenFromCookie } = require('./utils/cookie工具');
 const { handleVectorRequest } = require('./routes/vector');
 const { clientIp: getClientIp } = require('./utils/clientIp');
+const { sendJson } = require('./utils/sendJson');
 
 // ========== 管理员安全配置 ==========
 // 管理员密码由 admin.service.js 管理，优先从环境变量读取，其次从数据库读取
@@ -302,14 +303,20 @@ const server = http.createServer(async (req, res) => {
     authRoutes.getCaptcha(req, res); return;
   }
   if (req.method === 'POST' && pathname === '/api/auth/captcha/verify') {
+    // 验证成功会签发一枚放行注册的 token，不限速就能脚本猜滑块坐标；这一档比其他写入口更紧
+    if (!checkRateLimit(clientIp, 10)) { sendJson(res, 429, { success: false, message: '验证过于频繁，请稍后再试' }); return; }
     authRoutes.verifyCaptcha(req, res, readBodyWithLimit); return;
   }
   
   // 短信验证预留接口
   if (req.method === 'POST' && pathname === '/api/auth/sms/register-code') {
+    // 服务层只按手机号做了 60 秒防重，换一个号就能绕过，这里补按 IP 的闸
+    if (!checkRateLimit(clientIp)) { sendJson(res, 429, { success: false, message: '发送过于频繁，请稍后再试' }); return; }
     authRoutes.sendRegisterSmsCode(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/auth/sms/verify-register-code') {
+    // 6 位数字验证码，只闸发送不闸校验等于留下另一半
+    if (!checkRateLimit(clientIp)) { sendJson(res, 429, { success: false, message: '验证过于频繁，请稍后再试' }); return; }
     authRoutes.verifyRegisterSmsCode(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && (pathname === '/api/admin/login' || pathname === '/api/admin')) {
@@ -360,6 +367,8 @@ const server = http.createServer(async (req, res) => {
 
   // --- 用户自定义字段（EAV 键值表） ---
   if (pathname === '/api/users/custom-fields' || /^\/api\/users\/custom-fields\/[^\/]+$/.test(pathname)) {
+    // 只闸写：GET 是资料页渲染要用的批量读，拦了会白屏
+    if (req.method !== 'GET' && !checkRateLimit(clientIp)) { sendJson(res, 429, { success: false, message: '操作过于频繁，请稍后再试' }); return; }
     await userCustomFieldsRoutes.handleUserCustomFields(req, res, readBodyWithLimit, pathname); return;
   }
   // --- 批量获取用户自定义字段（按调用方给的 user_ids 下发，不做整表导出） ---

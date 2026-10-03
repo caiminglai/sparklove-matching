@@ -104,9 +104,9 @@ async function rejectContactUnlockRequest(id, adminNote = '') {
 
 async function deleteContactUnlockRequest(id) {
   const database = getDb();
-  const stmt = database.prepare('DELETE FROM contact_unlocks WHERE id = $1');
-  await stmt.run(id);
-  return true;
+  // RETURNING 把图片路径带出去给调用方删盘上文件（db 层不碰 fs）
+  const row = await database.prepare('DELETE FROM contact_unlocks WHERE id = $1 RETURNING proof_path').get(id);
+  return row ? row.proof_path : null;
 }
 
 async function addPaymentOrder(order) {

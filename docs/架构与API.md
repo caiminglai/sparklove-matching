@@ -44,7 +44,7 @@
 │   ├── routes/                   # API 路由层（10 个文件）
 │   ├── services/                 # 业务逻辑层（8 个文件）
 │   ├── middleware/              # 中间件（安全.js / 日志.js）
-│   ├── utils/                    # 零依赖纯函数（9 个文件：config.js / clientIp.js / cookie工具.js / extractId.js / multipart.js / sendJson.js / pricing.js / payment-verify.js / profile-derive.js）
+│   ├── utils/                    # 零依赖纯函数（10 个文件：config.js / clientIp.js / cookie工具.js / extractId.js / multipart.js / sendJson.js / pricing.js / payment-verify.js / profile-derive.js / uploadedFiles.js）
 │   ├── uploads/                  # 用户上传文件目录（compose 挂载到容器内 /uploads）
 │   │   ├── avatars/              # 用户头像
 │   │   ├── deposits/             # 认证费凭证
@@ -337,6 +337,8 @@ server: {
 | POST | `/api/deposit/upload-proof` | 上传认证费凭证 | Token |
 | GET | `/api/users/my-deposit` | 我的认证费状态 | Token |
 
+> **文件名与回收口径**（`backend/utils/uploadedFiles.js`）：落盘名一律 `buildUploadName(prefix, ext)` 生成（`<prefix>_<毫秒时间戳>_<6位随机>`），不再用可猜的定名。`deleteUploadedFile(publicPath)` 只删**解析后仍在 `UPLOADS_ROOT` 内且确实存在**的单个文件：`/uploads` 根、其子目录、`../` 越界、`/app/.env` 这类其他前缀、`data:` 内联图、空值一律回 `false` 且不动盘；文件本来就不在也回 `false`（不用 `rmSync({force})`，`force` 会把"什么都没删掉"报成成功）。保证金凭证、举报凭证、联系方式解锁凭证、用户（含头像）四条删除路径都走它 ⇒ 删行必连带删文件，`/uploads/*` 匿名可下的东西不会留在盘上。容器内 `UPLOADS_ROOT` 由 `__dirname` 推到 `/uploads`，**这套断言只能进容器跑**，在本机路径下算出来的根不是同一个。
+
 ### 5.4 评价接口
 
 | 方法 | 路径 | 描述 | 认证 |
@@ -464,7 +466,20 @@ server: {
   - XSS 防护（字符串清理）
   - 路径遍历防护
   - 文件类型验证（扩展名 + 魔数）
-- **速率限制**：全局已关闭，登录限制 100 次/5 分钟（每 IP）
+  - **头像引用写闸**（`db/users.js` 的 `normalizeAvatarRef()`，读写两侧都过）：`data:` 内联图、超过 512 字符、空值一律存 `''` ⇒ 一次 `POST /api/users` 塞进 300KB base64、把列表接口变成几十 MB 这条路堵掉
+- **速率限制**（`server.js`，全部按 IP 分桶；站2 取的是 XFF 末位 = 真访客 IP）：
+
+  | 入口 | 额度 | 窗口 |
+  |------|------|------|
+  | `POST /api/auth/captcha/verify` | 10 次 | 1 分钟（验证成功会签发放行注册的 token，比别的写入口更紧） |
+  | `POST /api/auth/sms/register-code` | 60 次 | 1 分钟（服务层原来只按手机号做 60 秒防重，换个号就绕过） |
+  | `POST /api/auth/sms/verify-register-code` | 60 次 | 1 分钟（6 位数字码，只闸发送不闸校验等于留下另一半） |
+  | `POST/PUT/DELETE /api/users/custom-fields` | 60 次 | 1 分钟（`GET` 不拦，读接口不写库） |
+  | `POST /api/auth/login`、`POST /api/admin/login` | 100 次 | 5 分钟 |
+  | `POST /api/auth/register` | 按 IP 30 次 | 10 分钟 |
+  | `POST /api/auth/register` | 按手机号 10 次 | 1 小时 |
+
+  四条 `checkRateLimit` 闸门**共用同一个 IP 桶**（`rateLimitMap`），一次调用就把计数推到本条的额度上 ⇒ 一个 IP 先打满 `custom-fields`，紧接着的短信发送也会 429；这是既有实现口径，压测时要么逐条清桶（`docker restart jzxr-local`），要么各用不同来源 IP。"全局限流"仍是对读接口关闭的，上表这些是逐条显式挂上的写入口。
 
 ---
 

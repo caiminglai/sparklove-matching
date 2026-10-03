@@ -10,6 +10,19 @@ const ALL_FIELDS = [
   'avatar'
 ];
 
+// 头像只认「指向磁盘文件的引用」：正规链路是前端 multipart 传 /api/upload/avatar 落盘后回一个路径。
+// data: 打头的 base64 会被整块塞进 text 列并被搜索接口原样吐给访客（实测单条 214,315 字符），
+// 这里读写两侧统一拦掉；库里已有的值不删，只是不再下发。
+const MAX_AVATAR_REF_LEN = 512;
+
+function normalizeAvatarRef(value) {
+  const v = String(value || '').trim();
+  if (!v) return '';
+  if (v.startsWith('data:')) return '';
+  if (v.length > MAX_AVATAR_REF_LEN) return '';
+  return v;
+}
+
 function jsonToDbRow(jsonRow) {
   // 表单不再追问年龄/星座/婚姻/兴趣标签，这几项在这里由生日、感情状态、兴趣+运动算出来
   const data = deriveProfileFields(jsonRow.data || {});
@@ -59,7 +72,7 @@ function jsonToDbRow(jsonRow) {
     data.interestTags || '',
     data.purpose || '',
     JSON.stringify(extraData),
-    data.avatar || ''
+    normalizeAvatarRef(data.avatar)
   ];
 }
 
@@ -111,7 +124,7 @@ function dbRowToJson(row) {
       contact: decrypt(row.contact),
       interestTags: row.interest_tags,
       purpose: row.purpose,
-      avatar: row.avatar
+      avatar: normalizeAvatarRef(row.avatar)
     }
   };
 }
@@ -260,13 +273,17 @@ async function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
     params.push(criteria.gender);
   }
   addLikeOrExact('city', criteria.city);
-  if (criteria.age_min) {
-    conditions.push(`CAST(age AS INTEGER) >= $${params.length + 1}`);
-    params.push(parseInt(criteria.age_min));
+  // age 是 varchar 且有空串行：直接 CAST('' AS INTEGER) 会让整条查询报错（500），
+  // 空值与非数字都当作「不参与筛选」，不能炸掉整个搜索
+  const ageMin = parseInt(criteria.age_min, 10);
+  if (Number.isFinite(ageMin)) {
+    conditions.push(`NULLIF(age, '')::int >= $${params.length + 1}`);
+    params.push(ageMin);
   }
-  if (criteria.age_max) {
-    conditions.push(`CAST(age AS INTEGER) <= $${params.length + 1}`);
-    params.push(parseInt(criteria.age_max));
+  const ageMax = parseInt(criteria.age_max, 10);
+  if (Number.isFinite(ageMax)) {
+    conditions.push(`NULLIF(age, '')::int <= $${params.length + 1}`);
+    params.push(ageMax);
   }
   // 非管理员不能按联系方式搜索；若只把条件丢弃，会退化成无条件分支返回整张表，故直接判空
   if (!isAdmin && criteria.contact) return { data: [], count: 0 };
