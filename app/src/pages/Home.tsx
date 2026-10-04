@@ -29,7 +29,10 @@ export default function Home() {
 
   // 分页相关状态（必须在 loadUsers 函数之前定义）
   const [currentPage, setCurrentPage] = useState(1)
-  const pageSize = 50 // 每页50条
+  // 必须与后端对匿名访客的每页硬上限一致（backend/routes/users.js：未登录 limit>20 一律夹到 20）。
+  // 之前这里是 50：服务器只回 20 行，而总页数按 50 算 ⇒ ceil(22/50)=1，「下一页」被禁用，
+  // 末尾那几个人访客永远翻不到（2026-10-04 线上 22 条真人资料时实测）。
+  const pageSize = 20 // 每页20条，与后端匿名夹页一致
   const [totalPages, setTotalPages] = useState(1) // 总页数
   const [totalCount, setTotalCount] = useState(0) // 总人数
   const [loadingPage, setLoadingPage] = useState(false) // 是否正在翻页
