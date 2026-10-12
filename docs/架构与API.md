@@ -10,11 +10,13 @@
 │   ├── public/                   # 静态资源（不参与打包）
 │   ├── src/                      # 业务源代码
 │   │   ├── api/config.ts         # API 请求配置
-│   │   ├── components/           # 公共组件（13 个）
+│   │   ├── components/           # 公共组件（15 个组件 + 1 个测试文件，2026-10-13 现量）
+│   │   │   ├── BirthdayPicker.tsx       # 年/月/日三列生日选择器
 │   │   │   ├── ContactPayModal.tsx      # 联系方式支付弹窗
 │   │   │   ├── DeleteConfirmModal.tsx   # 删除确认弹窗
 │   │   │   ├── ErrorBoundary.tsx       # 错误边界
 │   │   │   ├── ImagePreview.tsx         # 图片预览
+│   │   │   ├── PayQrPanel.tsx           # 收款二维码面板（微信/支付宝）
 │   │   │   ├── RatingModal.tsx         # 评价弹窗
 │   │   │   ├── ReportModal.tsx         # 举报弹窗
 │   │   │   ├── RequireAuth.tsx         # 路由守卫（未登录时跳转登录页）
@@ -26,8 +28,8 @@
 │   │   │   └── UserList.tsx           # 用户列表
 │   │   ├── data/                 # 数据类型与常量
 │   │   ├── pages/                # 页面组件（11 个）
-│   │   ├── services/             # 业务服务层
-│   │   └── utils/                # 工具函数
+│   │   ├── services/             # 业务服务层（7 个文件＝4 个模块 draft.service / field-mapping.service / match.service / user.service ＋ 3 个 .test.ts）
+│   │   └── utils/                # 工具函数（18 个文件＝11 个模块＋7 个 .test.ts；圈子分组口径在 circles.ts，圈子列表页与详情页共用）
 │   ├── index.html                # 入口 HTML
 │   ├── package.json
 │   ├── vite.config.ts            # Vite 构建配置
@@ -160,18 +162,31 @@ const DEFAULT_DEV_BASE_URL = 'http://localhost:8080/api';   // 开发模式直�
 const DEFAULT_PROD_BASE_URL = '/api';                  // 生产默认同源相对路径
 export const API_BASE_URL = ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL);
 
+// 这份是「接口台账」，不是请求封装：页面里几乎都是直接拼 `${API_BASE_URL}/xxx`。
+// 2026-10-13 现量：18 项里只有 users 有 1 处调用（syncRowsFromServer）。
 export const API_ENDPOINTS = {
   users: '/users',
-  userById: (id: string) => `/users/${encodeURIComponent(id)}`,
   myUser: '/users/my',
   userSearch: '/users/search',
   pendingUsers: '/users/pending',
+  approveUser: (id: string) => `/users/${encodeURIComponent(id)}/approve`,
+  rejectUser: (id: string) => `/users/${encodeURIComponent(id)}/reject`,
+  batchUsers: '/users/batch',
+  register: '/auth/register',
+  login: '/auth/login',
+  logout: '/auth/logout',
+  adminLogin: '/admin/login',
+  adminStats: '/admin/stats',
   ratings: '/ratings',
   reports: '/reports',
   unlockContact: (id: string) => `/users/${encodeURIComponent(id)}/unlock-contact`,
   checkUnlock: (id: string) => `/users/${encodeURIComponent(id)}/check-unlock`,
+  fieldMappings: '/field-mappings',
+  fieldLabels: '/field-mappings/labels',
 } as const;
 ```
+
+> 2026-10-13 删掉了原来这里抄着的一项 `userById: (id) => \`/users/${id}\``——后端**没有这条 GET 路由**（实测 `GET /api/users/1` → **404**，而 `PUT`/`DELETE` 同一地址 → **401**，说明路由表里只有改与删）。照着它发请求只会拿 404，所以台账里不能留它。
 
 ### 3.3 核心组件
 
@@ -522,11 +537,13 @@ module.exports = { handle };
 
 以下三个功能是经过重点调试的核心功能，除非用户明确要求，否则不要修改其逻辑、行为或相关文件：
 
+> ⚠️ 2026-10-13 全面审计这一轮**动过**这三处（代码里那几个 `[AGENT-DO-NOT-MODIFY]` 块）。起因不是风格，是三条自相矛盾：①「搜索」按钮会把用户刚填好的筛选条件清空、还会把清空结果写回 localStorage（刷新也找不回）；②条件填着但没点「开始匹配」时，界面上挂着条件、列表却完全没按条件筛；③多选下拉产出的是 `健身,登山` 这种逗号串，而匹配函数拿整串去 `includes`，等于要求资料格子里原样出现这六个字才算命中——可首页提示语偏偏写着「多项选择可用逗号分隔」。改后行为以本节为准，取证数字在 `docs/运维记录.md` §2.28。
+
 ### 8.1 搜索（按昵称/姓名/ID）
 
 - 位置：`app/src/components/SearchPanel.tsx` 顶部搜索框区域
 - 逻辑：`app/src/pages/Home.tsx` 中 `handleSearch` / `handleResetSearch` 及 `filteredRows` 内的关键词搜索部分
-- 说明：关键词模糊/精确匹配，前端过滤
+- 说明：关键词模糊/精确匹配，前端过滤。`handleSearch` 只管换一批行与关键词，**不碰筛选条件**；要清空条件请用「重置」或面板里的「清空」。
 
 ### 8.2 多条件筛选（字段 + 值）
 
@@ -537,9 +554,9 @@ module.exports = { handle };
 ### 8.3 多条件匹配
 
 - 位置：`app/src/components/SearchPanel.tsx` 中"开始匹配"按钮
-- 逻辑：`app/src/pages/Home.tsx` 中 `results` 计算逻辑
+- 逻辑：`app/src/pages/Home.tsx` 中 `results` 计算逻辑（`hasSearched || hasActiveConditions`）
 - 服务：`app/src/services/match.service.ts`
-- 说明：点击"开始匹配"后，根据所有活跃条件进行 AND 匹配，只显示满足全部条件的结果
+- 说明：**只要条件行里"字段 + 值"都填上了就即时生效**（沿用原有 300ms 防抖），不必非点「开始匹配」；点「开始匹配」＝立刻生效。同一行内多个逗号分隔的值按**或**算（`健身,登山` ＝ 爱练任一就算命中），不同条件行之间按**且**算；`age` 行的 `25-30`、`>25` 写法优先于逗号规则。⚠️ 匹配仍然只在**当前页那 20 行**里做（服务端筛选没做，这是既有边界，见 §2.28 未验到）。
 
 ### 8.4 通用约束
 

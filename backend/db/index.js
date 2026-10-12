@@ -170,6 +170,15 @@ function generateToken(userId, role = 'user') {
   return Buffer.from(data).toString('base64');
 }
 
+// 签名比对走定长时间：`a !== b` 会在第一个不同的字符就返回，
+// 理论上能被按响应耗时逐位猜出正确签名（本机量不出来，但这道判据没道理留着短板）。
+// 长度不等时 timingSafeEqual 直接抛错，所以先比长度再进比对
+function signatureEqual(actual, expected) {
+  const a = Buffer.from(String(actual), 'utf8');
+  const b = Buffer.from(String(expected), 'utf8');
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
 function verifyToken(token) {
   try {
     const decoded = Buffer.from(token, 'base64').toString('utf8');
@@ -178,9 +187,13 @@ function verifyToken(token) {
     const signature = parts.pop();
     const payload = parts.join(':');
     const expectedSig = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('hex').slice(0, 16);
-    if (signature !== expectedSig) return null;
+    if (!signatureEqual(signature, expectedSig)) return null;
     const [userId, timestamp] = payload.split(':');
-    if (Date.now() - parseInt(timestamp) > 7 * 24 * 60 * 60 * 1000) return null;
+    if (!userId) return null;
+    // 时间戳解不出数字时，老写法是 NaN > 7天 → false，等于这张 token 永不过期
+    const issuedAt = parseInt(timestamp, 10);
+    if (!Number.isFinite(issuedAt)) return null;
+    if (Date.now() - issuedAt > 7 * 24 * 60 * 60 * 1000) return null;
     return userId;
   } catch {
     return null;
@@ -199,10 +212,12 @@ function verifyAdminToken(token) {
     const signature = parts.pop();
     const payload = parts.join(':');
     const expectedSig = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('hex').slice(0, 16);
-    if (signature !== expectedSig) return null;
+    if (!signatureEqual(signature, expectedSig)) return null;
     const [username, timestamp, , role] = payload.split(':');
     if (role !== 'admin') return null;
-    if (Date.now() - parseInt(timestamp) > 24 * 60 * 60 * 1000) return null;
+    if (!username) return null;
+    if (!Number.isFinite(parseInt(timestamp, 10))) return null;
+    if (Date.now() - parseInt(timestamp, 10) > 24 * 60 * 60 * 1000) return null;
     return username;
   } catch {
     return null;
@@ -220,5 +235,7 @@ module.exports = {
   verifyToken,
   generateAdminToken,
   verifyAdminToken,
+  // 定长时间字符串比较，给「旧数据里还是明文密码」这类必须比明文的场景用（admin.service 的登录比对）
+  constantTimeEqual: signatureEqual,
   closeDb
 };

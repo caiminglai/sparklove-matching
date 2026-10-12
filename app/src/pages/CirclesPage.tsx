@@ -14,6 +14,7 @@ import {
 import { API_BASE_URL, normalizeAvatarUrl } from '../api/config'
 import type { Row } from '../data/types'
 import { getAuthHeaders } from '../utils/auth'
+import { buildCircleGroups, type CircleGroup } from '../utils/circles'
 import { hexToRgba } from '../utils/color'
 
 const CIRCLE_CONFIGS = [
@@ -24,53 +25,6 @@ const CIRCLE_CONFIGS = [
   { key: 'city', label: '同城圈', icon: MapPin, color: '#C47BAF', desc: '身边的朋友' },
   { key: 'personality', label: '性格圈', icon: Heart, color: '#E87A5D', desc: '同频相吸' },
 ]
-
-const CIRCLE_TAG_MAP: Record<string, string[]> = {
-  hobbies: [
-    '动漫',
-    '游戏',
-    '摄影',
-    '旅行',
-    '看书',
-    '电影',
-    '音乐',
-    '绘画',
-    '手工',
-    '露营',
-    '徒步',
-    '桌游',
-    '剧本杀',
-    'K歌',
-    '跳舞',
-    '乐器',
-    '科技',
-    '编程',
-  ],
-  food: ['火锅', '烧烤', '川菜', '粤菜', '日料', '西餐', '韩餐', '甜品', '海鲜', '咖啡', '奶茶'],
-  sport: ['跑步', '游泳', '篮球', '足球', '羽毛球', '网球', '瑜伽', '健身', '骑行', '登山', '滑雪'],
-  music: ['流行', '摇滚', '民谣', '古典', '爵士', '电子', 'R&B', '嘻哈', '古风', '轻音乐', '说唱'],
-  city: [
-    '北京',
-    '上海',
-    '广州',
-    '深圳',
-    '杭州',
-    '成都',
-    '武汉',
-    '南京',
-    '西安',
-    '重庆',
-    '苏州',
-    '长沙',
-  ],
-  personality: ['温柔', '开朗', '内向', '幽默', '沉稳', '活泼', '直爽', '细腻', '独立', '随和'],
-}
-
-interface CircleGroup {
-  tag: string
-  count: number
-  users: Row[]
-}
 
 export default function CirclesPage() {
   const navigate = useNavigate()
@@ -93,23 +47,12 @@ export default function CirclesPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const circleGroups = useMemo(() => {
-    const tags = CIRCLE_TAG_MAP[activeCircle] || []
-    const groups: CircleGroup[] = []
-
-    for (const tag of tags) {
-      const matched = rows.filter((r) => {
-        const val = String(r.data?.[activeCircle as keyof typeof r.data] || '')
-        return val.includes(tag)
-      })
-      if (matched.length > 0) {
-        groups.push({ tag, count: matched.length, users: matched })
-      }
-    }
-
-    groups.sort((a, b) => b.count - a.count)
-    return groups
-  }, [rows, activeCircle])
+  // 圈子怎么圈人见 utils/circles.ts：写死的城市/标签算大圈，
+  // 资料里真实出现却没被标签接住的词各自成圈，填了就一定在某个圈子里
+  const circleGroups = useMemo<CircleGroup[]>(
+    () => buildCircleGroups(rows, activeCircle),
+    [rows, activeCircle],
+  )
 
   const filteredGroups = useMemo(() => {
     if (!searchTag) return circleGroups

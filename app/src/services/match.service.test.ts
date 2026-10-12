@@ -177,4 +177,53 @@ describe('matchRows', () => {
     // 没匹配到 gender 所以不会返回
     expect(result).toHaveLength(0)
   })
+
+  // 首页那句提示写着「多项选择可用逗号分隔」，多选下拉也真会把几个值拼成 "火锅,烧烤" 存进条件；
+  // 改前这里只按整串 includes，等于要求资料格子里原样出现那串逗号写法 ⇒ 多选基本全筛空
+  it('逗号分隔的多选值：任一个命中就算命中（或），整串比对的时代结束了', () => {
+    const rows = [
+      makeRow('r1', { food: '火锅,小吃,快餐,下午茶' }),
+      makeRow('r2', { food: '川菜,烧烤' }),
+      makeRow('r3', { food: '粤菜,西餐,日料' }),
+    ]
+    const conditions: MatchCondition[] = [{ column: 'food', value: '火锅,烧烤' }]
+    const result = matchRows(rows, conditions)
+    console.log('[匹配] food="火锅,烧烤" 命中 =', JSON.stringify(result.map((r) => r.row.id)))
+    expect(result.map((r) => r.row.id).sort()).toEqual(['r1', 'r2'])
+    // 一个条件里勾几项，分数仍是 1（条件计数，不是勾选项计数）
+    expect(result[0].score).toBe(1)
+  })
+
+  it('中文逗号同样当多选分隔符，并且不炸空值', () => {
+    const rows = [makeRow('r1', { city: '西安' }), makeRow('r2', { city: '成都' })]
+    expect(
+      matchRows(rows, [{ column: 'city', value: '西安，成都' }])
+        .map((r) => r.row.id)
+        .sort(),
+    ).toEqual(['r1', 'r2'])
+    expect(matchRows(rows, [{ column: 'city', value: '西安,' }]).map((r) => r.row.id)).toEqual([
+      'r1',
+    ])
+  })
+
+  it('多选与其它条件之间仍是「且」', () => {
+    const rows = [
+      makeRow('r1', { gender: '女', food: '火锅,小吃' }),
+      makeRow('r2', { gender: '男', food: '川菜,烧烤' }),
+      makeRow('r3', { gender: '女', food: '粤菜,西餐' }),
+    ]
+    const conditions: MatchCondition[] = [
+      { column: 'gender', value: '女' },
+      { column: 'food', value: '火锅,烧烤' },
+    ]
+    const result = matchRows(rows, conditions)
+    expect(result.map((r) => r.row.id)).toEqual(['r1'])
+    expect(result[0].score).toBe(2)
+  })
+
+  it('年龄的比较写法不受逗号分支影响', () => {
+    const rows = [makeRow('r1', { age: 20 }), makeRow('r2', { age: 30 })]
+    expect(matchRows(rows, [{ column: 'age', value: '>25' }]).map((r) => r.row.id)).toEqual(['r2'])
+    expect(matchRows(rows, [{ column: 'age', value: '20-30' }])).toHaveLength(2)
+  })
 })

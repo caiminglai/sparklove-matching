@@ -7,7 +7,7 @@ const adminService = require('../services/admin.service');
 const captchaService = require('../services/captcha.service');
 const smsService = require('../services/sms.service');
 const { generateAdminToken } = require('../db/index');
-const { setAuthCookie } = require('../utils/cookie工具');
+const { setAuthCookie, clearAuthCookie } = require('../utils/cookie工具');
 
 // 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
 const { sendJson } = require('../utils/sendJson');
@@ -29,7 +29,10 @@ function register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp)
         sendJson(res, 429, { success: false, message: '该手机号注册过于频繁，请1小时后再试' });
         return;
       }
-      // 最低路径：跳过验证码校验
+      // 滑动验证：后端这套（/api/auth/captcha 与 checkCaptchaToken）已修好且按一次性令牌销毁，
+      // 但注册页现在压根没接这条流程——现量：app/src 里除一处敏感词正则，没有任何组件请求过 /auth/captcha。
+      // 这里贸然放开判据会把注册全站死（没人交得出 captchaToken），所以维持跳过，
+      // 等注册页接上滑块再把下面这段解注释；这是产品决定，不是漏改
       // if (!captchaService.checkCaptchaToken(data.captchaId, data.captchaToken)) {
       //   sendJson(res, 400, { success: false, message: '滑动验证无效或已过期，请重新验证' });
       //   return;
@@ -70,6 +73,17 @@ function login(req, res, readBodyWithLimit, checkLoginRateLimit) {
   }).catch(e => {
     sendJson(res, 413, { success: false, message: e.message || '请求体过大' });
   });
+}
+
+// ========== POST /api/auth/logout
+// 只清 httpOnly cookie。token 本身是无状态 HMAC，服务端没有会话表可以撤，
+// 所以「退出后这枚 token 还能用」是这套方案的固有限制，不是这里漏写的一步：
+// 前端同步清掉 localStorage 里的 auth_token，浏览器端就再也拿不出它；
+// 真正泄露出去的 token 要撤回，得等引入服务端黑名单/短有效期那天。
+// 不需要登录态也能调：登录态已过期的用户点退出同样应该把 cookie 清掉
+function logout(req, res) {
+  clearAuthCookie(res);
+  sendJson(res, 200, { success: true, message: '已退出登录' });
 }
 
 // ========== POST /api/auth/change-password
@@ -182,4 +196,4 @@ function verifyCaptcha(req, res, readBodyWithLimit) {
   });
 }
 
-module.exports = { register, login, changePassword, adminLogin, sendRegisterSmsCode, verifyRegisterSmsCode, getCaptcha, verifyCaptcha };
+module.exports = { register, login, logout, changePassword, adminLogin, sendRegisterSmsCode, verifyRegisterSmsCode, getCaptcha, verifyCaptcha };

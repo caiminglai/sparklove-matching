@@ -19,7 +19,7 @@ import { handleApiError } from '../utils/errorHandler'
 import { loadColumns } from '../services/user.service'
 import { fetchFieldMappings } from '../services/field-mapping.service'
 import type { Column, Row } from '../data/types'
-import { getAuthToken } from '../utils/auth'
+import { getAuthToken, logoutUser } from '../utils/auth'
 import { formatYuan } from '../utils/money'
 import { useToast } from '../components/Toast'
 import BirthdayPicker from '../components/BirthdayPicker'
@@ -109,8 +109,10 @@ export default function ProfilePage() {
     loadMyData()
   }, [])
 
-  const handleLogout = () => {
-    localStorage.removeItem('auth_token')
+  const handleLogout = async () => {
+    // logoutUser 内部先清 localStorage 再通知后端清 cookie；
+    // 只删 localStorage 的话，后端写在 cookie 里的那份 token 还能认人 7 天
+    await logoutUser()
     localStorage.removeItem('user_id')
     localStorage.removeItem('user_phone')
     localStorage.removeItem('user_nickname')
@@ -260,9 +262,11 @@ export default function ProfilePage() {
       return
     }
 
-    // 验证文件大小（限制5MB）
-    if (file.size > 5 * 1024 * 1024) {
-      toast('图片大小不能超过5MB', 'error')
+    // 验证文件大小（限制4MB）。后端 /api/upload/avatar 卡的是整段 multipart 请求体
+    // （MAX_UPLOAD_SIZE=5MB），前端放到 5MB 就等于让对方必然 413：图本身 5MB，
+    // 加上分帧和字段一定超过 5MB
+    if (file.size > 4 * 1024 * 1024) {
+      toast('图片大小不能超过4MB', 'error')
       return
     }
 

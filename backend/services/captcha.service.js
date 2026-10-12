@@ -126,7 +126,14 @@ function checkCaptchaToken(captchaId, token) {
   if (!record || !record.used || record.expiresAt < Date.now()) {
     return false;
   }
-  return signCaptcha(captchaId, record.targetX) === token;
+  const expected = signCaptcha(captchaId, record.targetX);
+  const a = Buffer.from(String(token), 'utf8');
+  const b = Buffer.from(expected, 'utf8');
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return false;
+  // 用完即销毁：名字写着「一次性 token」，但旧写法只验不销，
+  // 同一个 token 在五分钟内可以重复通过校验、批量注册多少个账号都不再需要过一次滑块
+  captchaStore.delete(captchaId);
+  return true;
 }
 
 module.exports = {

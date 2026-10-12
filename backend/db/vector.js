@@ -1,4 +1,11 @@
 const { getDb } = require('./index');
+// 推荐候选必须和访客搜索走同一条「对外可见」判据（缴过认证费 + 审核通过）。
+// user_vectors 里没有这两个字段，只从向量表取人会把没缴费、被驳回的人推给用户，
+// 而 maskUsers 只脱敏联系方式、不判断该不该出现。
+// 引用而非复制：判据以后改动，推荐这边自动跟上。子查询里不给 users 起别名，
+// 因为这段表达式内部写的是 users.deposit / users.user_id / users.status
+const { PUBLIC_VIEW_SQL } = require('./users');
+const CANDIDATE_VIEW_SQL = `EXISTS (SELECT 1 FROM users WHERE users.id = uv.user_id AND ${PUBLIC_VIEW_SQL})`;
 
 const VECTOR_DIMENSION = 1536;
 
@@ -58,7 +65,7 @@ async function findSimilarUsersByProfile(vector, limit = 10, excludeUserId = nul
     return await db.prepare(`
       SELECT uv.user_id, 1 - (uv.profile_vector <=> $1) as similarity
       FROM user_vectors uv
-      WHERE uv.user_id != $2
+      WHERE uv.user_id != $2 AND ${CANDIDATE_VIEW_SQL}
       ORDER BY uv.profile_vector <=> $1
       LIMIT $3
     `).all(vector, excludeUserId, limit);
@@ -66,6 +73,7 @@ async function findSimilarUsersByProfile(vector, limit = 10, excludeUserId = nul
   return await db.prepare(`
     SELECT uv.user_id, 1 - (uv.profile_vector <=> $1) as similarity
     FROM user_vectors uv
+    WHERE ${CANDIDATE_VIEW_SQL}
     ORDER BY uv.profile_vector <=> $1
     LIMIT $2
   `).all(vector, limit);
@@ -77,7 +85,7 @@ async function findSimilarUsersByExpectation(vector, limit = 10, excludeUserId =
     return await db.prepare(`
       SELECT uv.user_id, 1 - (uv.expectation_vector <=> $1) as similarity
       FROM user_vectors uv
-      WHERE uv.user_id != $2
+      WHERE uv.user_id != $2 AND ${CANDIDATE_VIEW_SQL}
       ORDER BY uv.expectation_vector <=> $1
       LIMIT $3
     `).all(vector, excludeUserId, limit);
@@ -85,6 +93,7 @@ async function findSimilarUsersByExpectation(vector, limit = 10, excludeUserId =
   return await db.prepare(`
     SELECT uv.user_id, 1 - (uv.expectation_vector <=> $1) as similarity
     FROM user_vectors uv
+    WHERE ${CANDIDATE_VIEW_SQL}
     ORDER BY uv.expectation_vector <=> $1
     LIMIT $2
   `).all(vector, limit);
@@ -100,7 +109,7 @@ async function findMutualMatchUsers(userId, limit = 10) {
       ((1 - (uv.profile_vector <=> (SELECT expectation_vector FROM user_vectors WHERE user_id = $1))) +
        (1 - (uv.expectation_vector <=> (SELECT profile_vector FROM user_vectors WHERE user_id = $1)))) / 2 as mutual_score
     FROM user_vectors uv
-    WHERE uv.user_id != $1
+    WHERE uv.user_id != $1 AND ${CANDIDATE_VIEW_SQL}
     ORDER BY mutual_score DESC
     LIMIT $2
   `).all(userId, limit);

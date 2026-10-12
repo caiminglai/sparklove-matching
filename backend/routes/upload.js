@@ -1,6 +1,7 @@
 const dbIndex = require('../db/index.js');
 const userDb = require('../db/users.js');
 const paymentsDb = require('../db/payments.js');
+const adminDb = require('../db/admin.js');
 const adminService = require('../services/admin.service');
 const fs = require('fs');
 const path = require('path');
@@ -38,11 +39,28 @@ async function uploadAvatar(req, res) {
 
   const chunks = [];
   let uploadSize = 0;
-  let tooLarge = false;
-  req.on('data', c => { uploadSize += c.length; if (uploadSize > MAX_UPLOAD_SIZE) tooLarge = true; chunks.push(c); });
+  // settled：这条请求的响应是否已经给出。超限时要立刻回 413 并断开连接，
+  // 不能让 'end' 回调再跑一遍解析（届时 req.destroy() 已经把流拆了）
+  let settled = false;
+  req.on('data', c => {
+    if (settled) return;
+    uploadSize += c.length;
+    if (uploadSize > MAX_UPLOAD_SIZE) {
+      settled = true;
+      // 旧写法只是置一个 tooLarge 标记，然后照常把剩下的字节继续 push 进 chunks：
+      // 上限拦住的只有落盘，拦不住内存——一条 2GB 的请求体照样先在内存里攒齐才回 413
+      sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' });
+      req.destroy();
+      return;
+    }
+    chunks.push(c);
+  });
+  // 主动 destroy 之后流会以 error 收尾，没有监听器就变成未处理事件
+  req.on('error', () => { settled = true; });
   req.on('end', async () => {
+    if (settled) return;
+    settled = true;
     try {
-      if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' }); return; }
       const buffer = Buffer.concat(chunks);
       const boundaryStr = '--' + boundary;
       const parts = [];
@@ -109,11 +127,28 @@ function uploadDepositProof(req, res) {
 
   const chunks = [];
   let uploadSize = 0;
-  let tooLarge = false;
-  req.on('data', c => { uploadSize += c.length; if (uploadSize > MAX_UPLOAD_SIZE) tooLarge = true; chunks.push(c); });
+  // settled：这条请求的响应是否已经给出。超限时要立刻回 413 并断开连接，
+  // 不能让 'end' 回调再跑一遍解析（届时 req.destroy() 已经把流拆了）
+  let settled = false;
+  req.on('data', c => {
+    if (settled) return;
+    uploadSize += c.length;
+    if (uploadSize > MAX_UPLOAD_SIZE) {
+      settled = true;
+      // 旧写法只是置一个 tooLarge 标记，然后照常把剩下的字节继续 push 进 chunks：
+      // 上限拦住的只有落盘，拦不住内存——一条 2GB 的请求体照样先在内存里攒齐才回 413
+      sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' });
+      req.destroy();
+      return;
+    }
+    chunks.push(c);
+  });
+  // 主动 destroy 之后流会以 error 收尾，没有监听器就变成未处理事件
+  req.on('error', () => { settled = true; });
   req.on('end', async () => {
+    if (settled) return;
+    settled = true;
     try {
-      if (tooLarge) { sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' }); return; }
       const buffer = Buffer.concat(chunks);
       const boundaryStr = '--' + boundary;
       const parts = [];
@@ -200,9 +235,12 @@ async function approveDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathn
       const adminNote = data.admin_note || '审核通过';
       const success = await paymentsDb.updateDepositStatus(id, 'approved', adminNote);
       if (success) {
+        // 和资料审核、解锁审核对齐：动库就留痕。原来只有这两条审核路径不打日志，
+        // 后台「操作日志」里能看到通过/驳回了一个人的资料，却看不到收没收到认证费
+        await adminDb.logAdminAction('approve_deposit', String(id), { note: adminNote });
         sendJson(res, 200, { success: true, message: '审核通过' });
       } else {
-        sendJson(res, 400, { success: false, message: '审核失败' });
+        sendJson(res, 404, { success: false, message: '该缴费记录不存在或已被删除，未做改动' });
       }
     } catch (err) { sendJson(res, 500, { success: false, message: '操作失败' }); }
   }).catch(err => { sendJson(res, 400, { success: false, message: err.message }); });
@@ -219,9 +257,10 @@ async function rejectDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathna
       const adminNote = data.admin_note || '审核未通过';
       const success = await paymentsDb.updateDepositStatus(id, 'rejected', adminNote);
       if (success) {
+        await adminDb.logAdminAction('reject_deposit', String(id), { note: adminNote });
         sendJson(res, 200, { success: true, message: '已拒绝' });
       } else {
-        sendJson(res, 400, { success: false, message: '操作失败' });
+        sendJson(res, 404, { success: false, message: '该缴费记录不存在或已被删除，未做改动' });
       }
     } catch (err) { sendJson(res, 500, { success: false, message: '操作失败' }); }
   }).catch(err => { sendJson(res, 400, { success: false, message: err.message }); });

@@ -1,7 +1,12 @@
 // ============================================================
 // 数据访问层 - 用户互相评分（user_ratings 表）
 // 导出 addRating / getRatingsForUser / getAverageRating / checkUserRated
-// addRating 用 ON CONFLICT(rater_id, rated_id) DO UPDATE：同一个人对同一个人只留最新一条评分，不是追加历史，重复打分直接覆盖旧分
+// addRating 用 ON CONFLICT(rater_id, rated_id) DO NOTHING 并回「是否真的插入了一行」：
+//   产品口径是 services/ratings.service.js 的「每人只能评价一次」，不是覆盖旧分。
+//   以前这里是 DO UPDATE（注释写着"重复打分直接覆盖旧分"），和 service 层那句拒绝重复评价
+//   互相矛盾——正常走接口永远碰不到 DO UPDATE，只有并发两条请求同时越过 service 的
+//   checkUserRated 时才会命中，那一刻旧分被悄悄覆盖、还回用户"评价成功"。
+//   现在冲突就是不写、回 false，由 service 层把它翻译成「您已经评价过该用户」。
 // getAverageRating 没人评过的时候回 {avg:0, count:0} 而不是 null，前端可以直接显示 0 分，但"0 分"和"还没人评"是两种状态，要区分得看 count
 // ============================================================
 
@@ -11,10 +16,10 @@ async function addRating(raterId, ratedId, rating, comment) {
   const database = getDb();
   const createdAt = Date.now();
   const stmt = database.prepare(
-    'INSERT INTO user_ratings (rater_id, rated_id, rating, comment, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT(rater_id, rated_id) DO UPDATE SET rating = EXCLUDED.rating, comment = EXCLUDED.comment, created_at = EXCLUDED.created_at'
+    'INSERT INTO user_ratings (rater_id, rated_id, rating, comment, created_at) VALUES ($1, $2, $3, $4, $5) ON CONFLICT(rater_id, rated_id) DO NOTHING'
   );
-  await stmt.run(raterId, ratedId, rating, comment || '', createdAt);
-  return true;
+  const info = await stmt.run(raterId, ratedId, rating, comment || '', createdAt);
+  return info.changes === 1;
 }
 
 async function getRatingsForUser(ratedId) {

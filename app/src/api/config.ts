@@ -31,19 +31,26 @@ export const API_BASE_URL =
   ENV_BASE_URL || (import.meta.env.DEV ? DEFAULT_DEV_BASE_URL : DEFAULT_PROD_BASE_URL)
 
 // API 端点
+// 说明：这份是「接口台账」，不是请求封装——页面里几乎都是直接拼 `${API_BASE_URL}/xxx`，
+// 2026-10-13 现量：下面 18 项里只有 users 有 1 处调用（syncRowsFromServer）。
+// 后端加/删路由时请顺手改这里，别让它变成假的地图。
+// 原来还有一项 userById: GET /users/:id —— 路由表里根本没有这条（server.js 只有
+// PUT/DELETE /api/users/:id 与 GET /api/users、/users/my、/users/search 等），
+// 照着它发请求只会拿到 404，已删。
 export const API_ENDPOINTS = {
   // 用户相关
   users: '/users',
-  userById: (id: string) => `/users/${encodeURIComponent(id)}`,
   myUser: '/users/my',
   userSearch: '/users/search',
   pendingUsers: '/users/pending',
   approveUser: (id: string) => `/users/${encodeURIComponent(id)}/approve`,
   rejectUser: (id: string) => `/users/${encodeURIComponent(id)}/reject`,
+  // 后台导入页（backend/admin/main.html）用的是字面量，这条留着当口径
   batchUsers: '/users/batch',
   // 认证相关
   register: '/auth/register',
   login: '/auth/login',
+  logout: '/auth/logout',
   // 管理员相关
   adminLogin: '/admin/login',
   adminStats: '/admin/stats',

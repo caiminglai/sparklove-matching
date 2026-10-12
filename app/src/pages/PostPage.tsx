@@ -56,6 +56,12 @@ export default function PostPage() {
     setSelectedTags((p) => ({ ...p, [key]: applyTagToggle(p[key] || [], key, tag) }))
   }
 
+  // 头像文件先攥在 state 里。原来只有 dataURL 预览：登录用户提交时把整张 base64
+  // 塞进 data.avatar 走 POST /api/users，一兆多的字符串直接进库，
+  // 而 /api/users 列表每行都带 data —— 99 条资料能把一次首页请求撑到几百 MB。
+  // 现在改成：登录态先把文件用 multipart 传 /api/upload/avatar，拿回 /uploads/avatars/xxx 的路径再入库
+  const [avatarFile, setAvatarFile] = useState<File | null>(null)
+
   const handleSubmit = async () => {
     if (!data.name) {
       toast('请填写昵称', 'error')
@@ -66,6 +72,31 @@ export default function PostPage() {
     Object.entries(selectedTags).forEach(([key, tags]) => {
       if (tags.length > 0) finalData[key] = tags.join(',')
     })
+
+    if (userId && authToken) {
+      // 传了图就先落盘成文件；上传失败绝不继续发布——
+      // 继续走的话 data.avatar 里那串 dataURL 会被后端的字段长度上限截断成半张坏图
+      if (avatarFile) {
+        try {
+          const fd = new FormData()
+          fd.append('avatar', avatarFile)
+          const upRes = await fetch(`${API_BASE_URL}/upload/avatar`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${authToken}` },
+            body: fd,
+          })
+          const upData = await upRes.json().catch(() => null)
+          if (!upRes.ok || !upData?.success || !upData.avatar) {
+            toast(upData?.message || '头像上传失败，请重试', 'error')
+            return
+          }
+          finalData.avatar = upData.avatar
+        } catch {
+          toast('头像上传失败，请重试', 'error')
+          return
+        }
+      }
+    }
 
     const row: Row = {
       id: 'r' + Date.now().toString(36) + Math.random().toString(36).slice(2, 4),
@@ -197,11 +228,16 @@ export default function PostPage() {
                       e.target.value = ''
                       return
                     }
-                    if (file.size > 3 * 1024 * 1024) {
-                      toast('图片不能超过 3MB', 'error')
+                    if (file.size > 4 * 1024 * 1024) {
+                      // 后端 /api/upload/avatar 量的是整段 multipart 请求体，上限 5MB
+                      // （backend/utils/config.js 的 MAX_UPLOAD_SIZE）。前端若也放到 5MB，
+                      // 5MB 的图片 + 表单分帧一定超，用户挑完图只会收到一句"请求体过大"。
+                      // 留 1MB 余量，越界在这一步就用能看懂的话挡住
+                      toast('图片不能超过 4MB', 'error')
                       e.target.value = ''
                       return
                     }
+                    setAvatarFile(file)
                     const reader = new FileReader()
                     reader.onload = (ev) => {
                       setVal('avatar', ev.target?.result as string)

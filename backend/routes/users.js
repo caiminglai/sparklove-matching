@@ -34,10 +34,22 @@ async function getUsers(req, res, _, parsedUrl) {
   const authInfo = await getAuthInfo(req);
   const isLoggedIn = !!(authInfo.userId || authInfo.isAdmin);
 
-  const page = parseInt(parsedUrl.query.page) || 1;
+  const page = Math.max(parseInt(parsedUrl.query.page) || 1, 1);
   let limit = parseInt(parsedUrl.query.limit) || 20;
   const keyword = parsedUrl.query.keyword;
   const exact = parsedUrl.query.exact;
+
+  // 条数上限先算好，再进分支。以前这套夹取只写在 else 里，
+  // 带 keyword 的搜索分支拿的是客户端原样传的 limit——?keyword=x&limit=100000 就能一次拖走全表
+  if (authInfo.isAdmin) {
+    limit = 10000;
+  } else if (!isLoggedIn) {
+    if (limit > 20) limit = 20;
+  } else if (limit > 50) {
+    limit = 50;
+  } else if (limit < 1) {
+    limit = 1;
+  }
 
   let result, total;
 
@@ -47,13 +59,6 @@ async function getUsers(req, res, _, parsedUrl) {
     result = searchResult.data;
     total = searchResult.count;
   } else {
-    if (authInfo.isAdmin) {
-      limit = 10000;
-    } else if (!isLoggedIn) {
-      if (limit > 20) limit = 20;
-    } else if (limit > 50) {
-      limit = 50;
-    }
     result = await userService.getUserList(page, limit, authInfo.isAdmin);
     total = await userService.countUsers(!authInfo.isAdmin);
   }
@@ -263,7 +268,8 @@ async function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
         }
 
         const result = await userService.editUserById(id, { data: fields });
-        sendJson(res, 200, result);
+        // 按业务结果回码：以前无论成功失败都回 200，后台拿到 200 也判不出「这人根本不存在」
+        sendJson(res, result.success ? 200 : 404, result);
       } catch (e) {
         sendJson(res, 500, { success: false, message: '编辑失败: ' + e.message });
       }
@@ -277,7 +283,7 @@ async function editUser(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
     try {
       const data = JSON.parse(body);
       const result = await userService.editUserById(id, data);
-      sendJson(res, 200, result);
+      sendJson(res, result.success ? 200 : 404, result);
     } catch (e) {
       sendJson(res, 500, { success: false, message: '编辑失败' });
     }
@@ -325,7 +331,7 @@ async function approveUser(req, res, checkAdminAuth, pathname) {
     return;
   }
   const result = await userService.approveUser(id);
-  sendJson(res, 200, result);
+  sendJson(res, result.success ? 200 : 404, result);
 }
 
 // ========== POST /api/users/:id/reject（拒绝审核）
@@ -340,7 +346,7 @@ async function rejectUser(req, res, checkAdminAuth, pathname) {
     return;
   }
   const result = await userService.rejectUser(id);
-  sendJson(res, 200, result);
+  sendJson(res, result.success ? 200 : 404, result);
 }
 
 // ========== GET /api/users/search（搜索用户）

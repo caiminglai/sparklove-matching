@@ -33,7 +33,20 @@ function setAuthCookie(res, token) {
 }
 
 function clearAuthCookie(res) {
-  res.setHeader('Set-Cookie', 'auth_token=; Path=/; HttpOnly; Max-Age=0');
+  const isProd = process.env.NODE_ENV === 'production';
+  // 删除 cookie 靠的是「同名 + 同 Path（同域）」匹配，属性不一致时浏览器把它当成
+  // 另一个作用域的新 cookie，auth_token 原样留着——退出点了、cookie 还在。
+  // 所以这里的 Path/HttpOnly/SameSite/Secure 必须和 setAuthCookie 一一对齐
+  const parts = [
+    'auth_token=',
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+    'Max-Age=0',
+    'Expires=Thu, 01 Jan 1970 00:00:00 GMT'
+  ];
+  if (isProd) parts.push('Secure');
+  res.setHeader('Set-Cookie', parts.join('; '));
 }
 
 module.exports = { parseCookies, getAuthTokenFromCookie, setAuthCookie, clearAuthCookie };

@@ -51,6 +51,33 @@ function validateIdFormat(id) {
   return /^[a-zA-Z0-9_-]+$/.test(id);
 }
 
+// 这几项由服务端掌握，绝不能由请求体里的 data 带进来。
+// 以前 data 里塞一个 user_id / deposit / created_at 会被 db/users.js 当成「不是资料列」
+// 原封写进 extra_data，再被 dbRowToJson 用 ...extraData 摊回响应里发给访客
+const RESERVED_DATA_KEYS = ['id', 'user_id', 'userid', 'deposit', 'created_at', 'createdat', 'status', 'custom_fields'];
+
+// 逐个值清洗，而不是清洗完固定几项后再 ...userData.data 覆盖回去。
+// createUser 旧写法正是后者：sanitizeString 白算一遍，客户端多传一个同名键就把它整个顶掉
+const MAX_DATA_FIELD_LEN = 2000;
+
+function sanitizeDataObject(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  for (const [key, value] of Object.entries(raw)) {
+    if (RESERVED_DATA_KEYS.includes(String(key).toLowerCase())) continue;
+    if (typeof value === 'string') {
+      out[key] = sanitizeString(value).slice(0, MAX_DATA_FIELD_LEN);
+    } else if (value === null || value === undefined || typeof value === 'number' || typeof value === 'boolean') {
+      out[key] = value;
+    } else {
+      // 数组/对象一律转成字符串再洗一遍：资料列全是 text，
+      // 直接把对象交给 pg 会被序列化成 PG 数组字面量（{a,b}）存进库里显示成乱码
+      out[key] = sanitizeString(String(value)).slice(0, MAX_DATA_FIELD_LEN);
+    }
+  }
+  return out;
+}
+
 function validateUserData(userData) {
   const errors = [];
   if (userData.id && !validateIdFormat(userData.id)) {
@@ -136,21 +163,9 @@ async function createUser(userData, ownerUserId, isPrivileged = false) {
     user_id: ownerUserId || null,
     deposit: isPrivileged ? (userData.deposit || 0) : 0,
     createdAt: Date.now(),
-    data: {
-      name: sanitizeString(userData.data?.name || ''),
-      gender: sanitizeString(userData.data?.gender || ''),
-      age: userData.data?.age || '',
-      height: userData.data?.height || '',
-      weight: userData.data?.weight || '',
-      city: sanitizeString(userData.data?.city || ''),
-      education: sanitizeString(userData.data?.education || ''),
-      job: sanitizeString(userData.data?.job || ''),
-      income: sanitizeString(userData.data?.income || ''),
-      contact: userData.data?.contact || '',
-      avatar: sanitizeString(userData.data?.avatar || ''),
-      ...userData.data
-    },
-    status: isPrivileged ? (userData.status || 'approved') : 'approved'
+    data: sanitizeDataObject(userData.data)
+    // status 不在这里写：审核状态只归 approve/reject 两个接口管，
+    // 连「客户端传来的 status」也不采信——否则任何人 POST 一个 status:'approved' 就自审通过了
   };
   await userDb.addUser(newUser);
   return { success: true, user: newUser };
@@ -167,7 +182,7 @@ async function updateMyUser(userId, userData) {
     ...current,
     data: {
       ...current.data,
-      ...userData.data
+      ...sanitizeDataObject(userData.data)
     }
   };
   await userDb.updateUser(current.id, updated);
@@ -179,12 +194,15 @@ async function editUserById(id, userData) {
   if (!existing) return { success: false, message: '用户不存在' };
   const updated = {
     ...existing,
-    ...userData,
     data: {
       ...existing.data,
-      ...(userData.data || {})
+      ...sanitizeDataObject(userData.data)
     }
   };
+  // 顶层字段仍按管理员原意保留（改挂靠账号、代收认证费要走这里），但资料内容统一清洗过
+  for (const key of ['user_id', 'deposit']) {
+    if (userData[key] !== undefined) updated[key] = userData[key];
+  }
   await userDb.updateUser(id, updated);
   return { success: true, user: updated };
 }
@@ -206,18 +224,26 @@ async function removeMyUser(userId) {
   const target = users[0];
   const success = await userDb.deleteUser(target.id, userId, false);
   if (success) deleteUploadedFile(target.data && target.data.avatar);
-  return { success: true, message: '已删除' };
+  // 以前这里无条件 return { success: true }：库里一行没删掉，接口照样回「已删除」，
+  // 前端弹提示、人还挂在搜索结果里。回码跟着真实结果走
+  return { success, message: success ? '已删除' : '删除失败' };
 }
 
 // ========== 审核 ==========
 
 async function approveUser(id) {
+  // 先确认这条资料还在：updateUser 对不存在的 id 是「0 行被改」而不是报错，
+  // 不查就等于给一个已经不存在的 id 记一笔「已通过审核」的后台操作日志
+  const existing = await userDb.getUserById(id);
+  if (!existing) return { success: false, message: '用户不存在' };
   await userDb.approveUser(id);
   await adminDb.logAdminAction('approve_user', id, {});
   return { success: true, message: '已通过审核' };
 }
 
 async function rejectUser(id) {
+  const existing = await userDb.getUserById(id);
+  if (!existing) return { success: false, message: '用户不存在' };
   await userDb.rejectUser(id);
   await adminDb.logAdminAction('reject_user', id, {});
   return { success: true, message: '已拒绝' };

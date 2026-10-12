@@ -132,13 +132,27 @@ function dbRowToJson(row) {
 // 「缴过诚意认证费」是访客能否看到这条资料的唯一判据，两条路任一成立即可：
 // ①本行 deposit>0（线下/后台代收，革命公园那种代录资料走这条，它们没有挂靠账号）
 // ②该行所属账号有 approved 的缴费记录（线上下单，一次缴费覆盖该账号名下所有资料行）
-// 管理员端不过这个滤网，否则后台看不到待缴的人。整个表达式带括号：它会被 AND 拼进搜索条件
 const CERTIFIED_SQL = `(COALESCE(users.deposit, 0) > 0 OR EXISTS (SELECT 1 FROM deposits d WHERE d.user_id = users.user_id AND d.status = 'approved'))`;
+
+// 审核状态只在这条「面向访客」的表达式里生效：pending / rejected 都不许被访客看见，
+// NULL 与 approved 同样放行（历史种子行从没写过 status，一律当已通过）。
+// 为什么必须并进同一条判据：后台「驳回」按钮走的是 UPDATE users SET status='rejected'，
+// 而此前所有对外查询只看认证费、一眼都没看过 status，于是驳回在库里成功、在网站上无效。
+// status 的写入只归 approve/reject 两个接口管，批量导入不碰它——
+// 否则真人资料那条「整表重传」的导入路会把已驳回的人悄悄放回前台。
+const REVIEWED_SQL = `COALESCE(users.status, 'approved') = 'approved'`;
+
+// 管理员端不过这个滤网，否则后台看不到待缴的人。整个表达式带括号：它会被 AND 拼进搜索条件
+const PUBLIC_VIEW_SQL = `((${CERTIFIED_SQL}) AND (${REVIEWED_SQL}))`;
+
+// 把 varchar 的 age 安全地取成整数：非纯数字（含空串行）一律回 NULL，
+// 在比较里 NULL 不成立 = 该行不参与筛选，且绝不会触发 varchar::int 的转换报错
+const AGE_INT_SQL = "(CASE WHEN age ~ '^[0-9]+$' THEN age::int END)";
 
 async function getAllUsers(page = 1, limit = 20, onlyCertified = false) {
   const database = getDb();
   const offset = (page - 1) * limit;
-  const whereClause = onlyCertified ? `WHERE ${CERTIFIED_SQL}` : '';
+  const whereClause = onlyCertified ? `WHERE ${PUBLIC_VIEW_SQL}` : '';
   const stmt = database.prepare(
     `SELECT ${ALL_FIELDS.join(', ')}, status FROM users ${whereClause} ORDER BY created_at DESC LIMIT $1 OFFSET $2`
   );
@@ -190,13 +204,27 @@ async function deleteUser(id, ownerUserId, isAdmin = false) {
     if (!user.user_id) return false;
     if (user.user_id !== ownerUserId) return false;
   }
-  await database.prepare('DELETE FROM user_ratings WHERE rater_id = $1 OR rated_id = $2').run(id, id);
-  await database.prepare('DELETE FROM user_reports WHERE reporter_id = $1 OR reported_id = $2').run(id, id);
-  // 自定义字段是账号级的（EAV 主键 user_id + field_key，user_id 指向 auth_users），
-  // 删一条资料不该把兄弟资料的字段一起连坐清掉。账号注销当前没有删除路径，
-  // 这批字段的生命周期不归 deleteUser 管。
-  const stmt = database.prepare('DELETE FROM users WHERE id = $1');
-  await stmt.run(id);
+  // 库里一条外键都没有（pg_constraint 现量：本库 0 条 contype='f'），关联记录全靠这里手工清。
+  // 放在一个事务里：以前这串 DELETE 各跑各的，中途失败会留下「人没了、评价/解锁还在」这种半删状态。
+  // user_vectors.user_id 存的就是这里的 users.id（现量：库里那行的 user_id 与某条资料行 id 同形），
+  // 跟着删；contact_unlocks 只删「别人解锁过这个已消失的人」那几行，
+  // viewer_id 是账号级身份（一个账号名下还有别的资料行），不能连坐。
+  try {
+    await database.transaction(async (tx) => {
+      await tx.prepare('DELETE FROM user_ratings WHERE rater_id = $1 OR rated_id = $2').run(id, id);
+      await tx.prepare('DELETE FROM user_reports WHERE reporter_id = $1 OR reported_id = $2').run(id, id);
+      await tx.prepare('DELETE FROM user_vectors WHERE user_id = $1').run(id);
+      await tx.prepare('DELETE FROM contact_unlocks WHERE target_id = $1').run(id);
+      // 自定义字段是账号级的（EAV 主键 user_id + field_key，user_id 指向 auth_users），
+      // 删一条资料不该把兄弟资料的字段一起连坐清掉。账号注销当前没有删除路径，
+      // 这批字段的生命周期不归 deleteUser 管。
+      await tx.prepare('DELETE FROM users WHERE id = $1').run(id);
+    });
+  } catch (e) {
+    // 只记错误消息：资料内容（姓名、联系方式）不允许进日志
+    console.error('[deleteUser] 删除资料及关联记录失败，已整体回滚:', e.message);
+    return false;
+  }
   return true;
 }
 
@@ -273,21 +301,23 @@ async function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
     params.push(criteria.gender);
   }
   addLikeOrExact('city', criteria.city);
-  // age 是 varchar 且有空串行：直接 CAST('' AS INTEGER) 会让整条查询报错（500），
-  // 空值与非数字都当作「不参与筛选」，不能炸掉整个搜索
+  // age 是 varchar：NULLIF(age,'')::int 只挡住了空串，挡住不了 '25岁' / '未知' 这类非数字值，
+  // 而 PG 对 varchar::int 的转换错误发生在求值阶段、没有"跳过该行"的余地，一条脏值就能让整页搜索 500。
+  // age 由客户端直传（deriveProfileFields 只在有生日时才覆盖），所以脏值写进库这条路真实存在。
+  // 正则先行判定，非数字行不参与筛选，搜索继续可用
   const ageMin = parseInt(criteria.age_min, 10);
   if (Number.isFinite(ageMin)) {
-    conditions.push(`NULLIF(age, '')::int >= $${params.length + 1}`);
+    conditions.push(`${AGE_INT_SQL} >= $${params.length + 1}`);
     params.push(ageMin);
   }
   const ageMax = parseInt(criteria.age_max, 10);
   if (Number.isFinite(ageMax)) {
-    conditions.push(`NULLIF(age, '')::int <= $${params.length + 1}`);
+    conditions.push(`${AGE_INT_SQL} <= $${params.length + 1}`);
     params.push(ageMax);
   }
   // 非管理员不能按联系方式搜索；若只把条件丢弃，会退化成无条件分支返回整张表，故直接判空
   if (!isAdmin && criteria.contact) return { data: [], count: 0 };
-  if (!isAdmin) conditions.push(CERTIFIED_SQL);
+  if (!isAdmin) conditions.push(PUBLIC_VIEW_SQL);
   const contactFilter = criteria.contact || null;
   let keywordContactFilter = null;
 
@@ -295,7 +325,21 @@ async function searchUsers(criteria, page = 1, limit = 20, isAdmin = false) {
   addLikeOrExact('income', criteria.income);
   addLikeOrExact('name', criteria.name);
   if (criteria.keyword) {
-    keywordContactFilter = criteria.keyword;
+    if (isAdmin) {
+      // 管理员的关键字要连联系方式一起比，而 contact 列是密文，只能捞出来解密后在 JS 里比
+      keywordContactFilter = criteria.keyword;
+    } else {
+      // 访客的关键字只比姓名、城市两列，都是明文，交给 SQL 就行。
+      // 旧代码把访客关键字也塞进那条 JS 分支，等于每次搜索都 SELECT 整张可见表（无 LIMIT）
+      // 再在 Node 里逐行过滤——几百人还扛得住，真人资料涨到几万行就是每次搜索吃满内存
+      if (isExact) {
+        conditions.push(`(name = $${params.length + 1} OR city = $${params.length + 1})`);
+        params.push(criteria.keyword);
+      } else {
+        conditions.push(`(name LIKE $${params.length + 1} OR city LIKE $${params.length + 1})`);
+        params.push('%' + escapeLikeString(criteria.keyword) + '%');
+      }
+    }
   }
 
   let customFieldUserIds = null;
@@ -407,7 +451,7 @@ async function getUserStats() {
 
 async function countUsers(onlyCertified = false) {
   const database = getDb();
-  const whereClause = onlyCertified ? `WHERE ${CERTIFIED_SQL}` : '';
+  const whereClause = onlyCertified ? `WHERE ${PUBLIC_VIEW_SQL}` : '';
   return parseInt((await database.prepare(`SELECT COUNT(*) as count FROM users ${whereClause}`).get()).count) || 0;
 }
 
@@ -457,6 +501,7 @@ async function getCustomFieldsByUserIds(userIds) {
 }
 
 module.exports = {
+  PUBLIC_VIEW_SQL,
   getAllUsers,
   getUserById,
   getUsersByUserId,

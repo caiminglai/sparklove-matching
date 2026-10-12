@@ -98,18 +98,18 @@ function normalizeLabel(label: unknown): string {
 }
 
 const PURPOSE_ICONS: Record<string, typeof Users> = {
-  同频交友: Heart,
+  相亲交友: Heart,
   拓展圈子: Users,
   兴趣交流: Sparkles,
   运动伙伴: Target,
   学习搭子: Users2,
   同城活动: Users,
   寻找知己: Sparkles,
-  同频共振: Sparkles,
-  异次元航行: Sparkles,
+  人生伴侣: Heart,
+  恋爱结婚: Heart,
   先交朋友: Users,
-  找个搭子: Users,
-  同城相聚: MapPin,
+  找个伴: Users,
+  同城约会: MapPin,
   周末玩伴: Users,
   一起旅行: MapPin,
   一起运动: Target,
@@ -245,6 +245,15 @@ export default function SearchPanel({
     [columns, adminCustomFields],
   )
 
+  // 顶部那排「目的」标签：以后端 field_mappings 的 purpose 选项为准，拉不到才退回 constants 的兜底。
+  // 2026-10-13 实测：后端 purpose 有 20 个选项，前端写死那份有 5 个后端根本没有
+  // （同频共振、异次元航行、找个搭子、同城相聚、同频交友），点了永远 0 人；
+  // 后端有的 5 个（相亲交友、人生伴侣、恋爱结婚、找个伴、同城约会）前端又点不到。
+  const purposeOptions = useMemo(() => {
+    const opts = normalizeOptions(columns.find((c) => c.key === 'purpose')?.options)
+    return opts.length > 0 ? opts : PURPOSE_OPTIONS
+  }, [columns])
+
   const addCond = useCallback(
     () => onConditionsChange([...conditions, { column: '', value: '' }]),
     [conditions, onConditionsChange],
@@ -348,7 +357,7 @@ export default function SearchPanel({
         >
           全部
         </button>
-        {PURPOSE_OPTIONS.map((purpose) => {
+        {purposeOptions.map((purpose) => {
           const Icon = PURPOSE_ICONS[purpose] || Users
           return (
             <button

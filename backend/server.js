@@ -45,13 +45,20 @@ async function checkAdminAuth(req) {
 
 // ========== CORS 配置 ==========
 const SERVER_ORIGIN = process.env.SERVER_ORIGIN || 'http://localhost:8080';
+// compose 里 FRONTEND_URL 写的是逗号分隔的一串（现量：容器内 printenv 回
+// "http://localhost:4000,http://localhost:4001"）。以前直接把这个整串塞进白名单数组，
+// 而 Origin 头永远是单个 URL，于是这一项从来没匹配上过——跨源请求的 ACAO 只能靠上面几个默认值兜着。
+// 现在按逗号拆开逐个收进白名单，两种写法（单个、逗号串）都算配置正确
 const ALLOWED_ORIGINS = [
   'http://localhost:4000',
   'http://localhost:4001',
   'http://localhost:8080',
   SERVER_ORIGIN,
   process.env.FRONTEND_URL
-].filter(Boolean);
+].filter(Boolean)
+ .flatMap(item => String(item).split(','))
+ .map(item => item.trim())
+ .filter(Boolean);
 
 // ========== 路由模块 ==========
 const authRoutes = require('./routes/auth.js');
@@ -148,12 +155,20 @@ const server = http.createServer(async (req, res) => {
 
   const origin = req.headers.origin || '';
   const allowOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : '';
-  res.setHeader('Access-Control-Allow-Origin', allowOrigin);
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PUT, OPTIONS');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-None-Match');
-  // 跨源时浏览器默认不把 ETag 交给 JS，前端拿不到就退化成 Date.now() 当版本号、协商缓存永不命中。
-  res.setHeader('Access-Control-Expose-Headers', 'ETag');
+  // 命中白名单才发跨源头。以前 Allow-Credentials: true 是无条件发的，
+  // 而 Allow-Origin 在不匹配时发空串——头看着像配好了，实际浏览器照样拦，
+  // 排错时谁都会以为"CORS 通了"。不匹配就一个跨源头都不留，让失败一眼可见。
+  // Vary: Origin 常驻：同一 URL 的响应会随请求的 Origin 不同而不同，
+  // 不加这句，中间的缓存（Caddy/浏览器）可能把 A 源的响应喂给 B 源
+  res.setHeader('Vary', 'Origin');
+  if (allowOrigin) {
+    res.setHeader('Access-Control-Allow-Origin', allowOrigin);
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, DELETE, PUT, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, If-None-Match');
+    // 跨源时浏览器默认不把 ETag 交给 JS，前端拿不到就退化成 Date.now() 当版本号、协商缓存永不命中。
+    res.setHeader('Access-Control-Expose-Headers', 'ETag');
+  }
 
   if (req.method === 'OPTIONS') { res.writeHead(200); res.end(); return; }
 
@@ -196,14 +211,22 @@ const server = http.createServer(async (req, res) => {
   }
 
   // ========== 管理后台页面 ==========
+  // 这三个页面的数据接口一律只认 Bearer token（getAdminTokenFromRequest 明确不读 Cookie 防 CSRF），
+  // 而浏览器地址栏跳转带不上 Authorization 头。所以在这里 checkAdminAuth 恒为 false：
+  // 现量证据——登录后跳 /admin/m，回的是 <title>登录 - 精准匹配</title>，手机后台永远进不去；
+  // 隔壁 /admin/main 不判，反倒正常出面板。页面自己会查 localStorage 里的 token 再跳登录页，
+  // 服务端这道判据既做不到、又挡住了正路，改成与 /admin/main 同样的直出
   if (req.method === 'GET' && (pathname === '/admin' || pathname === '/admin/')) {
     res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(ADMIN_HTML); return;
   }
   if (req.method === 'GET' && (pathname === '/admin/m' || pathname === '/admin/m/')) {
-    if (!(await checkAdminAuth(req))) {
-      res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(M_LOGIN_HTML); return;
-    }
     res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(M_HTML); return;
+  }
+  // m.html 查不到 token 时跳的是 /admin/m-login（无扩展名）。以前没有这条路由，
+  // 落进下面的静态分支后 path.basename 得到不带 .html 的文件名，读不到文件回 404；
+  // 现量：/admin/m-login 回 404，/admin/m-login.html 回 200
+  if (req.method === 'GET' && (pathname === '/admin/m-login' || pathname === '/admin/m-login/')) {
+    res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(M_LOGIN_HTML); return;
   }
   if (req.method === 'GET' && (pathname === '/admin/main' || pathname === '/admin/main/')) {
     res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'}); res.end(MAIN_HTML); return;
@@ -236,7 +259,7 @@ const server = http.createServer(async (req, res) => {
     await uploadRoutes.uploadAvatar(req, res); return;
   }
   if (req.method === 'POST' && pathname === '/api/deposit/upload-proof') {
-    uploadRoutes.uploadDepositProof(req, res); return;
+    await uploadRoutes.uploadDepositProof(req, res); return;
   }
   if (req.method === 'GET' && pathname === '/api/admin/deposits') {
     await uploadRoutes.getDeposits(req, res, checkAdminAuth); return;
@@ -269,7 +292,7 @@ const server = http.createServer(async (req, res) => {
     await paymentRoutes.contactCredits(req, res); return;
   }
   if (req.method === 'POST' && pathname === '/api/unlock-contact/submit') {
-    contactUnlockRoutes.submitUnlockRequest(req, res); return;
+    await contactUnlockRoutes.submitUnlockRequest(req, res); return;
   }
   if (req.method === 'GET' && pathname === '/api/admin/unlock-contact-requests') {
     await contactUnlockRoutes.getUnlockRequests(req, res, checkAdminAuth); return;
@@ -285,42 +308,45 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.method === 'GET' && pathname.startsWith('/uploads/')) {
-    uploadRoutes.serveUploadedFile(req, res, pathname); return;
+    await uploadRoutes.serveUploadedFile(req, res, pathname); return;
   }
 
   // --- 认证 ---
   const clientIp = getClientIp(req);
   if (req.method === 'POST' && pathname === '/api/auth/register') {
-    authRoutes.register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp); return;
+    await authRoutes.register(req, res, readBodyWithLimit, checkRegisterRateLimit, clientIp); return;
   }
   if (req.method === 'POST' && pathname === '/api/auth/login') {
-    authRoutes.login(req, res, readBodyWithLimit, checkLoginRateLimit); return;
+    await authRoutes.login(req, res, readBodyWithLimit, checkLoginRateLimit); return;
+  }
+  if (req.method === 'POST' && pathname === '/api/auth/logout') {
+    await authRoutes.logout(req, res); return;
   }
   if (req.method === 'POST' && pathname === '/api/auth/change-password') {
     await authRoutes.changePassword(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'GET' && pathname === '/api/auth/captcha') {
-    authRoutes.getCaptcha(req, res); return;
+    await authRoutes.getCaptcha(req, res); return;
   }
   if (req.method === 'POST' && pathname === '/api/auth/captcha/verify') {
     // 验证成功会签发一枚放行注册的 token，不限速就能脚本猜滑块坐标；这一档比其他写入口更紧
     if (!checkRateLimit(clientIp, 10)) { sendJson(res, 429, { success: false, message: '验证过于频繁，请稍后再试' }); return; }
-    authRoutes.verifyCaptcha(req, res, readBodyWithLimit); return;
+    await authRoutes.verifyCaptcha(req, res, readBodyWithLimit); return;
   }
   
   // 短信验证预留接口
   if (req.method === 'POST' && pathname === '/api/auth/sms/register-code') {
     // 服务层只按手机号做了 60 秒防重，换一个号就能绕过，这里补按 IP 的闸
     if (!checkRateLimit(clientIp)) { sendJson(res, 429, { success: false, message: '发送过于频繁，请稍后再试' }); return; }
-    authRoutes.sendRegisterSmsCode(req, res, readBodyWithLimit); return;
+    await authRoutes.sendRegisterSmsCode(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/auth/sms/verify-register-code') {
     // 6 位数字验证码，只闸发送不闸校验等于留下另一半
     if (!checkRateLimit(clientIp)) { sendJson(res, 429, { success: false, message: '验证过于频繁，请稍后再试' }); return; }
-    authRoutes.verifyRegisterSmsCode(req, res, readBodyWithLimit); return;
+    await authRoutes.verifyRegisterSmsCode(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && (pathname === '/api/admin/login' || pathname === '/api/admin')) {
-    authRoutes.adminLogin(req, res, readBodyWithLimit, checkLoginRateLimit); return;
+    await authRoutes.adminLogin(req, res, readBodyWithLimit, checkLoginRateLimit); return;
   }
 
   // --- 管理员统计 ---
@@ -339,7 +365,7 @@ const server = http.createServer(async (req, res) => {
     await userRoutes.getUsers(req, res, null, parsedUrl); return;
   }
   if (req.method === 'POST' && pathname === '/api/users') {
-    userRoutes.addUser(req, res, readBodyWithLimit); return;
+    await userRoutes.addUser(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'POST' && pathname === '/api/users/batch') {
     await userRoutes.batchSaveUsers(req, res, readBodyWithLimit, checkAdminAuth); return;
@@ -348,7 +374,7 @@ const server = http.createServer(async (req, res) => {
     await userRoutes.getMyUser(req, res); return;
   }
   if (req.method === 'PUT' && pathname === '/api/users/my') {
-    userRoutes.updateMyUser(req, res, readBodyWithLimit); return;
+    await userRoutes.updateMyUser(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'DELETE' && pathname === '/api/users/my') {
     await userRoutes.deleteMyUser(req, res); return;
@@ -408,7 +434,7 @@ const server = http.createServer(async (req, res) => {
 
   // --- 评价 ---
   if (req.method === 'POST' && pathname === '/api/ratings') {
-    ratingRoutes.addRating(req, res, readBodyWithLimit); return;
+    await ratingRoutes.addRating(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'GET' && /^\/api\/users\/[^\/]+\/ratings$/.test(pathname)) {
     await ratingRoutes.getRatings(req, res, pathname); return;
@@ -416,7 +442,7 @@ const server = http.createServer(async (req, res) => {
 
   // --- 举报 ---
   if (req.method === 'POST' && pathname === '/api/reports') {
-    reportRoutes.addReport(req, res, readBodyWithLimit); return;
+    await reportRoutes.addReport(req, res, readBodyWithLimit); return;
   }
   if (req.method === 'GET' && pathname === '/api/reports') {
     await reportRoutes.getAllReports(req, res, checkAdminAuth); return;

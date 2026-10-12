@@ -82,17 +82,28 @@ export function loadRows(): Row[] {
 }
 
 export function saveRows(rows: Row[]) {
-  localStorage.setItem(LS_ROWS, JSON.stringify(rows))
+  // 只写本地缓存。以前这里还顺手 POST /users/batch——那是后台 CSV 整表导入专用的管理员接口
+  // （backend/server.js 挂在 checkAdminAuth 后面），后果有两层：
+  // 1) 未登录访客在发布页提交时必然打一发 401，控制台一片红，数据并不同步；
+  // 2) 更坏的是管理员登录着用发布页：浏览器 localStorage 里那份 v6 缓存会被整表 upsert 回库，
+  //    batch 的 UPDATE 覆盖 ALL_FIELDS 全列（含 contact 密文、status、deposit），
+  //    等于用一份可能几个月没刷新的本地快照盖掉真人的线上资料。
+  // 本地缓存的定位就是「未登录草稿/兜底」，不承担回写线上的职责
   try {
-    const headers = { 'Content-Type': 'application/json', ...getAuthHeaders() }
-    fetch(`${API_BASE_URL}/users/batch`, {
-      method: 'POST',
-      headers,
-      credentials: 'include',
-      body: JSON.stringify(rows),
-    })
+    localStorage.setItem(LS_ROWS, JSON.stringify(rows))
   } catch (e) {
-    console.warn('saveRows: 网络同步失败', e)
+    // 未登录时发布页会把头像当 dataURL 存进这一份缓存，单张就能吃掉几 MB 配额。
+    // setItem 抛 QuotaExceededError 时不能让它把整个提交流程炸掉：
+    // 先去掉头像重试一次（缓存只是展示兜底，丢了不影响线上数据）
+    console.warn('saveRows: 本地缓存写入失败，去掉头像重试', e)
+    try {
+      const slim = rows.map((r) =>
+        r.data && 'avatar' in r.data ? { ...r, data: { ...r.data, avatar: '' } } : r,
+      )
+      localStorage.setItem(LS_ROWS, JSON.stringify(slim))
+    } catch (e2) {
+      console.warn('saveRows: 本地缓存仍然写不进，本次改动只保留在内存里', e2)
+    }
   }
 }
 

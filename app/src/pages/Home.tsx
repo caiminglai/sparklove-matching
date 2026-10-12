@@ -14,7 +14,7 @@ import UserList from '../components/UserList'
 import type { Column, FlatRow, MatchCondition, Rating, Row } from '../data/types'
 import { fetchFieldMappings } from '../services/field-mapping.service'
 import { matchRows } from '../services/match.service'
-import { addColumn, loadColumns, loadRows } from '../services/user.service'
+import { addColumn, deleteRow, loadColumns, loadRows } from '../services/user.service'
 import { getAuthHeaders, getAuthToken } from '../utils/auth'
 import { waitForBootstrapSafeWindow, withInFlightDedup } from '../utils/bootstrap-guard'
 import { handleApiError } from '../utils/errorHandler'
@@ -122,7 +122,12 @@ export default function Home() {
       const { users, customFields } =
         page === 1
           ? await withInFlightDedup<FetchUsersResult>(
-              'users:page1',
+              // 去重键必须带上本次请求的全部判据。原来写死 'users:page1'：
+              // 第一屏「西安」的请求还在飞的时候改搜「北京」，第二次调用直接复用
+              // 前一个 Promise 的结果 —— 列表渲染出来的是西安那批，搜索框写的却是北京，
+              // 用户看到的是「搜了个寂寞」，而且没有任何报错，只能刷新页面。
+              // 用 buildApiUrl 的返回值当键：请求身份和键天然一致，以后加判据也不会再漏
+              'users:' + buildApiUrl(page, keyword, exact),
               doFetch as () => Promise<FetchUsersResult>,
             )
           : await doFetch()
@@ -214,8 +219,10 @@ export default function Home() {
   // 注意：此区域为核心功能，请勿随意改动
   // ===================================================================
   const handleSearch = () => {
-    setHasSearched(false)
-    setConditions([{ column: '', value: '' }])
+    // 改于 2026-10-13 全面审计：原来这两行 setHasSearched(false) + setConditions([{column:'',value:''}])
+    // 会把用户刚在同一个面板里勾好的筛选条件清空，而且清空结果马上被 SearchPanel 写回 localStorage，
+    // 刷新页面也找不回来。面板下方那句提示还写着「多项选择可用逗号分隔」，等于一边教人填条件一边把条件抹掉。
+    // 「搜索」从此只换一批行，条件保持在场并继续生效；要清条件请用旁边的「重置」按钮。
     setFavoritesFilter(false)
     setActiveSearchKeyword(searchKeyword)
     setActiveSearchExact(searchExact)
@@ -383,12 +390,20 @@ export default function Home() {
   // 核心功能：多条件匹配逻辑
   // 注意：此区域为核心功能，请勿随意改动
   // ===================================================================
+  // 改于 2026-10-13 全面审计：以前只有点过「开始匹配」(hasSearched) 才走 matchRows，
+  // 于是条件填着、列表却完全没按条件筛，界面上还挂着那几个条件——自相矛盾。
+  // 现在只要条件里真的填了「字段+值」就直接生效（沿用原有的 300ms 防抖），两个按钮都还能用。
+  const hasActiveConditions = useMemo(
+    () => debouncedConditions.some((c) => c.column && c.value),
+    [debouncedConditions],
+  )
+
   const results = useMemo(
     () =>
-      hasSearched
+      hasSearched || hasActiveConditions
         ? matchRows(filteredRows, debouncedConditions)
         : filteredRows.map((r) => ({ row: r, score: 0, matches: [] as string[] })),
-    [hasSearched, filteredRows, debouncedConditions],
+    [hasSearched, hasActiveConditions, filteredRows, debouncedConditions],
   )
 
   // 后端分页模式：直接使用 results 作为 displayResults（每页数据由后端返回）
@@ -608,23 +623,44 @@ export default function Home() {
       return
     }
 
-    if (authToken && row?.user_id) {
-      try {
-        const res = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-          headers: { Authorization: `Bearer ${authToken}` },
-        })
-        if (res.ok) {
-          setRows((prev) => prev.filter((r) => r.id !== id))
-        } else {
-          const data = await res.json()
-          toast(data.message || '删除失败', 'error')
-        }
-      } catch (e) {
-        toast('网络错误', 'error')
+    // 这条行是不是只躺在本地缓存里（未登录发帖的兜底）。只有这种才允许「不碰服务端就消失」：
+    // 改前是无 token 就直接过滤内存数组，等于给访客演一场删除成功，刷新后人照样在
+    const localOnly = loadRows().some((r) => r.id === id)
+
+    if (!authToken) {
+      if (localOnly) {
+        deleteRow(id)
+        setRows((prev) => prev.filter((r) => r.id !== id))
+        toast('已删除', 'success')
+      } else {
+        toast('登录后才能删除这条资料', 'error')
       }
-    } else {
-      setRows((prev) => prev.filter((r) => r.id !== id))
+      setShowDelModal(false)
+      setSelRowId(null)
+      return
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${authToken}` },
+      })
+      if (res.ok) {
+        // 服务端删掉了，本地兜底那份也得一起清，不然刷新又从缓存冒出来
+        if (localOnly) deleteRow(id)
+        setRows((prev) => prev.filter((r) => r.id !== id))
+      } else {
+        const data = await res.json().catch(() => null)
+        if (localOnly && /不存在|无权限/.test(String(data?.message || ''))) {
+          deleteRow(id)
+          setRows((prev) => prev.filter((r) => r.id !== id))
+          toast('网上没有这条，已从本地删除', 'success')
+        } else {
+          toast(data?.message || '删除失败', 'error')
+        }
+      }
+    } catch (e) {
+      toast('网络错误', 'error')
     }
     setShowDelModal(false)
     setSelRowId(null)

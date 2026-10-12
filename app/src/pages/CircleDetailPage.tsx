@@ -14,10 +14,10 @@ import { API_BASE_URL, normalizeAvatarUrl } from '../api/config'
 import type { Row } from '../data/types'
 import ContactPayModal from '../components/ContactPayModal'
 import ImagePreview from '../components/ImagePreview'
-import { maskContact } from '../utils/mask'
 import { usePricing } from '../utils/pricing'
 import { formatYuan } from '../utils/money'
 import { hexToRgba } from '../utils/color'
+import { pickCircleMembers, splitTagTokens } from '../utils/circles'
 import { getAuthHeaders } from '../utils/auth'
 
 const CIRCLE_CONFIGS: Record<string, { label: string; icon: typeof Heart; color: string }> = {
@@ -58,12 +58,9 @@ export default function CircleDetailPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // 成员名单必须由 utils/circles 同一套口径算：列表页卡片上写几个人，点进来就是几个人
   const circleUsers = useMemo(
-    () =>
-      rows.filter((r) => {
-        const val = String(r.data?.[circleKey as keyof typeof r.data] || '')
-        return val.includes(decodedTag)
-      }),
+    () => pickCircleMembers(rows, circleKey || 'hobbies', decodedTag),
     [rows, circleKey, decodedTag],
   )
 
@@ -430,10 +427,7 @@ export default function CircleDetailPage() {
                   {Object.entries(CIRCLE_CONFIGS).map(([key, cfg]) => {
                     const val = String(detailData[key as keyof typeof detailData] || '')
                     if (!val) return null
-                    const tags = val
-                      .split(',')
-                      .map((t) => t.trim())
-                      .filter(Boolean)
+                    const tags = splitTagTokens(val)
                     return tags.map((t) => (
                       <span
                         key={`${key}-${t}`}
@@ -467,11 +461,14 @@ export default function CircleDetailPage() {
                   >
                     联系方式
                   </div>
+                  {/* detailData.contact 从 /circles/members 下来时已被后端脱敏（maskUsers），
+                      这里再 maskContact 一次等于把 "138****5678" 打成 "138****78"。
+                      未解锁要看的完整号走 unlockedContact（/check-unlock 回明文） */}
                   <div
                     className="text-sm font-medium"
                     style={{ color: 'var(--color-text-primary)' }}
                   >
-                    {unlockedContact || maskContact(detailData.contact)}
+                    {unlockedContact || detailData.contact}
                   </div>
                   {unlockedContact === null && (
                     <button

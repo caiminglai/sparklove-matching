@@ -2,7 +2,6 @@ import { X, Star, Flag, MapPin, Shield } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { CATEGORIES, FIELD_LABELS } from '../data/constants'
 import { normalizeAvatarUrl } from '../api/config'
-import { maskContact } from '../utils/mask'
 import { usePricing } from '../utils/pricing'
 import { formatYuan } from '../utils/money'
 import type { Row, Column, Rating } from '../data/types'
@@ -230,11 +229,15 @@ export default function UserDetailModal({
                     </>
                   ) : (
                     <>
+                      {/* 这里的 contact 已经是后端脱敏过的值（backend/services/user.service.js
+                          的 maskUsers 在 /users、/users/search、/circles/members、推荐位下发前统一打成
+                          138****5678）。前端再 maskContact 一次会把星号当字符截进去，
+                          显示变成 138****78——不是泄露，是把已经能辨认的号弄得更难认 */}
                       <div
                         className="text-sm font-medium"
                         style={{ color: 'var(--color-text-primary)' }}
                       >
-                        {maskContact(detailData.contact)}
+                        {detailData.contact}
                       </div>
                       <button
                         onClick={() => onShowPay(userId)}

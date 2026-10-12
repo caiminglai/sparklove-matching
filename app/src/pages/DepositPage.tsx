@@ -145,8 +145,10 @@ export default function DepositPage() {
       return
     }
 
-    if (file.size > 5 * 1024 * 1024) {
-      toast('图片大小不能超过5MB', 'error')
+    // 限制 4MB：后端 /api/deposit/upload-proof 卡的是整段 multipart 请求体（MAX_UPLOAD_SIZE=5MB），
+    // 前端放到 5MB 时，图片本身就到顶，加分帧必超，用户只会收到一句"请求体过大"
+    if (file.size > 4 * 1024 * 1024) {
+      toast('图片大小不能超过4MB', 'error')
       return
     }
 

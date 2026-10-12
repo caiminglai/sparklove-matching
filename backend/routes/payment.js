@@ -75,9 +75,17 @@ const PURPOSES = {
   contact_pack_5: { pricingItem: 'contactPack5', subject: '查看联系方式·5次包', credits: 5, isPack: true },
 };
 
+// 次数包：代码与入账都已就绪，定案是等站内有真人流量再上架。前端 app/src/utils/pricing.ts
+// 有个同名开关只管展示，以前后端没这一道——任何人 POST purpose=contact_pack_3 就能买到未上架的包。
+// 上架时两个开关一起改 true，只改一边会出现「收银台有、后端不认」或反过来
+const CONTACT_PACKS_ON_SALE = false;
+
 function resolvePurpose(raw) {
   if (raw === undefined || raw === null || raw === '') return 'deposit';
-  return PURPOSES[String(raw)] ? String(raw) : null;
+  const key = String(raw);
+  if (!PURPOSES[key]) return null;
+  if (PURPOSES[key].isPack && !CONTACT_PACKS_ON_SALE) return null;
+  return key;
 }
 
 async function applyOrderEffect(order) {
@@ -448,15 +456,26 @@ async function createOrderFor(req, res, readBodyWithLimit, forcedPurpose) {
       targetId = data.target_user_id || data.targetUserId || null;
       if (!targetId) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '缺少解锁对象' })); return; }
       targetId = String(targetId);
-      if (targetId === String(userId)) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '无需解锁自己的联系方式' })); return; }
+      // 自己名下那条资料不该花钱解：账号 id 和资料行 id 是两个不同的值，
+      // 只比 targetId === userId 挡不住「用自己的账号 id 当 target、解锁自己另一条资料」
+      const ownRow = await dbIndex.getDb().prepare(
+        'SELECT 1 AS hit FROM users WHERE (id = $1 OR user_id = $1) AND user_id = $2 LIMIT 1'
+      ).get(targetId, userId);
+      if (ownRow) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '无需解锁自己的联系方式' })); return; }
       const targetRow = await dbIndex.getDb().prepare('SELECT 1 AS hit FROM users WHERE id = $1 OR user_id = $2 LIMIT 1').get(targetId, targetId);
       if (!targetRow) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '要解锁的用户不存在' })); return; }
       if (await paymentsDb.checkContactUnlocked(userId, targetId)) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '该联系方式已解锁，无需重复支付' })); return; }
       // 手里还有次数就先花次数：买过包的人不该再看到一次收银台。
-      // 余额校验和扣减是同一条 SQL，余额不够时一行也写不进去，才会往下走去下单
+      // 余额校验和扣减在同一条 SQL，余额不够时一行也写不进去，才会往下走去下单
       const spent = await paymentsDb.trySpendContactCredit(userId, targetId);
       if (spent.success) {
         sendJson(res, 200, { success: true, unlocked: true, via: 'credit', remaining: spent.available, targetId: targetId });
+        return;
+      }
+      // 次数不够，或者这一对刚被另一条路径解开（管理端手动解锁 / 并发重复提交）。
+      // 后者绝不能往下走去生成收银台——那是让人为一把已经推开的门再付一次 9.9
+      if (spent.alreadyUnlocked) {
+        sendJson(res, 200, { success: true, unlocked: true, via: 'already', targetId: targetId });
         return;
       }
     }

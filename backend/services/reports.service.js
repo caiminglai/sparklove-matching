@@ -7,6 +7,12 @@ const userDb = require('../db/users');
 const { verifyToken } = require('../db/index');
 const { deleteUploadedFile } = require('../utils/uploadedFiles');
 
+// 举报类型白名单，逐字取自前端 app/src/components/ReportModal.tsx 的 REPORT_TYPES。
+// report_type 是 varchar(50)，以前直连 POST 传任意长字符串会撞在 PG 的截断错误上回 500，
+// 传页面四个选项以外的词则能落库——后台下拉筛不出它，那条记录在界面上等于消失
+const REPORT_TYPES = ['虚假信息', '骚扰他人', '不诚信行为', '其他'];
+const MAX_DESCRIPTION_LEN = 1000;
+
 async function submitReport(token, reportedId, reportType, description, proofPath) {
   const userId = verifyToken(token);
   if (!userId) {
@@ -19,15 +25,28 @@ async function submitReport(token, reportedId, reportType, description, proofPat
   if (!reportedId || !reportType) {
     return { success: false, message: '缺少参数' };
   }
+  if (!REPORT_TYPES.includes(reportType)) {
+    return { success: false, message: '举报类型不正确' };
+  }
+  const normalizedDescription = typeof description === 'string' ? description.trim() : '';
+  if (normalizedDescription.length > MAX_DESCRIPTION_LEN) {
+    return { success: false, message: `补充说明最多${MAX_DESCRIPTION_LEN}字` };
+  }
   const targetUser = await userDb.getUserById(reportedId);
   if (!targetUser) {
     return { success: false, message: '被举报用户不存在' };
   }
-  if (reportedId === users[0].id) {
+  // 和评价一样：一个账号名下可以挂多条资料行，原来只比 users[0].id，
+  // 名下第二行就能"举报自己"——刷出一条永远不该存在的工单占住后台
+  const ownedIds = new Set(users.map(u => String(u.id)));
+  if (ownedIds.has(String(reportedId))) {
+    return { success: false, message: '不能举报自己' };
+  }
+  if (typeof targetUser.user_id === 'string' && targetUser.user_id === String(userId)) {
     return { success: false, message: '不能举报自己' };
   }
   try {
-    await reportsDb.addReport(users[0].id, reportedId, reportType, description, proofPath);
+    await reportsDb.addReport(users[0].id, reportedId, reportType, normalizedDescription, proofPath);
     return { success: true, message: '举报成功' };
   } catch (e) {
     return { success: false, message: '举报失败：' + (e.message || '数据库错误') };
@@ -55,14 +74,27 @@ async function getAllReportsForAdmin(status) {
   return mappedReports;
 }
 
+// 后台四个状态值逐字取自 backend/admin/main.html 的下拉与文案（pending/processing/resolved/rejected）
+const REPORT_STATUSES = ['pending', 'processing', 'resolved', 'rejected'];
+
 async function updateStatus(reportId, status, adminNote) {
-  await reportsDb.updateReportStatus(reportId, status, adminNote);
+  if (!REPORT_STATUSES.includes(status)) {
+    return { success: false, message: '举报状态值不正确' };
+  }
+  const changed = await reportsDb.updateReportStatus(reportId, status, adminNote);
+  if (!changed) {
+    // notFound 给路由层区分 400（参数不对）和 404（记录已经没了）
+    return { success: false, notFound: true, message: '该举报记录不存在，未做改动' };
+  }
   return { success: true };
 }
 
 async function removeReport(reportId) {
-  const proofPath = await reportsDb.deleteReport(reportId);
-  deleteUploadedFile(proofPath);
+  const result = await reportsDb.deleteReport(reportId);
+  if (!result.deleted) {
+    return { success: false, notFound: true, message: '该举报记录不存在，未做改动' };
+  }
+  deleteUploadedFile(result.proofPath);
   return { success: true };
 }
 
