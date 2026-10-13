@@ -55,8 +55,8 @@
 │   ├── server.js                 # 服务器入口
 │   └── package.json
 │
-├── data/                        # 数据库 SQL（种子 / 导出 / 序列重置）；运行数据不在此（线上=服务器 PG 数据目录，容器方案=命名卷 `pgdata`）
-│   ├── match_db_pg15.sql        # ⚠️ 整个 data/ 被 .gitignore:20 排除，三个 SQL 均**不在 Git 里**（实测 `git ls-files data/` 为空）→ 服务器上必须单独 scp，否则 compose 挂的是缺失的 bind 源
+├── data/                        # 数据库 SQL（种子 / 导出 / 序列重置）；运行数据不在此（线上与本机都是 postgres 容器，数据在命名卷：compose 名 `pgdata` → Docker 实际名 `www_pgdata`）
+│   ├── match_db_pg15.sql        # ⚠️ `data/*` 被 .gitignore:20 整目录排除、**:21 只放行 `reset_sequences.sql`** ⇒ 三个 SQL 里**只有那一个进 Git**（10-14 现量 `git ls-files data/` 回一行 `data/reset_sequences.sql`，**不是空**）。另外两份（pg15 dump、server_seed）仓库里没有，上服务器必须单独 scp，否则 compose 挂的是缺失的 bind 源
 │   ├── match_db_server_seed.sql
 │   └── reset_sequences.sql
 │
@@ -223,8 +223,8 @@ server: {
 
 ## 4. 数据库 Schema
 
-数据库：PostgreSQL 18 + pgvector v0.8.2
-数据位置：PostgreSQL 跑在 `postgres` 容器内，数据在 Docker 命名卷 `pgdata`（容器挂 `/var/lib/postgresql`）。仓库 `data/` 只存 SQL 种子/导出文件、不含运行数据；但这些 SQL **不在 Git 里**（`data/` 被整目录 ignore），换机器或上服务器必须手工拷贝。
+数据库：PostgreSQL 18.6 ＋ pgvector 扩展 0.8.6（2026-10-14 线上现量：`select version()` 回 18.6，`pg_extension` 回 `vector@0.8.6`；旧文档写的 v0.8.2 是编译安装年代的值，随旧栈作废）
+数据位置：PostgreSQL 跑在 `postgres` 容器内（镜像 `pgvector/pgvector:pg18`），数据在 Docker 命名卷——compose 文件里写 `pgdata`，Docker 实际卷名带项目前缀 = `www_pgdata`（容器挂 `/var/lib/postgresql`）。仓库 `data/` 只存 SQL 种子/导出文件、不含运行数据；但这些 SQL **不在 Git 里**（`data/` 被整目录 ignore），换机器或上服务器必须手工拷贝。
 
 ### 4.1 核心业务数据表
 
@@ -284,11 +284,13 @@ server: {
 | `getUserVector()` | 获取用户向量 |
 | `getVectorStats()` | 获取向量统计信息 |
 
-说明：数据库已从 SQLite 迁移至 PostgreSQL，运行数据不在仓库 `data/` 内（线上在服务器 PG 数据目录，容器方案在 Docker 命名卷 `pgdata`，见 §4），原 `database.js` 已被拆分到 `db/` 目录，不再使用单一大文件。
+说明：数据库已从 SQLite 迁移至 PostgreSQL，运行数据不在仓库 `data/` 内（线上与本机都在 `postgres` 容器的 Docker 命名卷里，见 §4），原 `database.js` 已被拆分到 `db/` 目录，不再使用单一大文件。
 
 ---
 
 ## 5. API 接口一览
+
+> **这张表说明"接口存在、契约是什么"，不说明"这条业务在线上跑过"。** 逐条业务链路 2026-10-14 的线上现状（哪条通、哪条零数据、哪条根本跑不了、哪条靠代录）写在 `docs/项目总览.md` §9 的「线上现状」列，取证数字在 `docs/运维记录.md` §2.32。一句话摘要：线上只有**资料读取/搜索/圈子/条件筛选**这几条天天在跑，`ratings`、`reports`、`contact_unlocks`、`user_custom_fields`、`custom_filters`、`user_vectors` 六张表**全 0 行**，`deposits` 只 1 行（站长 ¥0.01 的测试单）。
 
 ### 5.1 认证接口
 
@@ -394,7 +396,8 @@ server: {
 
 > 注意：`routes/vector.js` 在处理任何分支前统一 `requireAuth`，所有 `/api/vector/*` 未登录一律 401。
 > `/api/vector/batch` 额外要求管理员令牌（`server.js` 把 `checkAdminAuth` 传进来），因为它一次最多跑 `limit`（默认 100）个用户的付费向量。
-> 现状：前端没有任何页面调用 `/api/vector/*`，`user_vectors` 表里有向量的行数为 0（唯一一行的两个向量列都是 NULL）。这套匹配引擎已实现但还没接到产品上，启用前先配 `EMBEDDING_API_KEY`，否则 `generateEmbedding` 直接抛错。
+> 现状（2026-10-14 两边分别现量）：前端没有任何页面调用 `/api/vector/*`；**线上** `user_vectors` **0 行**，**本机** 1 行但两个向量列都是 NULL。这套匹配引擎已实现但还没接到产品上（取证见 `docs/运维记录.md` §2.32）。
+> ⚠️ 比"没接上"更要紧的一条：**线上容器现在 `EMBEDDING_PROVIDER=mock`**，而 `generateEmbedding` 在 mock 分支**不抛错**（`services/vector.service.js:42-44` 直接回 `generateMockEmbedding(text)`，`75-89` 行是"字符串哈希→伪随机→归一化"，跟资料语义无关）。所以"启用前先配 `EMBEDDING_API_KEY` 否则直接抛错"这句只在 `PROVIDER != mock` 时成立；今天真去点 `POST /api/vector/batch`，它会把 99 行假向量写进库、接口一路回 200，之后 `/api/vector/similar` 返回的是噪声排序。启用顺序：改 `PROVIDER` 与真 key → 单个用户 `generate` → 抽一行看相似度是否讲得通 → 才谈 batch。
 
 **向量搜索参数说明：**
 - `type`：搜索类型，`profile`（资料相似）或 `expectation`（要求相似），默认 `profile`
