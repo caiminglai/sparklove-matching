@@ -57,24 +57,56 @@ describe('buildCircleGroups', () => {
     row('3', 'city', '贵阳'),
     row('4', 'city', ''),
     row('5', 'city', '宝鸡'),
+    row('6', 'city', '咸阳秦都区'),
+    row('7', 'city', '陕西周至'),
   ]
 
   it('写死标签负责合并：「西安」圈住写「西安高新区」的人', () => {
     const groups = buildCircleGroups(rows, 'city')
     console.log('[圈子分组] city =', JSON.stringify(groups.map((g) => `${g.tag}:${g.count}`)))
     expect(groupOf(groups, '西安')?.count).toBe(2)
-    expect(groupOf(groups, '西安高新区')?.count).toBe(1)
+    expect(groupOf(groups, '西安')?.users.map((u) => u.id)).toEqual(['1', '2'])
   })
 
-  it('标签以外的真实城市也成圈，空城市不成圈（改前：贵阳/宝鸡在圈子页根本不存在）', () => {
+  it('2026-10-13 他令「西安就西安，西安什么区地方太小」：区级名不再单开一圈', () => {
+    const groups = buildCircleGroups(rows, 'city')
+    const names = groups.map((g) => g.tag)
+    console.log('[圈子分组] 区级是否单开 =', JSON.stringify(names))
+    expect(names).not.toContain('西安高新区')
+    expect(names).not.toContain('咸阳秦都区')
+    // 人被并进大市，一个都没丢
+    expect(groupOf(groups, '咸阳')?.users.map((u) => u.id)).toEqual(['6'])
+    // 不含任何市名的写法（陕西周至）仍然自己成圈，否则这个人没圈子可进
+    expect(groupOf(groups, '陕西周至')?.count).toBe(1)
+  })
+
+  it('只有同城圈这一维做并市，兴趣圈里的「火锅／甜品」各是各圈', () => {
+    const rows2 = [row('1', 'hobbies', '火锅'), row('2', 'hobbies', '四川火锅')]
+    const groups = buildCircleGroups(rows2, 'hobbies')
+    console.log(
+      '[圈子分组] hobbies 不并 =',
+      JSON.stringify(groups.map((g) => `${g.tag}:${g.count}`)),
+    )
+    expect(groupOf(groups, '四川火锅')?.count).toBe(1)
+  })
+
+  it('老链接／旧缓存里的区名点进去仍能按子串找到人，不会空一片', () => {
+    console.log(
+      '[圈子成员] 区名兜底 =',
+      JSON.stringify(pickCircleMembers(rows, 'city', '西安高新区').map((r) => r.id)),
+    )
+    expect(pickCircleMembers(rows, 'city', '西安高新区').map((r) => r.id)).toEqual(['2'])
+  })
+
+  it('标签以外的真实城市也成圈，空城市不成圈（改前：贵阳这类没写死的城市在圈子页根本不存在）', () => {
     const groups = buildCircleGroups(rows, 'city')
     expect(groupOf(groups, '贵阳')?.users.map((u) => u.id)).toEqual(['3'])
     expect(groupOf(groups, '宝鸡')?.count).toBe(1)
     expect(groupOf(groups, '')).toBeUndefined()
-    // 可见 5 人里 4 人有城市，4 人都进了圈；「西安高新区」既在西安大圈也在自己的小圈
+    // 可见 7 人里 6 人有城市，6 人都进了圈；区级写法并进大市，不多开圈也不丢人
     const covered = new Set(groups.flatMap((g) => g.users.map((u) => u.id)))
     console.log('[圈子分组] 有城市的行 =', JSON.stringify([...covered]))
-    expect([...covered].sort()).toEqual(['1', '2', '3', '5'])
+    expect([...covered].sort()).toEqual(['1', '2', '3', '5', '6', '7'])
   })
 
   it('人多者优先排，且与写死标签重名的词不再单开一圈', () => {
@@ -127,5 +159,17 @@ describe('pickCircleMembers', () => {
       JSON.stringify(pickCircleMembers(rows, 'sport', '帆').map((r) => r.id)),
     )
     expect(pickCircleMembers(rows, 'sport', '帆').map((r) => r.id)).toEqual(['3'])
+  })
+
+  it('同城圈并市之后，卡片上的人数与点进去的人数仍然一致', () => {
+    const cityRows = [
+      row('1', 'city', '西安'),
+      row('2', 'city', '西安高新区'),
+      row('3', 'city', '陕西周至'),
+    ]
+    for (const g of buildCircleGroups(cityRows, 'city')) {
+      console.log('[圈子成员] 一致校验', g.tag, '=', g.count)
+      expect(pickCircleMembers(cityRows, 'city', g.tag).length).toBe(g.count)
+    }
   })
 })

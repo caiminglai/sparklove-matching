@@ -48,6 +48,11 @@ export const CIRCLE_TAG_MAP: Record<string, string[]> = {
     '重庆',
     '苏州',
     '长沙',
+    // 2026-10-13 他令「西安就西安」那天补的三个：真人资料里确实有人只填到市（咸阳／宝鸡）或省（甘肃），
+    // 之前没写死 ⇒ 同城圈头部数不到他们，他们只能靠派生词单开一圈
+    '咸阳',
+    '宝鸡',
+    '甘肃',
   ],
   personality: ['温柔', '开朗', '内向', '幽默', '沉稳', '活泼', '直爽', '细腻', '独立', '随和'],
 }
@@ -95,6 +100,21 @@ export function buildCircleGroups(rows: Row[], fieldKey: string): CircleGroup[] 
     for (const token of splitTagTokens(rawValue(row, fieldKey))) {
       // 和写死标签重名的词不再单开一圈：那一圈用子串匹配，人已经更全
       if (configuredNames.has(token)) continue
+      // 2026-10-13 他令「西安就西安，西安什么区地方太小、不符合现实」：
+      // 只有同城圈这一维做「小区名并进大市」——派生词里含某个写死城市（「西安高新区」含「西安」），
+      // 这个人已经在那个城市的圈里了，不再给区级名单开一圈。
+      // 兴趣／美食／运动／音乐／性格不这么并：那里的「火锅」「甜品」是两个都成立的独立标签，
+      // 并起来会让人找不到原本能找到的圈子。
+      if (fieldKey === 'city') {
+        let folded = false
+        for (const name of configuredNames) {
+          if (name !== token && token.includes(name)) {
+            folded = true
+            break
+          }
+        }
+        if (folded) continue
+      }
       const bucket = byToken.get(token)
       if (bucket) bucket.push(row)
       else byToken.set(token, [row])
