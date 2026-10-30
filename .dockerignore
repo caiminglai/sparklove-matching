@@ -10,9 +10,14 @@ backend/.env.production
 app/node_modules
 app/dist
 
-# 用户上传件不进镜像：运行时读的是挂载点 /uploads（server.js:181 从 /app 向上跳两级），
+# 用户上传件不进镜像：运行时读的是挂载点 /uploads（routes/files.js:18 从 /app 向上跳两级），
 # 镜像里那份 COPY 进来的副本既用不上，又把真实凭证图留在了镜像层
 backend/uploads
+
+# 后端单测不进镜像：Dockerfile 用的是 `npm ci --omit=dev`，镜像里没有 supertest/eslint/prettier，
+# 这 96 条用例在镜像里压根跑不起来；它们的位置是 CI 的 Backend job 和本机 `cd backend && npm test`。
+# 10-30 现量：不加这条时 /app/test 会跟着 `COPY backend/ ./` 进镜像（13 个文件，跑不了也留着）
+backend/test
 
 # 废弃的历史文件，不进镜像
 data/*.db

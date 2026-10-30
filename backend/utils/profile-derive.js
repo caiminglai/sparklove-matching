@@ -32,7 +32,10 @@ function parseBirthday(raw) {
   if (!nums || !nums.length) return null;
 
   let year = null;
-  let month = null;
+  // month 在下面两个分支里都必被赋值，所以这里不写 = null：
+  // 写了那个初值永远读不到（ESLint no-useless-assignment 报的就是这一条），
+  // 而 year 和 day 的 null 是真会被读到的（紧凑写法可以整段缺年或缺日）。
+  let month;
   let day = null;
 
   // 紧凑写法 19950615 / 199506：数字串直接按位切
@@ -97,15 +100,19 @@ function deriveMarriageFromRelationshipStatus(status) {
   return '';
 }
 
-/** 兴趣标签这一项历史上就是"兴趣爱好 + 运动爱好"两个列表的并集，逐项自己填等于填两遍。 */
+/** 兴趣标签这一项历史上就是"兴趣爱好 + 运动爱好"两个列表的并集，逐项自己填等于填两遍。
+ *  去重必须跨两栏一起做：旧写法只挡"运动爱好里重复兴趣爱好"那一半，
+ *  同一项在自己那栏写两遍（'旅游,旅游'）照样落两遍——10-30 补上，
+ *  app/src/utils/profile-derive.test.ts 那句"顺序按兴趣在前且去重"本来就是这个要求。 */
 function deriveInterestTags(hobbies, sport) {
   const split = (v) =>
     String(v == null ? '' : v)
       .split(',')
       .map((x) => x.trim())
       .filter(Boolean);
-  const merged = split(hobbies);
-  for (const tag of split(sport)) if (!merged.includes(tag)) merged.push(tag);
+  const merged = [];
+  for (const tag of [...split(hobbies), ...split(sport)])
+    if (!merged.includes(tag)) merged.push(tag);
   return merged.join(',');
 }
 

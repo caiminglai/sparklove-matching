@@ -7,7 +7,7 @@
 | 层级 | 技术 |
 |------|------|
 | 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS |
-| 后端 | Node.js 原生 HTTP 服务器(非 Express) |
+| 后端 | Node.js + Express 4(10-30 起；此前是手写的原生 `http` 分发器) + multer + express-rate-limit |
 | 数据库 | PostgreSQL + pg 连接池（全异步）+ pgvector(向量搜索扩展) |
 | 部署 | Docker Compose + Caddy 单轨。**线上与本机都已跑在这一轨上**（2026-10-14 现量：服务器 Debian 12、`docker compose ps` 里 caddy/jzxr/jzxr-web/postgres 全 running、宿主机没有 nginx/pm2/node 命令）。旧栈 Alibaba Cloud Linux + Nginx + PM2 已作废，要回看走 Git 历史 |
 
@@ -23,13 +23,17 @@
 │   │   └── api/            # API 请求配置
 │   └── vite.config.ts
 │
-├── backend/                # 后端(三层架构)
+├── backend/                # 后端(Express + 三层架构)
+│   ├── config/             # 环境变量 → 常量的唯一取值处
 │   ├── db/                 # 数据访问层(含 vector.js 向量模块)
-│   ├── routes/             # API 路由层(含 vector.js 向量路由)
+│   ├── middleware/         # HTTP 中间件(安全头/日志/CORS/鉴权/限流/请求体/上传/错误)
+│   ├── routes/             # API 路由层(13 个 router + index.js 装配表)
 │   ├── services/           # 业务逻辑层(含 vector.service.js)
+│   ├── test/               # 后端单测(96 条,全都不连库)
 │   ├── admin/              # 管理后台 HTML 模板
 │   ├── uploads/            # 用户上传文件(运行时创建)
-│   └── server.js           # 服务器入口
+│   ├── app.js              # createApp():中间件顺序 + 路由装配
+│   └── server.js           # 进程入口(listen / 启动校验 / 优雅退出)
 │
 └── data/                   # 仅存 3 个 SQL 文件(种子/结构脚本)
                             # 数据库实际数据不在仓库：线上与本机都是 compose 里的 postgres 容器，

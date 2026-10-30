@@ -1,122 +1,131 @@
+// ============================================================
+// 路由 - 向量搜索（生成 / 相似 / 双向匹配 / 统计 / 批量）
+//
+// 旧写法不是 router，而是一个 handleVectorRequest(req, res, checkAdminAuth)：
+// 每条请求都先过它一次，路径不是 /api/vector/ 开头就回 false 让 server.js 接着匹配。
+// 换成 router 时把"回 false"这件事拆成了两半，两半都得照着旧行为来：
+//   1) 登录判据挂在路径上，判据仍是 startsWith('/api/vector/')。
+//      所以 /api/vector（不带尾斜杠）压根不吃这道闸，和旧写法一样直接 404——
+//      用 router.use('/api/vector', ...) 会让它变成 401，那是凭据语义的漂移。
+//   2) 认了登录但没匹配到具体子路径的（/api/vector/foo），继续往下漏，最后 404。
+//
+// ⚠ 这里的 viewerId 来自 verifyToken，不是 isAdminToken。管理员令牌在这套 token
+//   格式里也会被 verifyToken 解出来（解出来的"userId"其实是管理员用户名），
+//   旧写法就是这个行为，批量生成向量靠它先过登录闸、再过管理员闸。别顺手改成 resolveAuth。
+// ============================================================
+
+const express = require('express');
+
 const vectorService = require('../services/vector.service');
-const dbIndex = require('../db/index.js');
-const { collectBody } = require('../utils/multipart');
-const { MAX_VECTOR_BODY } = require('../utils/config');
+const { requireToken } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/admin-auth');
+const { asyncHandler } = require('../middleware/async-handler');
+const { bodyLimit } = require('../middleware/body');
+const { searchParam } = require('../utils/searchParam');
+const { MAX_VECTOR_BODY } = require('../config');
 
-/**
- * 验证用户身份，返回 userId 或 null
- */
-function requireAuth(req) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) return null;
-  return dbIndex.verifyToken(authHeader.slice(7));
-}
+const router = express.Router({ strict: true }); // strict：尾斜杠不当同一条，理由见 routes/index.js 头部
 
-// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
-const { sendJson } = require('../utils/sendJson');
-
-/**
- * 向量搜索API路由（原生HTTP）
- * 返回 true 表示已处理该请求，false 表示非向量路由，由 server.js 继续匹配
- */
-async function handleVectorRequest(req, res, checkAdminAuth) {
-  const url = new URL(req.url, `http://${req.headers.host}`);
-  let pathname = url.pathname;
-  const method = req.method;
-
-  // 关键修复：仅当路径以 /api/vector/ 开头时才视为向量路由
-  // 否则返回 false 让 server.js 继续匹配其他路由（如公开的 /api/users）
-  if (!pathname.startsWith('/api/vector/')) {
-    return false;
+// 所有向量 API 都需要登录：没带令牌和令牌不对都回同一句「请先登录」，
+// 这是旧写法 requireAuth 的口径（两个分支合并成一句），不拆
+const vectorAuth = requireToken({ missing: '请先登录', invalid: '请先登录' });
+router.use((req, res, next) => {
+  if (!req.path.startsWith('/api/vector/')) {
+    next();
+    return;
   }
+  vectorAuth(req, res, next);
+});
 
-  // 所有向量 API 都需要登录
-  const viewerId = requireAuth(req);
-  if (!viewerId) {
-    sendJson(res, 401, { success: false, message: '请先登录' });
-    return true;
-  }
-
-  // GET /api/vector/stats - 获取向量统计
-  if (method === 'GET' && pathname === '/api/vector/stats') {
+// GET /api/vector/stats - 获取向量统计
+router.get(
+  '/api/vector/stats',
+  asyncHandler(async (req, res) => {
     try {
       const stats = await vectorService.getStats();
-      sendJson(res, 200, { success: true, data: stats });
+      res.status(200).json({ success: true, data: stats });
     } catch (e) {
-      sendJson(res, 500, { success: false, message: e.message });
+      res.status(500).json({ success: false, message: e.message });
     }
-    return true;
-  }
+  }),
+);
 
-  // POST /api/vector/generate/:userId - 生成用户向量（仅本人）
-  if (method === 'POST' && pathname.match(/^\/api\/vector\/generate\/([^/]+)$/)) {
-    const userId = pathname.match(/^\/api\/vector\/generate\/([^/]+)$/)[1];
+// POST /api/vector/generate/:userId - 生成用户向量（仅本人）
+router.post(
+  '/api/vector/generate/:userId',
+  asyncHandler(async (req, res) => {
+    const viewerId = req.auth.userId;
+    const userId = req.params.userId;
     if (String(viewerId) !== String(userId)) {
-      sendJson(res, 403, { success: false, message: '只能为自己生成向量' });
-      return true;
+      res.status(403).json({ success: false, message: '只能为自己生成向量' });
+      return;
     }
     try {
       const result = await vectorService.generateAndStoreUserVector(userId);
-      sendJson(res, 200, { success: true, data: result });
+      res.status(200).json({ success: true, data: result });
     } catch (e) {
-      sendJson(res, 500, { success: false, message: e.message });
+      res.status(500).json({ success: false, message: e.message });
     }
-    return true;
-  }
+  }),
+);
 
-  // GET /api/vector/similar/:userId - 查找相似用户（仅本人）
-  if (method === 'GET' && pathname.match(/^\/api\/vector\/similar\/([^/]+)$/)) {
-    const userId = pathname.match(/^\/api\/vector\/similar\/([^/]+)$/)[1];
+// GET /api/vector/similar/:userId - 查找相似用户（仅本人）
+router.get(
+  '/api/vector/similar/:userId',
+  asyncHandler(async (req, res) => {
+    const viewerId = req.auth.userId;
+    const userId = req.params.userId;
     if (String(viewerId) !== String(userId)) {
-      sendJson(res, 403, { success: false, message: '只能查看自己的匹配' });
-      return true;
+      res.status(403).json({ success: false, message: '只能查看自己的匹配' });
+      return;
     }
-    const type = url.searchParams.get('type') || 'profile';
-    const limit = parseInt(url.searchParams.get('limit')) || 10;
+    const type = searchParam(req, 'type') || 'profile';
+    const limit = parseInt(searchParam(req, 'limit')) || 10;
     try {
       const results = await vectorService.findSimilarUsers(userId, type, limit);
-      sendJson(res, 200, { success: true, data: results });
+      res.status(200).json({ success: true, data: results });
     } catch (e) {
-      sendJson(res, 500, { success: false, message: e.message });
+      res.status(500).json({ success: false, message: e.message });
     }
-    return true;
-  }
+  }),
+);
 
-  // GET /api/vector/match/:userId - 双向匹配推荐（仅本人）
-  if (method === 'GET' && pathname.match(/^\/api\/vector\/match\/([^/]+)$/)) {
-    const userId = pathname.match(/^\/api\/vector\/match\/([^/]+)$/)[1];
+// GET /api/vector/match/:userId - 双向匹配推荐（仅本人）
+router.get(
+  '/api/vector/match/:userId',
+  asyncHandler(async (req, res) => {
+    const viewerId = req.auth.userId;
+    const userId = req.params.userId;
     if (String(viewerId) !== String(userId)) {
-      sendJson(res, 403, { success: false, message: '只能查看自己的匹配' });
-      return true;
+      res.status(403).json({ success: false, message: '只能查看自己的匹配' });
+      return;
     }
-    const limit = parseInt(url.searchParams.get('limit')) || 10;
+    const limit = parseInt(searchParam(req, 'limit')) || 10;
     try {
       const results = await vectorService.findMutualMatches(userId, limit);
-      sendJson(res, 200, { success: true, data: results });
+      res.status(200).json({ success: true, data: results });
     } catch (e) {
-      sendJson(res, 500, { success: false, message: e.message });
+      res.status(500).json({ success: false, message: e.message });
     }
-    return true;
-  }
+  }),
+);
 
-  // POST /api/vector/batch - 批量生成向量（仅管理员：一次最多跑 limit 个用户的付费向量）
-  if (method === 'POST' && pathname === '/api/vector/batch') {
-    if (!checkAdminAuth || !(await checkAdminAuth(req))) {
-      sendJson(res, 403, { success: false, message: '仅管理员可批量生成向量' });
-      return true;
-    }
+// POST /api/vector/batch - 批量生成向量（仅管理员：一次最多跑 limit 个用户的付费向量）
+// 先过登录闸、再过管理员闸，两道话不一样：旧写法就是这样，运维看文案能分清卡在哪一道
+// 请求体上限这里跟着旧写法回 500「请求体过大」，不是别处的 413
+router.post(
+  '/api/vector/batch',
+  requireAdmin({ status: 403, message: '仅管理员可批量生成向量' }),
+  bodyLimit(MAX_VECTOR_BODY, { status: 500, message: '请求体过大' }),
+  asyncHandler(async (req, res) => {
     try {
-      const body = await collectBody(req, MAX_VECTOR_BODY);
-      const { limit = 100 } = body ? JSON.parse(body) : {};
+      const { limit = 100 } = req.body ? JSON.parse(req.body) : {};
       const results = await vectorService.batchGenerateVectors(parseInt(limit));
-      sendJson(res, 200, { success: true, data: results });
+      res.status(200).json({ success: true, data: results });
     } catch (e) {
-      sendJson(res, 500, { success: false, message: e.message });
+      res.status(500).json({ success: false, message: e.message });
     }
-    return true;
-  }
+  }),
+);
 
-  return false; // 未处理的路由
-}
-
-module.exports = { handleVectorRequest };
+module.exports = router;

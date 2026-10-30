@@ -83,7 +83,7 @@ Phase 2 要做的是：
 | 层级 | 技术 |
 |------|------|
 | 前端 | React 19 + TypeScript + Vite 7 + Tailwind CSS |
-| 后端 | Node.js 原生 HTTP 服务器（非 Express，轻量高效） |
+| 后端 | Node.js + Express 4（10-30 起；此前是手写的原生 `http` 分发器，那份 618 行的 `server.js` if 链拆成了中间件与路由装配表） |
 | 数据库 | PostgreSQL + **pg 连接池（全异步）** + **pgvector**（向量搜索扩展） |
 | 安全 | AES-256-CBC 加密、自定义 HMAC Token、bcrypt |
 | 部署 | Docker Compose + Caddy 单轨。**线上与本机都已是这一轨**（2026-10-14 现量：服务器 Debian 12 bookworm，`docker compose ps` 里 caddy / jzxr / jzxr-web / postgres 全 running，宿主机上 nginx、pm2、node 三个命令都不存在）；旧栈 Alibaba Cloud Linux + Nginx + PM2 已作废 |

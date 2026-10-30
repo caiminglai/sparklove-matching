@@ -1,10 +1,37 @@
+// ============================================================
+// 路由 - 支付（下单 / 两条异步通知 / 查单 / 模拟支付 / 价格配置）
+//
+// 这一份只改了"HTTP 外壳"：每个 handler 的入参从 (req,res,readBodyWithLimit,parsedUrl)
+// 变成 Express 的 (req,res)，路径改由 router 注册。业务判据——签名怎么拼、哪些字段
+// 必须对齐才允许入账、哪种失败回 5xx 换重推——一个字没动。
+//
+// 三处必须点名的口径，改造时最容易碰坏：
+//   1) 下单与两条通知的"请求体超限"不在中间件上回 413，而是 throw 进 handler
+//      自己那个 try/catch（旧写法就是 await readBodyWithLimit 在 try 里 reject）。
+//      于是三条各自的兜底照旧：下单 500+e.message、微信 500 {code:'FAIL'}、
+//      支付宝 200 'fail'。见 middleware/body.js 的 textWithinLimit。
+//   2) 模拟支付（mock-pay）第一道闸是"有没有开闸"，在鉴权之前：没开闸时无论谁问
+//      都回 404 Not Found（跟接口不存在一个样），不能变成 401——那是信息泄露，
+//      告诉外人这条路由开着呢。
+//   3) 支付宝通知必须拿**原始** form 串验签（'+' 是空格的线格式），所以全局用的是
+//      express.text 而不是 express.urlencoded；解析后的字段表由 decodeFormBody 自己拆。
+// ============================================================
+
+const express = require('express');
 const crypto = require('crypto');
+
 const dbIndex = require('../db/index.js');
 const paymentsDb = require('../db/payments.js');
 const paymentVerify = require('../utils/payment-verify.js');
 const pricing = require('../utils/pricing.js');
 const adminDb = require('../db/admin.js');
-const { sendJson } = require('../utils/sendJson');
+
+const { requireToken, bearerToken } = require('../middleware/auth');
+const { requireAdmin } = require('../middleware/admin-auth');
+const { asyncHandler } = require('../middleware/async-handler');
+const { defaultBodyLimit, textWithinLimit } = require('../middleware/body');
+
+const router = express.Router({ strict: true }); // strict：尾斜杠不当同一条，理由见 routes/index.js 头部
 
 // 支付配置
 let wechatConfig = null;
@@ -40,9 +67,19 @@ function initConfig(env) {
   };
 }
 
+// 旧写法由 server.js 在 require 之后手动调一次 initConfig(process.env)，
+// 顺序是承重的（dotenv 没跑完就取值 ⇒ 全空）。现在本文件顶部已经 require('../config')，
+// dotenv 在那一刻就跑完了，所以自己调自己，不再依赖外部的调用顺序。
+initConfig(process.env);
+
 function isPaymentConfigured() {
-  const wechatReady = !!(wechatConfig.appId && wechatConfig.mchId && wechatConfig.apiV3Key
-    && wechatConfig.serialNo && wechatConfig.privateKey);
+  const wechatReady = !!(
+    wechatConfig.appId &&
+    wechatConfig.mchId &&
+    wechatConfig.apiV3Key &&
+    wechatConfig.serialNo &&
+    wechatConfig.privateKey
+  );
   const alipayReady = !!(alipayConfig.appId && alipayConfig.privateKey);
   return { wechat: wechatReady, alipay: alipayReady, any: wechatReady || alipayReady };
 }
@@ -71,8 +108,18 @@ function generateOrderId() {
 const PURPOSES = {
   deposit: { pricingItem: 'deposit', subject: '诚意认证费' },
   contact_unlock: { pricingItem: 'contactUnlock', subject: '查看联系方式' },
-  contact_pack_3: { pricingItem: 'contactPack3', subject: '查看联系方式·3次包', credits: 3, isPack: true },
-  contact_pack_5: { pricingItem: 'contactPack5', subject: '查看联系方式·5次包', credits: 5, isPack: true },
+  contact_pack_3: {
+    pricingItem: 'contactPack3',
+    subject: '查看联系方式·3次包',
+    credits: 3,
+    isPack: true,
+  },
+  contact_pack_5: {
+    pricingItem: 'contactPack5',
+    subject: '查看联系方式·5次包',
+    credits: 5,
+    isPack: true,
+  },
 };
 
 // 次数包：代码与入账都已就绪，定案是等站内有真人流量再上架。前端 app/src/utils/pricing.ts
@@ -113,8 +160,10 @@ function buildAuthHeader(cfg, method, urlPath, body) {
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(message);
   const signature = sign.sign(cfg.privateKey, 'base64');
-  return `WECHATPAY2-SHA256-RSA2048 mchid="${cfg.mchId}",nonce_str="${nonceStr}",`
-    + `signature="${signature}",timestamp="${timestamp}",serial_no="${cfg.serialNo}"`;
+  return (
+    `WECHATPAY2-SHA256-RSA2048 mchid="${cfg.mchId}",nonce_str="${nonceStr}",` +
+    `signature="${signature}",timestamp="${timestamp}",serial_no="${cfg.serialNo}"`
+  );
 }
 
 async function wechatV3Post(urlPath, body, cfg) {
@@ -124,11 +173,11 @@ async function wechatV3Post(urlPath, body, cfg) {
       Authorization: buildAuthHeader(cfg, 'POST', urlPath, body),
       'Content-Type': 'application/json',
       Accept: 'application/json',
-      'User-Agent': 'jzxr-deposit/1.0'
+      'User-Agent': 'jzxr-deposit/1.0',
     },
     body: JSON.stringify(body),
     // 无超时会让微信侧挂起无限占着连接（v2 时代就踩过，这里保持同样的 10 秒上限）
-    signal: AbortSignal.timeout(10000)
+    signal: AbortSignal.timeout(10000),
   });
   const text = await res.text();
   if (!res.ok) throw new Error(`微信下单 ${res.status}: ${text.slice(0, 200)}`);
@@ -141,11 +190,14 @@ function decryptWechatResource(resource, apiV3Key) {
   const decipher = crypto.createDecipheriv(
     'aes-256-gcm',
     Buffer.from(apiV3Key, 'utf8'),
-    Buffer.from(resource.nonce, 'utf8')
+    Buffer.from(resource.nonce, 'utf8'),
   );
   decipher.setAAD(Buffer.from(resource.associated_data || '', 'utf8'));
   decipher.setAuthTag(cipher.subarray(cipher.length - 16));
-  const plain = Buffer.concat([decipher.update(cipher.subarray(0, cipher.length - 16)), decipher.final()]);
+  const plain = Buffer.concat([
+    decipher.update(cipher.subarray(0, cipher.length - 16)),
+    decipher.final(),
+  ]);
   return JSON.parse(plain.toString('utf8'));
 }
 
@@ -153,16 +205,29 @@ async function createWechatOrder(userId, amount, opts) {
   if (!isPaymentConfigured().wechat) throw new Error('微信支付配置不完整');
   const purpose = (opts && opts.purpose) || 'deposit';
   const orderId = generateOrderId();
-  const data = await wechatV3Post('/v3/pay/transactions/native', {
-    appid: wechatConfig.appId,
-    mchid: wechatConfig.mchId,
-    description: PURPOSES[purpose].subject,
-    out_trade_no: orderId,
-    notify_url: wechatConfig.notifyUrl,
-    amount: { total: Math.round(amount * 100), currency: 'CNY' }
-  }, wechatConfig);
+  const data = await wechatV3Post(
+    '/v3/pay/transactions/native',
+    {
+      appid: wechatConfig.appId,
+      mchid: wechatConfig.mchId,
+      description: PURPOSES[purpose].subject,
+      out_trade_no: orderId,
+      notify_url: wechatConfig.notifyUrl,
+      amount: { total: Math.round(amount * 100), currency: 'CNY' },
+    },
+    wechatConfig,
+  );
   if (!data.code_url) throw new Error('微信未返回 code_url');
-  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'wechat', status: 'pending', purpose: purpose, target_id: opts && opts.targetId, credits: opts && opts.credits });
+  await paymentsDb.addPaymentOrder({
+    order_id: orderId,
+    user_id: userId,
+    amount: amount,
+    channel: 'wechat',
+    status: 'pending',
+    purpose: purpose,
+    target_id: opts && opts.targetId,
+    credits: opts && opts.credits,
+  });
   return { success: true, orderId: orderId, codeUrl: data.code_url };
 }
 
@@ -220,8 +285,8 @@ async function handleWechatNotify(rawBody) {
 function alipaySign(params, privateKey) {
   const sortedKeys = Object.keys(params).sort();
   const stringToSign = sortedKeys
-    .filter(key => params[key] !== '' && params[key] !== undefined)
-    .map(key => key + '=' + params[key])
+    .filter((key) => params[key] !== '' && params[key] !== undefined)
+    .map((key) => key + '=' + params[key])
     .join('&');
   const sign = crypto.createSign('RSA-SHA256');
   sign.update(stringToSign);
@@ -235,17 +300,39 @@ async function createAlipayOrder(userId, amount, opts) {
   const timestamp = new Date().toISOString().replace('T', ' ').substring(0, 19);
   // method 与 product_code 必须成对：后台开通的是「电脑网站支付」(page.pay / FAST_INSTANT_TRADE_PAY)，
   // 换回手机网站支付要先在后台开通那件产品，否则支付宝回 sub_code 报错。
-  const bizContent = { out_trade_no: orderId, total_amount: amount.toFixed(2), subject: PURPOSES[purpose].subject, product_code: 'FAST_INSTANT_TRADE_PAY' };
+  const bizContent = {
+    out_trade_no: orderId,
+    total_amount: amount.toFixed(2),
+    subject: PURPOSES[purpose].subject,
+    product_code: 'FAST_INSTANT_TRADE_PAY',
+  };
   const params = {
-    app_id: alipayConfig.appId, method: 'alipay.trade.page.pay', format: 'JSON',
-    return_url: alipayConfig.returnUrl, charset: 'utf-8', sign_type: 'RSA2',
-    timestamp: timestamp, version: '1.0', notify_url: alipayConfig.notifyUrl,
+    app_id: alipayConfig.appId,
+    method: 'alipay.trade.page.pay',
+    format: 'JSON',
+    return_url: alipayConfig.returnUrl,
+    charset: 'utf-8',
+    sign_type: 'RSA2',
+    timestamp: timestamp,
+    version: '1.0',
+    notify_url: alipayConfig.notifyUrl,
     biz_content: JSON.stringify(bizContent),
   };
   params.sign = alipaySign(params, alipayConfig.privateKey);
-  const queryString = Object.keys(params).map(key => key + '=' + encodeURIComponent(params[key])).join('&');
+  const queryString = Object.keys(params)
+    .map((key) => key + '=' + encodeURIComponent(params[key]))
+    .join('&');
   const payUrl = 'https://openapi.alipay.com/gateway.do?' + queryString;
-  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: 'alipay', status: 'pending', purpose: purpose, target_id: opts && opts.targetId, credits: opts && opts.credits });
+  await paymentsDb.addPaymentOrder({
+    order_id: orderId,
+    user_id: userId,
+    amount: amount,
+    channel: 'alipay',
+    status: 'pending',
+    purpose: purpose,
+    target_id: opts && opts.targetId,
+    credits: opts && opts.credits,
+  });
   return { success: true, orderId: orderId, payUrl: payUrl };
 }
 
@@ -256,7 +343,11 @@ function verifyAlipaySign(params, publicKey) {
     const p = { ...params };
     delete p.sign;
     if (dropSignType) delete p.sign_type;
-    const str = Object.keys(p).sort().filter(k => p[k] !== '' && p[k] !== undefined).map(k => k + '=' + p[k]).join('&');
+    const str = Object.keys(p)
+      .sort()
+      .filter((k) => p[k] !== '' && p[k] !== undefined)
+      .map((k) => k + '=' + p[k])
+      .join('&');
     return crypto.createVerify('RSA-SHA256').update(str).verify(publicKey, params.sign, 'base64');
   };
   return check(true) || check(false);
@@ -273,7 +364,9 @@ function decodeFormBody(body) {
     const rawKey = idx < 0 ? pair : pair.substring(0, idx);
     const rawValue = idx < 0 ? '' : pair.substring(idx + 1);
     try {
-      params[decodeURIComponent(String(rawKey).replace(/\+/g, ' '))] = decodeURIComponent(String(rawValue).replace(/\+/g, ' '));
+      params[decodeURIComponent(String(rawKey).replace(/\+/g, ' '))] = decodeURIComponent(
+        String(rawValue).replace(/\+/g, ' '),
+      );
     } catch {
       return null; // 非法百分号转义：整个通知按不可信处理，交给调用方回 fail
     }
@@ -305,7 +398,9 @@ function extractResponseNode(raw, nodeKey) {
   while (i < raw.length && /\s/.test(raw[i])) i++;
   if (raw[i] !== '{') return null;
   const from = i;
-  let depth = 0, inStr = false, escaped = false;
+  let depth = 0,
+    inStr = false,
+    escaped = false;
   for (; i < raw.length; i++) {
     const ch = raw[i];
     if (inStr) {
@@ -325,22 +420,41 @@ function extractResponseNode(raw, nodeKey) {
 }
 
 function verifyAlipayContent(content, signature) {
-  return crypto.createVerify('RSA-SHA256').update(content, 'utf8').verify(alipayConfig.alipayPublicKey, signature, 'base64');
+  return crypto
+    .createVerify('RSA-SHA256')
+    .update(content, 'utf8')
+    .verify(alipayConfig.alipayPublicKey, signature, 'base64');
 }
 
 /** 按商户订单号查单；配置不全或应答不可信时返回 null，调用方保持原状态 */
 async function queryAlipayOrder(orderId) {
-  if (!alipayConfig || !alipayConfig.appId || !alipayConfig.privateKey || !alipayConfig.alipayPublicKey) return null;
+  if (
+    !alipayConfig ||
+    !alipayConfig.appId ||
+    !alipayConfig.privateKey ||
+    !alipayConfig.alipayPublicKey
+  )
+    return null;
   const params = {
-    app_id: alipayConfig.appId, method: 'alipay.trade.query', format: 'JSON',
-    charset: 'utf-8', sign_type: 'RSA2', timestamp: alipayTimestamp(), version: '1.0',
+    app_id: alipayConfig.appId,
+    method: 'alipay.trade.query',
+    format: 'JSON',
+    charset: 'utf-8',
+    sign_type: 'RSA2',
+    timestamp: alipayTimestamp(),
+    version: '1.0',
     biz_content: JSON.stringify({ out_trade_no: orderId }),
   };
   params.sign = alipaySign(params, alipayConfig.privateKey);
-  const body = Object.keys(params).map(k => encodeURIComponent(k) + '=' + encodeURIComponent(params[k])).join('&');
+  const body = Object.keys(params)
+    .map((k) => encodeURIComponent(k) + '=' + encodeURIComponent(params[k]))
+    .join('&');
   const res = await fetch(ALIPAY_GATEWAY, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8', Accept: 'application/json' },
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded;charset=utf-8',
+      Accept: 'application/json',
+    },
     body,
   });
   const text = await res.text();
@@ -351,9 +465,20 @@ async function queryAlipayOrder(orderId) {
     return null;
   }
   let envelope;
-  try { envelope = JSON.parse(text); } catch { console.warn('[payment] 支付宝查单应答不是合法 JSON'); return null; }
-  if (!envelope.sign) { console.warn('[payment] 支付宝查单应答缺 sign'); return null; }
-  if (!verifyAlipayContent(nodeRaw, envelope.sign)) { console.warn('[payment] 支付宝查单应答验签失败'); return null; }
+  try {
+    envelope = JSON.parse(text);
+  } catch {
+    console.warn('[payment] 支付宝查单应答不是合法 JSON');
+    return null;
+  }
+  if (!envelope.sign) {
+    console.warn('[payment] 支付宝查单应答缺 sign');
+    return null;
+  }
+  if (!verifyAlipayContent(nodeRaw, envelope.sign)) {
+    console.warn('[payment] 支付宝查单应答验签失败');
+    return null;
+  }
   return JSON.parse(nodeRaw);
 }
 
@@ -361,15 +486,19 @@ async function handleAlipayNotify(params) {
   if (!alipayConfig.alipayPublicKey) return { success: false, message: '未配置支付宝公钥' };
   const sign = params.sign;
   if (!sign) return { success: false, message: '缺少签名' };
-  if (!verifyAlipaySign(params, alipayConfig.alipayPublicKey)) return { success: false, message: '签名验证失败' };
+  if (!verifyAlipaySign(params, alipayConfig.alipayPublicKey))
+    return { success: false, message: '签名验证失败' };
   // 同一把支付宝公钥可被多个应用复用，不校验 app_id 就可能收到发给别站的合法回调
-  if (params.app_id !== alipayConfig.appId) return { success: false, message: '回调 app_id 与配置不符' };
-  if (params.trade_status !== 'TRADE_SUCCESS' && params.trade_status !== 'TRADE_FINISHED') return { success: false, message: '非支付成功通知' };
+  if (params.app_id !== alipayConfig.appId)
+    return { success: false, message: '回调 app_id 与配置不符' };
+  if (params.trade_status !== 'TRADE_SUCCESS' && params.trade_status !== 'TRADE_FINISHED')
+    return { success: false, message: '非支付成功通知' };
   const orderId = params.out_trade_no;
   const order = await paymentsDb.getPaymentOrder(orderId);
   if (!order) return { success: false, message: '订单不存在' };
   // 🔴 签名只证明"出自支付宝"，不证明金额对得上。少这一步，一笔小额真实支付就能把大额订单标成已付
-  if (Number(params.total_amount).toFixed(2) !== Number(order.amount).toFixed(2)) return { success: false, message: '回调金额与订单不符' };
+  if (Number(params.total_amount).toFixed(2) !== Number(order.amount).toFixed(2))
+    return { success: false, message: '回调金额与订单不符' };
   if (order.status === 'paid') return { success: true, orderId: orderId };
   const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid', params.trade_no);
   if (!flipped) return { success: true, orderId: orderId };
@@ -379,103 +508,96 @@ async function handleAlipayNotify(params) {
 
 async function createMockOrder(userId, amount, channel, opts) {
   const orderId = generateOrderId();
-  await paymentsDb.addPaymentOrder({ order_id: orderId, user_id: userId, amount: amount, channel: channel || 'mock', status: 'pending', purpose: (opts && opts.purpose) || 'deposit', target_id: opts && opts.targetId, credits: opts && opts.credits });
+  await paymentsDb.addPaymentOrder({
+    order_id: orderId,
+    user_id: userId,
+    amount: amount,
+    channel: channel || 'mock',
+    status: 'pending',
+    purpose: (opts && opts.purpose) || 'deposit',
+    target_id: opts && opts.targetId,
+    credits: opts && opts.credits,
+  });
   return {
     success: true,
     orderId: orderId,
-    payUrl: '/api/payment/mock-pay?orderId=' + encodeURIComponent(orderId)
+    payUrl: '/api/payment/mock-pay?orderId=' + encodeURIComponent(orderId),
   };
 }
 
-async function mockPay(req, res, parsedUrl) {
-  // 仅开发环境且显式开闸时可用
-  if (!mockPayAllowed()) {
-    res.writeHead(404, {'Content-Type': 'application/json; charset=utf-8'});
-    res.end(JSON.stringify({success: false, message: 'Not Found'}));
-    return;
-  }
-  // Bearer token 认证
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'});
-    res.end(JSON.stringify({success: false, message: '请先登录'}));
-    return;
-  }
-  const userId = dbIndex.verifyToken(authHeader.slice(7));
-  if (!userId) {
-    res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'});
-    res.end(JSON.stringify({success: false, message: 'token无效'}));
-    return;
-  }
-  const orderId = parsedUrl.query.orderId;
-  if (!orderId) {
-    res.writeHead(400, {'Content-Type': 'text/html; charset=utf-8'});
-    res.end('<h1>缺少订单号</h1>');
-    return;
-  }
-  const order = await paymentsDb.getPaymentOrder(orderId);
-  if (!order) {
-    res.writeHead(404, {'Content-Type': 'text/html; charset=utf-8'});
-    res.end('<h1>订单不存在</h1>');
-    return;
-  }
-  // 归属校验：只能支付自己的订单
-  if (order.user_id !== userId) {
-    res.writeHead(403, {'Content-Type': 'application/json; charset=utf-8'});
-    res.end(JSON.stringify({success: false, message: '无权操作此订单'}));
-    return;
-  }
-  if (order.status === 'pending') {
-    const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid');
-    if (flipped) await applyOrderEffect(order);
-  }
-  const purpose = order.purpose || 'deposit';
-  const back = purpose === 'contact_unlock'
-    ? { label: '返回查看联系方式', href: '/' }
-    : (PURPOSES[purpose] && PURPOSES[purpose].isPack)
-      ? { label: '返回继续查看联系方式', href: '/' }
-      : { label: '返回认证费页面', href: '/deposit' };
-  res.writeHead(200, {'Content-Type': 'text/html; charset=utf-8'});
-  res.end('<html><head><meta charset="utf-8"><title>支付成功</title></head><body style="text-align:center;padding-top:50px;font-family:sans-serif;"><h1>✅ 模拟支付成功</h1><p>订单号：' + orderId + '</p><p><a href="' + back.href + '">' + back.label + '</a></p></body></html>');
-}
+// ============================================================
+// HTTP 层
+// ============================================================
 
-async function createOrderFor(req, res, readBodyWithLimit, forcedPurpose) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) { res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '未登录' })); return; }
-  const userId = dbIndex.verifyToken(authHeader.slice(7));
-  if (!userId) { res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: 'token无效' })); return; }
+/**
+ * 下单的公共实现：/api/payment/create 与 /api/payments/view-contact 共用。
+ * forcedPurpose 是后者的写死用途——那个入口不接受前端传 purpose。
+ * 鉴权已由 requireToken 做完，这里只处理旧 try/catch 覆盖的那一段。
+ */
+async function createOrderFor(req, res, forcedPurpose) {
+  const userId = req.auth.userId;
   try {
-    const body = await readBodyWithLimit(req);
+    const body = textWithinLimit(req);
     const data = JSON.parse(body);
     const { channel } = data;
-    if (!channel) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '缺少参数' })); return; }
+    if (!channel) {
+      res.status(400).json({ success: false, message: '缺少参数' });
+      return;
+    }
     const purpose = forcedPurpose || resolvePurpose(data.purpose);
-    if (!purpose) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '不支持的支付用途' })); return; }
+    if (!purpose) {
+      res.status(400).json({ success: false, message: '不支持的支付用途' });
+      return;
+    }
     let targetId = null;
     if (purpose === 'contact_unlock') {
       targetId = data.target_user_id || data.targetUserId || null;
-      if (!targetId) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '缺少解锁对象' })); return; }
+      if (!targetId) {
+        res.status(400).json({ success: false, message: '缺少解锁对象' });
+        return;
+      }
       targetId = String(targetId);
       // 自己名下那条资料不该花钱解：账号 id 和资料行 id 是两个不同的值，
       // 只比 targetId === userId 挡不住「用自己的账号 id 当 target、解锁自己另一条资料」
-      const ownRow = await dbIndex.getDb().prepare(
-        'SELECT 1 AS hit FROM users WHERE (id = $1 OR user_id = $1) AND user_id = $2 LIMIT 1'
-      ).get(targetId, userId);
-      if (ownRow) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '无需解锁自己的联系方式' })); return; }
-      const targetRow = await dbIndex.getDb().prepare('SELECT 1 AS hit FROM users WHERE id = $1 OR user_id = $2 LIMIT 1').get(targetId, targetId);
-      if (!targetRow) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '要解锁的用户不存在' })); return; }
-      if (await paymentsDb.checkContactUnlocked(userId, targetId)) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '该联系方式已解锁，无需重复支付' })); return; }
+      const ownRow = await dbIndex
+        .getDb()
+        .prepare(
+          'SELECT 1 AS hit FROM users WHERE (id = $1 OR user_id = $1) AND user_id = $2 LIMIT 1',
+        )
+        .get(targetId, userId);
+      if (ownRow) {
+        res.status(400).json({ success: false, message: '无需解锁自己的联系方式' });
+        return;
+      }
+      const targetRow = await dbIndex
+        .getDb()
+        .prepare('SELECT 1 AS hit FROM users WHERE id = $1 OR user_id = $2 LIMIT 1')
+        .get(targetId, targetId);
+      if (!targetRow) {
+        res.status(400).json({ success: false, message: '要解锁的用户不存在' });
+        return;
+      }
+      if (await paymentsDb.checkContactUnlocked(userId, targetId)) {
+        res.status(400).json({ success: false, message: '该联系方式已解锁，无需重复支付' });
+        return;
+      }
       // 手里还有次数就先花次数：买过包的人不该再看到一次收银台。
       // 余额校验和扣减在同一条 SQL，余额不够时一行也写不进去，才会往下走去下单
       const spent = await paymentsDb.trySpendContactCredit(userId, targetId);
       if (spent.success) {
-        sendJson(res, 200, { success: true, unlocked: true, via: 'credit', remaining: spent.available, targetId: targetId });
+        res.status(200).json({
+          success: true,
+          unlocked: true,
+          via: 'credit',
+          remaining: spent.available,
+          targetId: targetId,
+        });
         return;
       }
       // 次数不够，或者这一对刚被另一条路径解开（管理端手动解锁 / 并发重复提交）。
       // 后者绝不能往下走去生成收银台——那是让人为一把已经推开的门再付一次 9.9
       if (spent.alreadyUnlocked) {
-        sendJson(res, 200, { success: true, unlocked: true, via: 'already', targetId: targetId });
+        res.status(200).json({ success: true, unlocked: true, via: 'already', targetId: targetId });
         return;
       }
     }
@@ -487,181 +609,300 @@ async function createOrderFor(req, res, readBodyWithLimit, forcedPurpose) {
     const allowMock = mockPayAllowed();
     let result;
     if (channel === 'wechat') {
-      if (!config.wechat && allowMock) result = await createMockOrder(userId, amount, 'wechat', opts);
-      else if (!config.wechat) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '微信支付暂未开通' })); return; }
-      else result = await createWechatOrder(userId, amount, opts);
+      if (!config.wechat && allowMock)
+        result = await createMockOrder(userId, amount, 'wechat', opts);
+      else if (!config.wechat) {
+        res.status(400).json({ success: false, message: '微信支付暂未开通' });
+        return;
+      } else result = await createWechatOrder(userId, amount, opts);
     } else if (channel === 'alipay') {
-      if (!config.alipay && allowMock) result = await createMockOrder(userId, amount, 'alipay', opts);
-      else if (!config.alipay) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '支付宝暂未开通' })); return; }
-      else result = await createAlipayOrder(userId, amount, opts);
-    } else { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '不支持的支付渠道' })); return; }
+      if (!config.alipay && allowMock)
+        result = await createMockOrder(userId, amount, 'alipay', opts);
+      else if (!config.alipay) {
+        res.status(400).json({ success: false, message: '支付宝暂未开通' });
+        return;
+      } else result = await createAlipayOrder(userId, amount, opts);
+    } else {
+      res.status(400).json({ success: false, message: '不支持的支付渠道' });
+      return;
+    }
     result.purpose = purpose;
     result.amount = amount;
-    res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
-    res.end(JSON.stringify(result));
-  } catch (e) { res.writeHead(500, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: e.message || '创建订单失败' })); }
+    res.status(200).json(result);
+  } catch (e) {
+    // 旧写法这一句回的是 e.message || '创建订单失败'：
+    // 超限（textWithinLimit 抛的那句）、JSON 不合法（SyntaxError 原文）、下单抛错都从这走
+    res.status(500).json({ success: false, message: e.message || '创建订单失败' });
+  }
 }
 
-async function createPayment(req, res, readBodyWithLimit) {
-  return createOrderFor(req, res, readBodyWithLimit, null);
-}
+// POST /api/payment/create：用途由前端传，但要过 resolvePurpose 那道白名单
+router.post(
+  '/api/payment/create',
+  requireToken(),
+  asyncHandler((req, res) => createOrderFor(req, res, null)),
+);
 
 // POST /api/payments/view-contact：用途写死成 contact_unlock，不接受前端传 purpose，
 // 这个入口只干"付钱解锁某个人的联系方式"这一件事。返回体与 /api/payment/create 同形。
-async function viewContactPayment(req, res, readBodyWithLimit) {
-  return createOrderFor(req, res, readBodyWithLimit, 'contact_unlock');
-}
+router.post(
+  '/api/payments/view-contact',
+  requireToken(),
+  asyncHandler((req, res) => createOrderFor(req, res, 'contact_unlock')),
+);
 
 // GET /api/payments/contact-credits：只回当前登录账号还剩几次，余额由服务端推导，不接受前端传值
-async function contactCredits(req, res) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    sendJson(res, 401, { success: false, message: '未登录' }); return;
-  }
-  const userId = dbIndex.verifyToken(authHeader.slice(7));
-  if (!userId) {
-    sendJson(res, 401, { success: false, message: 'token无效' }); return;
-  }
-  try {
-    const balance = await paymentsDb.getContactCreditBalance(userId);
-    sendJson(res, 200, { success: true, ...balance });
-  } catch (e) {
-    console.error('[次数包] 余额读取失败:', e.message);
-    sendJson(res, 500, { success: false, message: '余额读取失败' });
-  }
-}
+router.get(
+  '/api/payments/contact-credits',
+  requireToken(),
+  asyncHandler(async (req, res) => {
+    try {
+      const balance = await paymentsDb.getContactCreditBalance(req.auth.userId);
+      res.status(200).json({ success: true, ...balance });
+    } catch (e) {
+      console.error('[次数包] 余额读取失败:', e.message);
+      res.status(500).json({ success: false, message: '余额读取失败' });
+    }
+  }),
+);
 
-async function wechatNotify(req, res, readBodyWithLimit) {
-  // v3 用 HTTP 状态码决定是否重推：回 2xx 就等于宣告处理完成，非 2xx/204 会被按策略重推约一天。
-  // 所以两类失败要分开：暂时处理不了的（解密失败、订单暂时查不到）回 5xx 换重推，
-  // 金额/身份不符这种重推多少次也不会变好的伪通知回 204 收口，别把重推队列和日志刷满。
-  const reply = (statusCode, payload) => {
-    res.writeHead(statusCode, {'Content-Type': 'application/json; charset=utf-8'});
-    res.end(JSON.stringify(payload));
-  };
-  const ackAndStopRetry = () => {
-    // 204 是微信文档认可的"已收到"应答，且按规范不带 body
-    res.writeHead(204);
-    res.end();
-  };
-  try {
-    const body = await readBodyWithLimit(req);
-    const result = await handleWechatNotify(body);
-    if (result.success) reply(200, { code: 'SUCCESS' });
-    else if (result.retryable === false) ackAndStopRetry();
-    else reply(500, { code: 'FAIL', message: result.message || '处理失败' });
-  } catch (e) {
-    reply(500, { code: 'FAIL', message: (e && e.message) || '服务器处理失败' });
-  }
-}
-
-async function alipayNotify(req, res, readBodyWithLimit) {
-  const replyFail = () => { res.writeHead(200, {'Content-Type': 'text/plain'}); res.end('fail'); };
-  try {
-    const body = await readBodyWithLimit(req);
-    const params = decodeFormBody(body);
-    if (!params) { console.warn('[payment] 支付宝通知体含非法百分号转义，已拒'); replyFail(); return; }
-    const result = await handleAlipayNotify(params);
-    if (result.success) {
-      res.writeHead(200, {'Content-Type': 'text/plain'});
-      res.end('success');
+// GET /api/payment/mock-pay：把订单直接置为已付，只在开发环境显式开闸时存在（见 mockPayAllowed）
+router.get(
+  '/api/payment/mock-pay',
+  asyncHandler(async (req, res) => {
+    // 顺序照旧：先判开没开闸，再判登录态。未开闸时回的样子要和"没有这个接口"一致
+    if (!mockPayAllowed()) {
+      res.status(404).json({ success: false, message: 'Not Found' });
       return;
     }
-    // 支付宝只认应答里的 'success'：回 fail 它就会按阶梯重试，所以原因必须留痕，
-    // 否则线上只能看见"钱付了订单还 pending"，谁也说不清是哪一个门拦的。
-    console.warn(`[payment] 支付宝通知被拒: ${result.message} order=${params.out_trade_no || '-'} trade_status=${params.trade_status || '-'} amount=${params.total_amount || '-'}`);
-    replyFail();
-  } catch (e) {
-    console.warn('[payment] 支付宝通知处理异常:', (e && e.message) || e);
-    replyFail();
-  }
-}
+    const token = bearerToken(req);
+    if (!token) {
+      res.status(401).json({ success: false, message: '请先登录' });
+      return;
+    }
+    const userId = dbIndex.verifyToken(token);
+    if (!userId) {
+      res.status(401).json({ success: false, message: 'token无效' });
+      return;
+    }
+    const orderId = req.query.orderId;
+    if (!orderId) {
+      res.status(400).set('Content-Type', 'text/html; charset=utf-8').end('<h1>缺少订单号</h1>');
+      return;
+    }
+    const order = await paymentsDb.getPaymentOrder(orderId);
+    if (!order) {
+      res.status(404).set('Content-Type', 'text/html; charset=utf-8').end('<h1>订单不存在</h1>');
+      return;
+    }
+    // 归属校验：只能支付自己的订单
+    if (order.user_id !== userId) {
+      res.status(403).json({ success: false, message: '无权操作此订单' });
+      return;
+    }
+    if (order.status === 'pending') {
+      const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid');
+      if (flipped) await applyOrderEffect(order);
+    }
+    const purpose = order.purpose || 'deposit';
+    const back =
+      purpose === 'contact_unlock'
+        ? { label: '返回查看联系方式', href: '/' }
+        : PURPOSES[purpose] && PURPOSES[purpose].isPack
+          ? { label: '返回继续查看联系方式', href: '/' }
+          : { label: '返回认证费页面', href: '/deposit' };
+    res
+      .status(200)
+      .set('Content-Type', 'text/html; charset=utf-8')
+      .end(
+        '<html><head><meta charset="utf-8"><title>支付成功</title></head><body style="text-align:center;padding-top:50px;font-family:sans-serif;"><h1>✅ 模拟支付成功</h1><p>订单号：' +
+          orderId +
+          '</p><p><a href="' +
+          back.href +
+          '">' +
+          back.label +
+          '</a></p></body></html>',
+      );
+  }),
+);
 
-async function queryPaymentStatus(req, res, parsedUrl) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) { res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '未登录' })); return; }
-  const token = authHeader.slice(7);
-  const userId = dbIndex.verifyToken(token);
-  if (!userId) { res.writeHead(401, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: 'token无效' })); return; }
-  const orderId = parsedUrl.query.orderId;
-  if (!orderId) { res.writeHead(400, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '缺少订单号' })); return; }
-  let order = await paymentsDb.getPaymentOrder(orderId);
-  if (!order || order.user_id !== userId) { res.writeHead(404, {'Content-Type': 'application/json; charset=utf-8'}); res.end(JSON.stringify({ success: false, message: '订单不存在' })); return; }
-  // 异步通知只是其中一条路：它验签失败或重试耗尽时，用户已经付过的钱会一直卡在 pending。
-  // 这里主动查一次单，钱就能落账，不必再付一遍。
-  if (order.status !== 'paid' && order.channel === 'alipay') {
-    const lastQueryAt = lastAlipayQueryAt.get(orderId) || 0;
-    if (Date.now() - lastQueryAt >= 10000) {
-      lastAlipayQueryAt.set(orderId, Date.now());
-      try {
-        const remote = await queryAlipayOrder(orderId);
-        // code 10000 只代表接口调通，到账只看 trade_status；金额再卡一道，
-        // 因为置 paid 会直接发货（认证费入账 / 解锁联系方式）
-        const amountMatches = remote && remote.total_amount !== undefined
-          && Number(remote.total_amount).toFixed(2) === Number(order.amount).toFixed(2);
-        if (remote && remote.code === '10000' && amountMatches && ALIPAY_PAID_STATUSES.has(remote.trade_status)) {
-          const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid', remote.trade_no);
-          if (flipped) await applyOrderEffect(order);
-          order = await paymentsDb.getPaymentOrder(orderId);
+// POST /api/payment/notify-wechat
+// v3 用 HTTP 状态码决定是否重推：回 2xx 就等于宣告处理完成，非 2xx/204 会被按策略重推约一天。
+// 所以两类失败要分开：暂时处理不了的（解密失败、订单暂时查不到）回 5xx 换重推，
+// 金额/身份不符这种重推多少次也不会变好的伪通知回 204 收口，别把重推队列和日志刷满。
+router.post(
+  '/api/payment/notify-wechat',
+  asyncHandler(async (req, res) => {
+    const reply = (statusCode, payload) => {
+      res.status(statusCode).json(payload);
+    };
+    const ackAndStopRetry = () => {
+      // 204 是微信文档认可的"已收到"应答，且按规范不带 body
+      res.status(204).end();
+    };
+    try {
+      const body = textWithinLimit(req);
+      const result = await handleWechatNotify(body);
+      if (result.success) reply(200, { code: 'SUCCESS' });
+      else if (result.retryable === false) ackAndStopRetry();
+      else reply(500, { code: 'FAIL', message: result.message || '处理失败' });
+    } catch (e) {
+      reply(500, { code: 'FAIL', message: (e && e.message) || '服务器处理失败' });
+    }
+  }),
+);
+
+// POST /api/payment/notify-alipay
+// 支付宝只认应答里的 'success'：回 fail 它就会按阶梯重试，所以原因必须留痕，
+// 否则线上只能看见"钱付了订单还 pending"，谁也说不清是哪一个门拦的。
+router.post(
+  '/api/payment/notify-alipay',
+  asyncHandler(async (req, res) => {
+    // 应答体只有 'success' / 'fail' 两个词，支付宝按内容判定收没收到。
+    // Content-Type 用 setHeader 而不是 res.set：后者内部走 res.type，会给 text/* 补
+    // "; charset=utf-8"，而旧写法是 writeHead(200, {'Content-Type':'text/plain'})——
+    // 头值逐字是 "text/plain"，支付宝不 care charset，但契约基线 care，保持原样。
+    const replyText = (res, word) => {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'text/plain');
+      res.end(word);
+    };
+    const replyFail = () => replyText(res, 'fail');
+    try {
+      const params = decodeFormBody(textWithinLimit(req));
+      if (!params) {
+        console.warn('[payment] 支付宝通知体含非法百分号转义，已拒');
+        replyFail();
+        return;
+      }
+      const result = await handleAlipayNotify(params);
+      if (result.success) {
+        replyText(res, 'success');
+        return;
+      }
+      console.warn(
+        `[payment] 支付宝通知被拒: ${result.message} order=${params.out_trade_no || '-'} trade_status=${params.trade_status || '-'} amount=${params.total_amount || '-'}`,
+      );
+      replyFail();
+    } catch (e) {
+      console.warn('[payment] 支付宝通知处理异常:', (e && e.message) || e);
+      replyFail();
+    }
+  }),
+);
+
+// GET /api/payment/status：前端轮询用；支付宝单在 pending 时顺带主动查一次单（通知只是其中一条路）
+router.get(
+  '/api/payment/status',
+  requireToken(),
+  asyncHandler(async (req, res) => {
+    const userId = req.auth.userId;
+    const orderId = req.query.orderId;
+    if (!orderId) {
+      res.status(400).json({ success: false, message: '缺少订单号' });
+      return;
+    }
+    let order = await paymentsDb.getPaymentOrder(orderId);
+    if (!order || order.user_id !== userId) {
+      res.status(404).json({ success: false, message: '订单不存在' });
+      return;
+    }
+    // 异步通知只是其中一条路：它验签失败或重试耗尽时，用户已经付过的钱会一直卡在 pending。
+    // 这里主动查一次单，钱就能落账，不必再付一遍。
+    if (order.status !== 'paid' && order.channel === 'alipay') {
+      const lastQueryAt = lastAlipayQueryAt.get(orderId) || 0;
+      if (Date.now() - lastQueryAt >= 10000) {
+        lastAlipayQueryAt.set(orderId, Date.now());
+        try {
+          const remote = await queryAlipayOrder(orderId);
+          // code 10000 只代表接口调通，到账只看 trade_status；金额再卡一道，
+          // 因为置 paid 会直接发货（认证费入账 / 解锁联系方式）
+          const amountMatches =
+            remote &&
+            remote.total_amount !== undefined &&
+            Number(remote.total_amount).toFixed(2) === Number(order.amount).toFixed(2);
+          if (
+            remote &&
+            remote.code === '10000' &&
+            amountMatches &&
+            ALIPAY_PAID_STATUSES.has(remote.trade_status)
+          ) {
+            const flipped = await paymentsDb.updatePaymentOrder(orderId, 'paid', remote.trade_no);
+            if (flipped) await applyOrderEffect(order);
+            order = await paymentsDb.getPaymentOrder(orderId);
+          }
+        } catch (e) {
+          console.warn('[payment] 支付宝查单异常:', (e && e.message) || e);
         }
-      } catch (e) {
-        console.warn('[payment] 支付宝查单异常:', (e && e.message) || e);
       }
     }
-  }
-  res.writeHead(200, {'Content-Type': 'application/json; charset=utf-8'});
-  res.end(JSON.stringify({ success: true, status: order.status, purpose: order.purpose || 'deposit', targetId: order.target_id || null }));
-}
+    res.status(200).json({
+      success: true,
+      status: order.status,
+      purpose: order.purpose || 'deposit',
+      targetId: order.target_id || null,
+    });
+  }),
+);
 
 // ============================================================
 // 价格配置（金额存 admin_settings，后台「价格设置」直接改，不用动代码）
 // ============================================================
 
 /** GET /api/payment/config：公开，只回前端要展示的那两个标价（诚意认证费 / 查看联系方式） */
-async function publicConfig(req, res) {
-  try {
-    const view = await pricing.publicView();
-    const cfg = isPaymentConfigured();
-    sendJson(res, 200, {
-      success: true,
-      data: view,
-      alipay_online: cfg.alipay,
-      wechat_online: cfg.wechat,
-    });
-  } catch (e) {
-    console.error('[价格] 读取公开配置失败:', e.message);
-    sendJson(res, 500, { success: false, message: '读取价格配置失败' });
-  }
-}
+router.get(
+  '/api/payment/config',
+  asyncHandler(async (req, res) => {
+    try {
+      const view = await pricing.publicView();
+      const cfg = isPaymentConfigured();
+      res.status(200).json({
+        success: true,
+        data: view,
+        alipay_online: cfg.alipay,
+        wechat_online: cfg.wechat,
+      });
+    } catch (e) {
+      console.error('[价格] 读取公开配置失败:', e.message);
+      res.status(500).json({ success: false, message: '读取价格配置失败' });
+    }
+  }),
+);
 
 /** GET /api/admin/payment-price：当前价、代码默认值、来源、上次改动时间 */
-async function adminGetPrice(req, res, checkAdminAuth) {
-  if (!(await checkAdminAuth(req))) {
-    sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
-  }
-  try {
-    sendJson(res, 200, { success: true, data: await pricing.describeAll() });
-  } catch (e) {
-    console.error('[价格] 读取价格配置失败:', e.message);
-    sendJson(res, 500, { success: false, message: '读取价格配置失败' });
-  }
-}
+router.get(
+  '/api/admin/payment-price',
+  requireAdmin(),
+  asyncHandler(async (req, res) => {
+    try {
+      res.status(200).json({ success: true, data: await pricing.describeAll() });
+    } catch (e) {
+      console.error('[价格] 读取价格配置失败:', e.message);
+      res.status(500).json({ success: false, message: '读取价格配置失败' });
+    }
+  }),
+);
 
 /**
  * PUT /api/admin/payment-price：body 里给了哪个改哪个。
  * 只影响之后新建的订单：payment_orders 每行都存着下单那一刻的 amount，
  * 回调与查单核对的都是自己那一行，所以改价不会让正在付的单子对不上账。
+ *
+ * 这条的超限和"格式错误"是两套话：超限走旧 .catch 的 413（middleware 上判），
+ * JSON 不合法走 400「请求格式错误」（handler 里判）。所以这里用 defaultBodyLimit()，
+ * 不像上面三条那样把 throw 留进 handler 的 try。
  */
-async function adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit) {
-  if (!(await checkAdminAuth(req))) {
-    sendJson(res, 401, { success: false, message: '需要管理员权限' }); return;
-  }
-  readBodyWithLimit(req).then(async body => {
+router.put(
+  '/api/admin/payment-price',
+  requireAdmin(),
+  defaultBodyLimit(),
+  asyncHandler(async (req, res) => {
     let data;
     try {
-      data = JSON.parse(body);
+      data = JSON.parse(req.body);
     } catch (e) {
-      sendJson(res, 400, { success: false, message: '请求格式错误' }); return;
+      res.status(400).json({ success: false, message: '请求格式错误' });
+      return;
     }
     const pending = [];
     for (const name of pricing.itemNames()) {
@@ -669,13 +910,16 @@ async function adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit) {
       if (raw === undefined || raw === null || raw === '') continue;
       const parsed = pricing.parseAmountYuan(raw);
       if (!parsed.ok) {
-        sendJson(res, 400, { success: false, message: pricing.ITEMS[name].label + '：' + parsed.error });
+        res
+          .status(400)
+          .json({ success: false, message: pricing.ITEMS[name].label + '：' + parsed.error });
         return;
       }
       pending.push({ name, fen: parsed.fen });
     }
     if (!pending.length) {
-      sendJson(res, 400, { success: false, message: '没有要改的金额' }); return;
+      res.status(400).json({ success: false, message: '没有要改的金额' });
+      return;
     }
     const changes = [];
     for (const p of pending) {
@@ -683,26 +927,25 @@ async function adminSavePrice(req, res, checkAdminAuth, readBodyWithLimit) {
       changes.push({ field: pricing.ITEMS[p.name].field, amount_fen: p.fen });
     }
     await adminDb.logAdminAction('update_price', null, { changes });
+    // 只记标价数字，不记操作人令牌
     console.log('[价格] 标价变更:', JSON.stringify(changes));
-    sendJson(res, 200, { success: true, message: '价格已更新', data: await pricing.describeAll() });
-  }).catch(e => {
-    sendJson(res, 413, { success: false, message: e.message || '请求体过大' });
-  });
-}
+    res
+      .status(200)
+      .json({ success: true, message: '价格已更新', data: await pricing.describeAll() });
+  }),
+);
 
-module.exports = {
+module.exports = router;
+
+// 非路由出口。四个函数都不是 HTTP 接口，但必须能被外部拿到：
+//   initConfig —— 换一套环境变量重算配置（启动自检与离线断言用）
+//   isPaymentConfigured —— 判两个渠道到底配齐没配齐
+//   decodeFormBody / verifyAlipaySign / extractResponseNode —— 离线验签断言用，
+//     线上每一笔支付宝通知都靠这三条复现"待签串是不是那一份"（§2 运维记录里
+//     那次 '+' 事故就是这么查出来的）。业务代码不要直接调。
+module.exports.internals = {
   initConfig,
-  createPayment,
-  viewContactPayment,
-  contactCredits,
-  mockPay,
-  wechatNotify,
-  alipayNotify,
-  queryPaymentStatus,
-  publicConfig,
-  adminGetPrice,
-  adminSavePrice,
-  // 下面三个是给离线断言用的，业务代码不要直接调
+  isPaymentConfigured,
   decodeFormBody,
   verifyAlipaySign,
   extractResponseNode,

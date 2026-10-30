@@ -1,102 +1,67 @@
-const dbIndex = require('../db/index.js');
-const userDb = require('../db/users.js');
-const paymentsDb = require('../db/payments.js');
-const adminDb = require('../db/admin.js');
-const adminService = require('../services/admin.service');
+// ============================================================
+// 路由 - 上传（头像 / 认证费凭证）
+//
+// 旧写法这两条是自己从 req 流里一段段切 multipart 的（routes/upload.js 里那 50 行
+// while + indexOf(boundaryStr)），和 utils/multipart.js 那份解析器同名不同实现。
+// 现在收口到 middleware/upload.js 的 multer，路由只留"取哪一段、验什么、落到哪"。
+//
+// ⚠ 本轮动到行为的两处，都是修洞不是漂移：
+//   1) 头像的魔术数字判据原来是 `if (expectedMagic && data.length >= expectedMagic.length)`
+//      ——小于签名的文件（比如 2 字节的 .png）压根不进判断，直接算通过并落盘。
+//      现在统一走 validateMagicBytes：短于签名就是 false。正常图片不受影响。
+//   2) 原来"超限只拦落盘、不拦内存"，2GB 的请求体会先在内存里攒齐再回 413；
+//      multer 的 fileSize 是在收流的过程中拦的。
+// ============================================================
+
+const express = require('express');
 const fs = require('fs');
 const path = require('path');
-// 统一使用 utils/multipart.js 的常量与解析器，避免重复定义
-const { ALLOWED_IMAGE_EXTENSIONS, MAGIC_NUMBERS } = require('../utils/multipart');
-const { MAX_UPLOAD_SIZE } = require('../utils/config');
 
-// 认证费金额：后台「价格设置」可改，每次请求现读（原来冻结在进程启动时的环境变量里）
+const userDb = require('../db/users.js');
+const paymentsDb = require('../db/payments.js');
 const pricing = require('../utils/pricing');
+const { ALLOWED_IMAGE_EXTENSIONS, validateMagicBytes } = require('../utils/file-validation');
 
-// 兼容引用：内部用 ALLOWED_EXTENSIONS / MAGIC_NUMBERS 名称
-const ALLOWED_EXTENSIONS = ALLOWED_IMAGE_EXTENSIONS;
+const { requireToken } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/async-handler');
+const { avatarUpload, depositProofUpload, fileField } = require('../middleware/upload');
 
-// 统一 JSON 响应工具（从 utils 抽取，避免 9 个 route 文件重复定义）
-const { sendJson } = require('../utils/sendJson');
-const { deleteUploadedFile } = require('../utils/uploadedFiles');
+const router = express.Router({ strict: true }); // strict：尾斜杠不当同一条，理由见 routes/index.js 头部
 
-async function uploadAvatar(req, res) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    sendJson(res, 401, { success: false, message: '未登录' }); return;
-  }
-  const token = authHeader.slice(7);
-  const isAdmin = await adminService.isAdminToken(token);
-  const userId = isAdmin ? null : dbIndex.verifyToken(token);
-  if (!userId && !isAdmin) {
-    sendJson(res, 401, { success: false, message: 'token无效' }); return;
-  }
+const UPLOADS_ROOT = path.resolve(__dirname, '..', '..', 'uploads');
 
-  const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'avatars');
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+// ========== POST /api/upload/avatar
+// 后台令牌也能调这一条（旧写法先 isAdminToken 再 verifyToken，两把都认），
+// 所以下游拿 userId 时要按 null 处理——管理员不属于任何一条资料，只传图不落库
+router.post(
+  '/api/upload/avatar',
+  requireToken({ missing: '未登录', invalid: 'token无效', allowAdmin: true }),
+  avatarUpload,
+  asyncHandler(async (req, res) => {
+    const uploadsDir = path.join(UPLOADS_ROOT, 'avatars');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
 
-  const boundary = req.headers['content-type']?.split('boundary=')[1];
-  if (!boundary) { sendJson(res, 400, { success: false, message: '无效的上传格式' }); return; }
-
-  const chunks = [];
-  let uploadSize = 0;
-  // settled：这条请求的响应是否已经给出。超限时要立刻回 413 并断开连接，
-  // 不能让 'end' 回调再跑一遍解析（届时 req.destroy() 已经把流拆了）
-  let settled = false;
-  req.on('data', c => {
-    if (settled) return;
-    uploadSize += c.length;
-    if (uploadSize > MAX_UPLOAD_SIZE) {
-      settled = true;
-      // 旧写法只是置一个 tooLarge 标记，然后照常把剩下的字节继续 push 进 chunks：
-      // 上限拦住的只有落盘，拦不住内存——一条 2GB 的请求体照样先在内存里攒齐才回 413
-      sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' });
-      req.destroy();
-      return;
-    }
-    chunks.push(c);
-  });
-  // 主动 destroy 之后流会以 error 收尾，没有监听器就变成未处理事件
-  req.on('error', () => { settled = true; });
-  req.on('end', async () => {
-    if (settled) return;
-    settled = true;
     try {
-      const buffer = Buffer.concat(chunks);
-      const boundaryStr = '--' + boundary;
-      const parts = [];
-      let start = buffer.indexOf(boundaryStr) + boundaryStr.length;
-      while (start < buffer.length) {
-        const nextBoundary = buffer.indexOf(boundaryStr, start);
-        if (nextBoundary === -1) break;
-        parts.push(buffer.slice(start, nextBoundary - 2));
-        start = nextBoundary + boundaryStr.length;
+      const file = fileField(req, 'avatar');
+      if (!file) {
+        res.status(400).json({ success: false, message: '未找到头像文件' });
+        return;
       }
-      let avatarData = null;
-      let filename = '';
-      for (const part of parts) {
-        const headerEnd = part.indexOf('\r\n\r\n');
-        if (headerEnd === -1) continue;
-        const header = part.slice(0, headerEnd).toString();
-        const bodyData = part.slice(headerEnd + 4);
-        if (header.includes('name="avatar"')) {
-          const match = header.match(/filename="([^"]+)"/);
-          filename = match ? match[1] : 'avatar.png';
-          avatarData = bodyData;
-        }
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
+        res.status(400).json({ success: false, message: '不支持的文件类型' });
+        return;
       }
-      if (!avatarData) { sendJson(res, 400, { success: false, message: '未找到头像文件' }); return; }
-      const ext = path.extname(filename).toLowerCase();
-      if (!ALLOWED_EXTENSIONS.includes(ext)) { sendJson(res, 400, { success: false, message: '不支持的文件类型' }); return; }
-      const expectedMagic = MAGIC_NUMBERS[ext];
-      if (expectedMagic && avatarData.length >= expectedMagic.length) {
-        const actualMagic = avatarData.slice(0, expectedMagic.length);
-        if (!actualMagic.equals(expectedMagic)) { sendJson(res, 400, { success: false, message: '文件内容与扩展名不匹配' }); return; }
+      if (!validateMagicBytes(file.buffer, ext)) {
+        res.status(400).json({ success: false, message: '文件内容与扩展名不匹配' });
+        return;
       }
       const savedName = 'avatar_' + Date.now() + '_' + Math.random().toString(36).slice(2, 6) + ext;
       const savePath = path.join(uploadsDir, savedName);
-      fs.writeFileSync(savePath, avatarData);
+      fs.writeFileSync(savePath, file.buffer);
       const avatarUrl = '/uploads/avatars/' + savedName;
-      const targetUserId = userId || null;
+
+      const targetUserId = req.auth.userId || null;
       if (targetUserId) {
         const users = await userDb.getUsersByUserId(targetUserId);
         if (users.length > 0) {
@@ -106,217 +71,59 @@ async function uploadAvatar(req, res) {
           await userDb.updateUser(existing.id, existing);
         }
       }
-      sendJson(res, 200, { success: true, avatar: avatarUrl });
-    } catch (e) { sendJson(res, 500, { success: false, message: '上传失败' }); }
-  });
-}
-
-// 修复：原第三参 ADMIN_TOKEN 永远 undefined（server.js 调用时未传），且函数内未使用，删除
-function uploadDepositProof(req, res) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) { sendJson(res, 401, { success: false, message: '未登录' }); return; }
-  const token = authHeader.slice(7);
-  const userId = dbIndex.verifyToken(token);
-  if (!userId) { sendJson(res, 401, { success: false, message: 'token无效' }); return; }
-
-  const uploadsDir = path.join(__dirname, '..', '..', 'uploads', 'deposits');
-  if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
-
-  const boundary = req.headers['content-type']?.split('boundary=')[1];
-  if (!boundary) { sendJson(res, 400, { success: false, message: '无效的上传格式' }); return; }
-
-  const chunks = [];
-  let uploadSize = 0;
-  // settled：这条请求的响应是否已经给出。超限时要立刻回 413 并断开连接，
-  // 不能让 'end' 回调再跑一遍解析（届时 req.destroy() 已经把流拆了）
-  let settled = false;
-  req.on('data', c => {
-    if (settled) return;
-    uploadSize += c.length;
-    if (uploadSize > MAX_UPLOAD_SIZE) {
-      settled = true;
-      // 旧写法只是置一个 tooLarge 标记，然后照常把剩下的字节继续 push 进 chunks：
-      // 上限拦住的只有落盘，拦不住内存——一条 2GB 的请求体照样先在内存里攒齐才回 413
-      sendJson(res, 413, { success: false, message: '文件过大，最大允许' + (MAX_UPLOAD_SIZE / 1024 / 1024) + 'MB' });
-      req.destroy();
-      return;
+      res.status(200).json({ success: true, avatar: avatarUrl });
+    } catch (e) {
+      res.status(500).json({ success: false, message: '上传失败' });
     }
-    chunks.push(c);
-  });
-  // 主动 destroy 之后流会以 error 收尾，没有监听器就变成未处理事件
-  req.on('error', () => { settled = true; });
-  req.on('end', async () => {
-    if (settled) return;
-    settled = true;
+  }),
+);
+
+// ========== POST /api/deposit/upload-proof（认证费转账截图）
+// 修复：原第三参 ADMIN_TOKEN 永远 undefined（server.js 调用时未传），且函数内未使用，删除
+router.post(
+  '/api/deposit/upload-proof',
+  requireToken({ missing: '未登录', invalid: 'token无效' }),
+  depositProofUpload,
+  asyncHandler(async (req, res) => {
+    const userId = req.auth.userId;
+    const uploadsDir = path.join(UPLOADS_ROOT, 'deposits');
+    if (!fs.existsSync(uploadsDir)) fs.mkdirSync(uploadsDir, { recursive: true });
+
     try {
-      const buffer = Buffer.concat(chunks);
-      const boundaryStr = '--' + boundary;
-      const parts = [];
-      let start = buffer.indexOf(boundaryStr) + boundaryStr.length;
-      while (start < buffer.length) {
-        const nextBoundary = buffer.indexOf(boundaryStr, start);
-        if (nextBoundary === -1) break;
-        parts.push(buffer.slice(start, nextBoundary - 2));
-        start = nextBoundary + boundaryStr.length;
+      const file = fileField(req, 'proof');
+      if (!file) {
+        res.status(400).json({ success: false, message: '未找到凭证文件' });
+        return;
       }
-      let proofData = null;
-      let filename = '';
-      // 🔴 不读表单里的 amount 字段：那是前端传来的，改一个字就能把 29.9 的认证费按 0.01 记账
-      for (const part of parts) {
-        const headerEnd = part.indexOf('\r\n\r\n');
-        if (headerEnd === -1) continue;
-        const header = part.slice(0, headerEnd).toString();
-        const bodyData = part.slice(headerEnd + 4);
-        if (header.includes('name="proof"')) {
-          const match = header.match(/filename="([^"]+)"/);
-          filename = match ? match[1] : 'proof.png';
-          proofData = bodyData;
-        }
+      const ext = path.extname(file.originalname).toLowerCase();
+      if (!ALLOWED_IMAGE_EXTENSIONS.includes(ext)) {
+        res.status(400).json({ success: false, message: '不支持的文件类型' });
+        return;
       }
-      if (!proofData) { sendJson(res, 400, { success: false, message: '未找到凭证文件' }); return; }
-      const ext = path.extname(filename).toLowerCase();
-      if (!ALLOWED_EXTENSIONS.includes(ext)) { sendJson(res, 400, { success: false, message: '不支持的文件类型' }); return; }
-      let magicValid = false;
-      const magicBytes = MAGIC_NUMBERS[ext];
-      if (magicBytes && proofData.length >= magicBytes.length) {
-        magicValid = magicBytes.every((byte, i) => proofData[i] === byte);
+      if (!validateMagicBytes(file.buffer, ext)) {
+        res.status(400).json({ success: false, message: '文件内容不匹配' });
+        return;
       }
-      if (!magicValid) { sendJson(res, 400, { success: false, message: '文件内容不匹配' }); return; }
+      // 🔴 不读表单里的 amount 字段：那是前端传来的数字，改一个字就能把 29.9 的认证费按 0.01 记账
       const amount = await pricing.getYuan('deposit');
       const timestamp = Date.now();
       const randomStr = Math.random().toString(36).substring(2, 8);
       const safeFilename = userId + '_' + timestamp + '_' + randomStr + ext;
-      const filepath = path.join(uploadsDir, safeFilename);
-      fs.writeFileSync(filepath, proofData);
+      fs.writeFileSync(path.join(uploadsDir, safeFilename), file.buffer);
       const proofPath = '/uploads/deposits/' + safeFilename;
-      const depositRecord = { user_id: userId, amount: amount, proof_path: proofPath, status: 'pending', created_at: timestamp };
+      const depositRecord = {
+        user_id: userId,
+        amount: amount,
+        proof_path: proofPath,
+        status: 'pending',
+        created_at: timestamp,
+      };
       await paymentsDb.addDeposit(userId, amount, proofPath);
-      sendJson(res, 200, { success: true, message: '凭证已提交，等待审核', data: depositRecord });
-    } catch (err) { sendJson(res, 500, { success: false, message: '上传失败: ' + err.message }); }
-  });
-}
-
-function serveUploadedFile(req, res, pathname) {
-  const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
-  const relativePath = pathname.replace(/^\/uploads\//, '');
-  const filePath = path.join(uploadsDir, relativePath);
-  const resolvedPath = path.resolve(filePath);
-  if (!resolvedPath.startsWith(path.resolve(uploadsDir) + path.sep) && resolvedPath !== path.resolve(uploadsDir)) {
-    res.writeHead(403, {'Content-Type': 'text/plain; charset=utf-8'}); res.end('Forbidden'); return;
-  }
-  if (fs.existsSync(resolvedPath)) {
-    const ext = path.extname(resolvedPath).toLowerCase();
-    const mimeTypes = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp' };
-    res.writeHead(200, {'Content-Type': mimeTypes[ext] || 'application/octet-stream'});
-    fs.createReadStream(resolvedPath).pipe(res);
-  } else {
-    res.writeHead(404, {'Content-Type': 'text/plain'}); res.end('Not Found');
-  }
-}
-
-async function getDeposits(req, res, checkAdminAuth) {
-  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
-  const parsedUrl = require('url').parse(req.url, true);
-  const status = parsedUrl.query.status || '';
-  try {
-    const records = await paymentsDb.getAllDeposits(status);
-    sendJson(res, 200, { success: true, data: records });
-  } catch (err) { sendJson(res, 500, { success: false, message: '服务器错误' }); }
-}
-
-async function approveDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
-  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
-  const match = pathname.match(/\/api\/admin\/deposits\/(\d+)\/approve/);
-  if (!match) { sendJson(res, 400, { success: false, message: '无效的请求' }); return; }
-  const id = match[1];
-  readBodyWithLimit(req).then(async body => {
-    try {
-      const data = JSON.parse(body || '{}');
-      const adminNote = data.admin_note || '审核通过';
-      const success = await paymentsDb.updateDepositStatus(id, 'approved', adminNote);
-      if (success) {
-        // 和资料审核、解锁审核对齐：动库就留痕。原来只有这两条审核路径不打日志，
-        // 后台「操作日志」里能看到通过/驳回了一个人的资料，却看不到收没收到认证费
-        await adminDb.logAdminAction('approve_deposit', String(id), { note: adminNote });
-        sendJson(res, 200, { success: true, message: '审核通过' });
-      } else {
-        sendJson(res, 404, { success: false, message: '该缴费记录不存在或已被删除，未做改动' });
-      }
-    } catch (err) { sendJson(res, 500, { success: false, message: '操作失败' }); }
-  }).catch(err => { sendJson(res, 400, { success: false, message: err.message }); });
-}
-
-async function rejectDeposit(req, res, readBodyWithLimit, checkAdminAuth, pathname) {
-  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
-  const match = pathname.match(/\/api\/admin\/deposits\/(\d+)\/reject/);
-  if (!match) { sendJson(res, 400, { success: false, message: '无效的请求' }); return; }
-  const id = match[1];
-  readBodyWithLimit(req).then(async body => {
-    try {
-      const data = JSON.parse(body || '{}');
-      const adminNote = data.admin_note || '审核未通过';
-      const success = await paymentsDb.updateDepositStatus(id, 'rejected', adminNote);
-      if (success) {
-        await adminDb.logAdminAction('reject_deposit', String(id), { note: adminNote });
-        sendJson(res, 200, { success: true, message: '已拒绝' });
-      } else {
-        sendJson(res, 404, { success: false, message: '该缴费记录不存在或已被删除，未做改动' });
-      }
-    } catch (err) { sendJson(res, 500, { success: false, message: '操作失败' }); }
-  }).catch(err => { sendJson(res, 400, { success: false, message: err.message }); });
-}
-
-async function getMyDeposit(req, res) {
-  const authHeader = req.headers.authorization;
-  if (!authHeader || !authHeader.startsWith('Bearer ')) { sendJson(res, 401, { success: false, message: '未登录' }); return; }
-  const token = authHeader.slice(7);
-  const userId = dbIndex.verifyToken(token);
-  if (!userId) { sendJson(res, 401, { success: false, message: 'token无效' }); return; }
-  try {
-    const record = await paymentsDb.getMyDeposit(userId);
-    sendJson(res, 200, { success: true, data: record || null });
-  } catch (err) { sendJson(res, 500, { success: false, message: '服务器错误' }); }
-}
-
-async function getDepositProofById(req, res, checkAdminAuth, pathname) {
-  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
-  const id = parseInt(pathname.split('/').pop());
-  if (!id || isNaN(id)) { sendJson(res, 400, { success: false, message: '无效的 ID' }); return; }
-  try {
-    const database = require('../db/index').getDb();
-    const record = await database.prepare('SELECT * FROM deposits WHERE id = $1').get(id);
-    if (!record) { sendJson(res, 404, { success: false, message: '记录不存在' }); return; }
-    if (record.proof_path && !/\.[a-zA-Z0-9]+$/.test(record.proof_path)) {
-      const depositsDir = path.join(__dirname, '..', '..', 'uploads', 'deposits');
-      const baseName = String(record.proof_path).replace(/^.*\//, '');
-      if (fs.existsSync(depositsDir)) {
-        const files = fs.readdirSync(depositsDir).filter(f => f.includes(baseName));
-        if (files.length > 0) {
-          record.proof_path = '/uploads/deposits/' + files[0];
-        }
-      }
+      res.status(200).json({ success: true, message: '凭证已提交，等待审核', data: depositRecord });
+    } catch (err) {
+      res.status(500).json({ success: false, message: '上传失败: ' + err.message });
     }
-    sendJson(res, 200, { success: true, data: record });
-  } catch (err) { sendJson(res, 500, { success: false, message: '服务器错误' }); }
-}
+  }),
+);
 
-async function deleteDeposit(req, res, checkAdminAuth, pathname) {
-  if (!(await checkAdminAuth(req))) { sendJson(res, 401, { success: false, message: '需要管理员权限' }); return; }
-  const id = parseInt(pathname.split('/').pop());
-  if (!id || isNaN(id)) { sendJson(res, 400, { success: false, message: '无效的 ID' }); return; }
-  try {
-    const database = require('../db/index').getDb();
-    const record = await database.prepare('SELECT * FROM deposits WHERE id = $1').get(id);
-    if (!record) { sendJson(res, 404, { success: false, message: '记录不存在' }); return; }
-    const result = await database.prepare('DELETE FROM deposits WHERE id = $1').run(id);
-    if (result.changes > 0) {
-      // 记录删了就必须把盘上那张付款截图一起删掉：/uploads/* 匿名可下
-      deleteUploadedFile(record.proof_path);
-      sendJson(res, 200, { success: true, message: '删除成功' });
-    } else {
-      sendJson(res, 500, { success: false, message: '删除失败' });
-    }
-  } catch (err) { sendJson(res, 500, { success: false, message: '服务器错误' }); }
-}
-
-module.exports = { uploadAvatar, uploadDepositProof, serveUploadedFile, getDeposits, approveDeposit, rejectDeposit, getMyDeposit, getDepositProofById, deleteDeposit };
+module.exports = router;

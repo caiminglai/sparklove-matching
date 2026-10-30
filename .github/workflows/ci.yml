@@ -42,3 +42,40 @@ jobs:
 
       - name: Build
         run: npm run build
+
+  backend:
+    name: Backend (express)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    # 这里没有 Build 这一步：后端是 CommonJS 源码直接 `node server.js` 起，没有编译产物。
+    # CI 上也不会有 backend/.env（.gitignore 第 10 行挡着），测试不依赖它——
+    # 需要真数据库的那 126 个契约用例在本机容器彩排里逐条对过（docs 有记档），
+    # 这套单测断言的全是"连不上库也照样成立"的路径：鉴权门、路由表、限流、
+    # 请求体上限、静态页、纯函数。10-30 把 PG 端口指到没人监听的 127.0.0.1:1 复量过一遍，
+    # 96 条仍然全绿，才算这句成立。
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          # 同样对齐 Dockerfile 的运行时（node:24-slim）；bcrypt 在这里装的是 CI 用的编译产物，
+          # 容器里那份由镜像自己带，两边版本都钉在 package.json 的 ^6.0.0
+          node-version: 24
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # 口径与前端 job 一致：先跑最便宜的格式判定，再跑语义判定
+      - name: Format check
+        run: npm run format:check
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit test
+        run: npm test

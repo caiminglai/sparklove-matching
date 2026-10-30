@@ -36,23 +36,29 @@
 │   ├── .prettierrc
 │   └── .env.*                    # 环境变量
 │
-├── backend/                      # 后端应用（三层架构）
+├── backend/                      # 后端应用（Express + 三层架构；10-30 由原生 http 整体换成 Express）
 │   ├── admin/                    # 管理后台 HTML 模板（4 个文件）
 │   │   ├── login.html            # 管理员登录页面
 │   │   ├── m-login.html          # 手机版登录页面
 │   │   ├── m.html                # 手机版管理主页
 │   │   └── main.html             # 桌面版管理主页
-│   ├── db/                       # 数据访问层（9 个文件）
-│   ├── routes/                   # API 路由层（10 个文件）
-│   ├── services/                 # 业务逻辑层（8 个文件）
-│   ├── middleware/              # 中间件（安全.js / 日志.js）
-│   ├── utils/                    # 零依赖纯函数（10 个文件：config.js / clientIp.js / cookie工具.js / extractId.js / multipart.js / sendJson.js / pricing.js / payment-verify.js / profile-derive.js / uploadedFiles.js）
+│   ├── config/index.js           # 环境变量 → 常量的唯一取值处（上限/端口/来源白名单都在这）
+│   ├── db/                       # 数据访问层（9 个文件，本轮一行未动）
+│   ├── middleware/               # HTTP 中间件（10 个文件：安全头/日志/Cookie 桥接/CORS/请求体/限流/鉴权/管理员/上传/错误）
+│   ├── routes/                   # API 路由层（14 个文件 = 13 个 router + index.js 装配表）
+│   ├── services/                 # 业务逻辑层（8 个文件，本轮一行未动）
+│   ├── test/                     # 后端单测（13 个文件 = 10 个用例文件 + helpers 2 + fixtures 1；全都不连库，见 §2.3）
+│   ├── utils/                    # 零依赖纯函数（8 个文件：cookie工具.js / extractId.js / file-validation.js / payment-verify.js / pricing.js / profile-derive.js / searchParam.js / uploadedFiles.js）
 │   ├── uploads/                  # 用户上传文件目录（compose 挂载到容器内 /uploads）
 │   │   ├── avatars/              # 用户头像
 │   │   ├── deposits/             # 认证费凭证
 │   │   ├── contact-unlock/       # 联系方式解锁凭证（运行时创建）
 │   │   └── reports/              # 举报凭证
-│   ├── server.js                 # 服务器入口
+│   ├── app.js                    # `createApp()`：四个 `app.set` + 一个 `app.disable` + 中间件按序装载 + 路由装配（不 listen、不连库，测试起的就是它）
+│   ├── server.js                 # 进程入口：拿 createApp() 的结果 listen，再加优雅退出
+│   ├── eslint.config.mjs         # 后端 lint（flat config，口径与站3 同源）
+│   ├── .prettierrc.json          # 后端格式（与前端 app/.prettierrc 同一组参数）
+│   ├── .prettierignore           # 本轮没排的版记在里面的注释上
 │   └── package.json
 │
 ├── data/                        # 数据库 SQL（种子 / 导出 / 序列重置）；运行数据不在此（线上与本机都是 postgres 容器，数据在命名卷：compose 名 `pgdata` → Docker 实际名 `www_pgdata`）
@@ -82,10 +88,16 @@ API 路由层 (routes/)  ->  业务逻辑层 (services/)  ->  数据访问层 (d
 
 | 层级 | 目录 | 做什么 | 不做什么 |
 |------|------|--------|----------|
-| routes | `routes/` | 解析 HTTP 请求、鉴权、返回 JSON 响应 | 不直接写 SQL、不写加密逻辑 |
+| routes | `routes/` | 解析 HTTP 请求、鉴权、限流、返回 JSON 响应 | 不直接写 SQL、不写加密逻辑 |
+| middleware | `middleware/` | 跨路由的横切事：安全头 / 日志 / CORS / 请求体 / 限流 / 鉴权桥接 / 错误 | 不写业务规则、不碰数据库 |
 | services | `services/` | 业务规则 / 参数校验 / 状态流转 / 权限判定 | 不写 HTTP 响应、不直接操作数据库 |
 | db | `db/` | 纯 SQL 操作 / 数据读写 / Token 工具 / 加密工具 | 不含业务规则、不写 HTTP 逻辑 |
-| 入口 | `server.js` | HTTP 服务启动 / 路由注册 / 全局中间件 | 不写具体业务 |
+| config | `config/index.js` | 环境变量 → 常量的唯一取值处（模块加载时取一次） | 不读请求、不碰数据库 |
+| 装配 | `app.js` | `createApp()`：四个 `app.set` + 一个 `app.disable`、中间件按序装载、路由装配 | 不 listen、不连库、不写具体业务 |
+| 入口 | `server.js` | 进程级：拿 `createApp()` 的结果 listen、启动横幅、优雅退出 | 不写中间件、不写具体业务 |
+
+拆成 `app.js` + `server.js` 两个文件是有原因的：测试要用 supertest 起一个不占端口的实例，
+一个进程里跑几份互不打架；如果装配和 listen 混在 server.js 里，require 它就把端口占了。
 
 ### 2.1 后端目录详细说明
 
@@ -96,6 +108,9 @@ backend/
 │   ├── m-login.html                # 手机版登录页面
 │   ├── m.html                      # 手机版管理主页
 │   └── main.html                   # 桌面版管理主页
+│
+├── config/
+│   └── index.js                    # 上限/端口/来源白名单等常量的唯一取值处（含 BODY_HARD_LIMIT 不得低于最宽路由的自检）
 │
 ├── db/                             # 数据访问层（纯 SQL，9 个文件）
 │   ├── index.js                    # DB 连接 / Token / 加密 / 密码哈希
@@ -108,17 +123,33 @@ backend/
 │   ├── vector.js                   # 向量数据库：向量 CRUD / 相似搜索 / 双向匹配
 │   └── field-mappings.js           # 字段映射工具
 │
-├── routes/                         # API 路由层（10 个文件）
-│   ├── users.js                    # 用户相关 API
-│   ├── auth.js                     # 认证登录 API
-│   ├── reports.js                  # 举报 API
-│   ├── ratings.js                  # 评价 API
-│   ├── payment.js                  # 支付 API
-│   ├── upload.js                   # 上传 API
-│   ├── vector.js                   # 向量搜索 API
-│   ├── admin-custom-fields.js      # 管理员自定义字段 API
-│   ├── user-custom-fields.js       # 用户自定义字段 API
-│   └── contact-unlock.js           # 联系方式解锁 API
+├── middleware/                     # HTTP 中间件（10 个文件）
+│   ├── security.js                 # 六个安全头（含 /api 的 nostore）
+│   ├── request-logger.js           # 一行请求日志 + 访客 IP 走 req.ip（= XFF 末项，替掉旧 utils/clientIp.js）
+│   ├── auth.js                     # cookieAuthBridge（Cookie→Bearer 桥接）/ bearerToken / requireToken / requireBearer
+│   ├── admin-auth.js               # requireAdmin（管理员令牌 + 白名单账号双闸）
+│   ├── cors.js                     # 来源白名单 + 预检
+│   ├── body.js                     # 全局 text 解析（multipart 让给 multer）+ 空体归一 + 超限判定
+│   ├── rate-limit.js               # 六个限流桶（注册 IP／注册手机号／登录／验证码／短信／写操作）
+│   ├── upload.js                   # multer 封装（五种上传各自的字段名与大小上限）
+│   ├── async-handler.js            # 把 async 路由的 reject 送进 errorHandler，替掉旧那圈手写 try/catch
+│   └── error-handler.js            # notFound（旧那句 text/plain "Not Found"）+ 统一 500
+│
+├── routes/                         # API 路由层（14 个文件 = 13 个 router + 装配表）
+│   ├── index.js                    # 装配表：STATIC_ROUTERS(2) + API_ROUTERS(11)，顺序承重
+│   ├── pages.js                    # 后台 HTML 四条（每条并列写「带尾斜杠/不带」两种）+ /admin/* 静态兜底
+│   ├── files.js                    # 收款码 / 头像 / uploads 静态读盘（越界 403、读不到 404）
+│   ├── upload.js                   # /api/upload/avatar、/api/deposit/upload-proof
+│   ├── deposits.js                 # /api/admin/deposits*、/api/users/my-deposit
+│   ├── vector.js                   # /api/vector/*（整族前置一道闸）
+│   ├── contact-unlock.js           # /api/unlock-contact/*、后台审核与手动解锁
+│   ├── payment.js                  # /api/payment/*、/api/payments/*、价格设置、两条回调
+│   ├── auth.js                     # /api/auth/*、/api/admin/login
+│   ├── custom-fields.js            # 自定义字段一整族（旧的 admin-custom-fields.js + user-custom-fields.js 两个文件并到这里）
+│   ├── users.js                    # /api/users*、/api/circles/members、/api/admin/stats
+│   ├── ratings.js                  # /api/ratings、/api/users/:id/ratings
+│   ├── reports.js                  # /api/reports*
+│   └── field-mappings.js           # /api/field-mappings*（自带 ETag 协商缓存）
 │
 ├── services/                       # 业务逻辑层（8 个文件）
 │   ├── user.service.js             # 用户业务：数据脱敏 / 验证 / 审核流转
@@ -130,8 +161,57 @@ backend/
 │   ├── sms.service.js              # 短信验证预留服务
 │   └── vector.service.js           # 向量业务：文本向量化 / 相似搜索 / 双向匹配
 │
-└── server.js                       # 服务器入口：注册路由 / 全局中间件
+├── test/                           # 后端单测（13 个文件，全都不连库；口径见 §2.3）
+│   ├── app-wiring.test.js          # 安全头矩阵 / CORS / 四个 app.set 的效果
+│   ├── static-and-pages.test.js    # 收款码 / 头像 / uploads / 后台页
+│   ├── route-parity.test.js        # 入口总数 76、尾斜杠、方法白名单
+│   ├── auth-gates.test.js          # 未登录/令牌无效/需要管理员那一族文案 + Cookie 桥接
+│   ├── body-limit.test.js          # 请求体上限与三种坏 JSON 文案
+│   ├── rate-limit.test.js          # 六个桶的阈值、429 文案、互不串桶
+│   ├── utils.test.js               # 上传校验/文件名/搜索参数/脱敏等纯函数
+│   ├── payment-gates.test.js       # 回调入账三道闸（状态→身份→金额）
+│   ├── profile-derive.test.js      # 生日/星座/婚况/兴趣标签派生
+│   ├── config.test.js              # env → 常量（每档开一个子进程量）
+│   ├── helpers/env.js              # 钉 NODE_ENV=test + 静音请求日志
+│   ├── helpers/tokens.js           # 造用户/管理员/伪造令牌
+│   └── fixtures/config-probe.js    # 子进程配置探针
+│
+├── app.js                          # createApp()：框架开关 + 中间件顺序 + 路由装配
+├── server.js                       # 进程入口：listen + 启动横幅 + 优雅退出
+└── eslint.config.mjs               # 后端 lint 规则
 ```
+
+### 2.2 中间件装载顺序（承重，别按字母重排）
+
+`app.js` 里的顺序就是旧 `server.js` 从上往下那几行：
+
+```
+securityHeaders → requestLogger → cookieAuthBridge → cors → textBody → normalizeEmptyBody
+→ STATIC_ROUTERS(2) → API_ROUTERS(11) → notFound → errorHandler
+```
+
+三条理由（原文写在 `app.js` 头部注释里，改顺序前先读那段）：安全头必须最前，否则 404 和预检会少那六个头；
+日志必须在桥接之前，否则日志里"有没有带令牌"这一列变成"浏览器有没有 cookie"；
+CORS 必须在读体之前，因为预检请求历史上从不读体。
+
+四个 `app.set` 也各有现量：`trust proxy: 1`（限流按访客 IP 分桶，取 1 不是 true）、
+`query parser: 'simple'`（旧的是 querystring 口径）、`strict routing`（尾斜杠是另一条路由，
+且必须每个子路由器自己 `express.Router({ strict: true })`，app 级那句管不到子路由器）、
+`etag: false`（旧 JSON 响应没有 ETag）。
+
+### 2.3 后端测试与门禁
+
+| 门禁 | 命令 | 跑什么 | 不跑什么 |
+|------|------|--------|----------|
+| 格式 | `cd backend && npm run format:check` | 本轮改动过的 46 个文件（现量：`prettier --write .` 处理 46 行，`--check .` RC=0） | `db/`、`services/`、`admin/` 与 5 个旧 utils（记在 `.prettierignore` 的注释里，本轮不背这个 diff） |
+| lint | `cd backend && npm run lint` | `eslint .`（0 error；warning 34 条都是未动过的旧文件里的未用变量） | `node_modules`、`uploads`、`admin`、`data` |
+| 单测 | `cd backend && npm test` | 96 条用例，2.3 秒 | 任何需要真数据库的分支 |
+
+单测的取舍写在 `test/` 各文件头部：**只断言在 `getPool()` 之前就短路返回的路径**——鉴权门、静态读盘、
+路由形状、请求体上限、限流计数、纯函数、以及用子进程量的配置。需要连库才能验的那部分不在这 96 条里，
+它的替代证据是本机容器的 126 条契约基线（改前/改后各跑一次逐字段对差，三趟差报告逐字节相同，见 `docs/运维记录.md` §2.35）。
+CI 的 Backend job 就是这三条命令，没有 Build 这一步（后端没有编译产物）；
+`npm ci --omit=dev` 的镜像里跑不了这些用例，所以 `.dockerignore` 把 `backend/test` 挡在镜像外。
 
 ---
 
@@ -395,7 +475,7 @@ server: {
 | POST | `/api/vector/batch` | 批量生成向量 | 管理员 Token |
 
 > 注意：`routes/vector.js` 在处理任何分支前统一 `requireAuth`，所有 `/api/vector/*` 未登录一律 401。
-> `/api/vector/batch` 额外要求管理员令牌（`server.js` 把 `checkAdminAuth` 传进来），因为它一次最多跑 `limit`（默认 100）个用户的付费向量。
+> `/api/vector/batch` 额外要求管理员令牌（`routes/vector.js:118` 在那条分支上挂了 `requireAdmin({status:403, message:'仅管理员可批量生成向量'})`），因为它一次最多跑 `limit`（默认 100）个用户的付费向量。
 > 现状（2026-10-14 两边分别现量）：前端没有任何页面调用 `/api/vector/*`；**线上** `user_vectors` **0 行**，**本机** 1 行但两个向量列都是 NULL。这套匹配引擎已实现但还没接到产品上（取证见 `docs/运维记录.md` §2.32）。
 > ⚠️ 比"没接上"更要紧的一条：**线上容器现在 `EMBEDDING_PROVIDER=mock`**，而 `generateEmbedding` 在 mock 分支**不抛错**（`services/vector.service.js:42-44` 直接回 `generateMockEmbedding(text)`，`75-89` 行是"字符串哈希→伪随机→归一化"，跟资料语义无关）。所以"启用前先配 `EMBEDDING_API_KEY` 否则直接抛错"这句只在 `PROVIDER != mock` 时成立；今天真去点 `POST /api/vector/batch`，它会把 99 行假向量写进库、接口一路回 200，之后 `/api/vector/similar` 返回的是噪声排序。启用顺序：改 `PROVIDER` 与真 key → 单个用户 `generate` → 抽一行看相似度是否讲得通 → 才谈 batch。
 
@@ -461,14 +541,18 @@ server: {
 | DELETE | `/api/users/custom-fields/:fieldKey` | 删除我的某个自定义字段 | Token |
 | GET | `/api/users/all-custom-fields?user_ids=a,b,c` | 按 `user_ids` 批量取自定义字段（首页卡片合并显示用）；单次最多 100 个 id，不带参数即空结果 | 否 |
 
-> 该组路由在 `server.js` 中按前缀整体转交给 `handleUserCustomFields`，方法不匹配返回 405。
-> `all-custom-fields` 不在那条前缀里，由 `server.js` 内联处理：只按调用方给的 `user_ids` 下发，不再整表导出（2026-09-21 收紧）。
+> 这一族四条路径由 `routes/custom-fields.js` 里的一条 `router.all()` 接（旧的 `admin-custom-fields.js` + `user-custom-fields.js` 两个文件在 10-30 并入这一个），方法不匹配返回 405 `不支持的请求方法`。
+> `all-custom-fields` 不在那条前缀里，单独一条 GET：只按调用方给的 `user_ids` 下发，不再整表导出（2026-09-21 收紧）。
 
 ### 5.12 路由分发方式
 
-路由不是 Express 的 `app.use(router)`，而是 `server.js` 内手写的 pathname 分发器（正则 + 前缀判断），末尾统一 404。
-分发器内部只匹配 `/api/xxx`。后端曾有一条剥 `/jzxr` 前缀的兼容分支，已删除（线上前端从不用带前缀的地址，删除不影响任何现有请求）。
-管理员接口统一走 `checkAdminAuth(req)`（只认 `Authorization: Bearer <token>`）。
+10-30 起是 Express 的 `app.use(router)`：路由按 `routes/index.js` 那张装配表装载，
+`STATIC_ROUTERS`（2 条）在前、`API_ROUTERS`（11 条）在后，谁都没接住时由 `middleware/error-handler.js` 的 `notFound` 回旧那句 `text/plain` 的 `Not Found`。
+数组顺序=命中顺序，`/api/users/custom-fields` 与 `/api/users/my` 必须早于 `/api/users/:id`，理由写在 `routes/index.js` 头部。
+本站开了 `strict routing`，所以 `/api/users/`（带尾斜杠）仍然是另一条路由、仍然回 404；
+这一句必须由每个子路由器自己写 `express.Router({ strict: true })`，app 级那句管不到子路由器。
+后端曾有一条剥 `/jzxr` 前缀的兼容分支，已删除（线上前端从不用带前缀的地址，删除不影响任何现有请求）。
+管理员接口统一走 `requireAdmin`（只认 `Authorization: Bearer <token>`；Cookie 只给用户侧接口做桥接）。
 
 ---
 
@@ -485,7 +569,7 @@ server: {
   - 路径遍历防护
   - 文件类型验证（扩展名 + 魔数）
   - **头像引用写闸**（`db/users.js` 的 `normalizeAvatarRef()`，读写两侧都过）：`data:` 内联图、超过 512 字符、空值一律存 `''` ⇒ 一次 `POST /api/users` 塞进 300KB base64、把列表接口变成几十 MB 这条路堵掉
-- **速率限制**（`server.js`，全部按 IP 分桶；站2 取的是 XFF 末位 = 真访客 IP）：
+- **速率限制**（`middleware/rate-limit.js`，除注册手机号那一桶外全部按 IP 分桶；`app.set('trust proxy', 1)` 之后 `req.ip` 等于 X-Forwarded-For 的最后一项 = Caddy 追加的真访客 IP）：
 
   | 入口 | 额度 | 窗口 |
   |------|------|------|
@@ -497,7 +581,10 @@ server: {
   | `POST /api/auth/register` | 按 IP 30 次 | 10 分钟 |
   | `POST /api/auth/register` | 按手机号 10 次 | 1 小时 |
 
-  四条 `checkRateLimit` 闸门**共用同一个 IP 桶**（`rateLimitMap`），一次调用就把计数推到本条的额度上 ⇒ 一个 IP 先打满 `custom-fields`，紧接着的短信发送也会 429；这是既有实现口径，压测时要么逐条清桶（`docker restart jzxr-local`），要么各用不同来源 IP。"全局限流"仍是对读接口关闭的，上表这些是逐条显式挂上的写入口。
+  上表这七档现在**各用各的桶**（10-30 起：`middleware/rate-limit.js` 里每一档是一个独立的 `rateLimit()` 实例，express-rate-limit 的内存桶跟着实例走）。旧写法是滑块、短信发送、短信校验、自定义字段四处共用一张手写的 `rateLimitMap`（`git show HEAD:backend/server.js` 的 333/340/345/397 行），只各自拿不同的上限去比 ⇒ 一个 IP 先打满 `custom-fields`，紧接着的短信发送也会 429；这条已经改掉，`backend/test/rate-limit.test.js` 里「一档耗尽不牵连另一档」那句就是钉它的。
+  `custom-fields` 的 GET 免拦现在写在 `makeLimiter({ skip: req => req.method === 'GET' })` 里（先前是路由文件里包了一层内联函数，结构检查看不见那个 limiter，才改成 skip 的）。
+  还有一处口径差别要知道：旧写法在 handler 内部先判限流再读请求体，现在请求体由全局 body 解析先读过 ⇒ 「又超限又被限流」的那条请求回 413 而不是 429。
+  "全局限流"仍是对读接口关闭的，上表这些是逐条显式挂上的写入口。重启容器（`docker restart jzxr-local`）清桶这件事不变：内存桶不落盘。
 
 ---
 
@@ -525,14 +612,39 @@ module.exports = { create };
 ### 7.3 `routes/activity.js` - 只写 HTTP
 
 ```js
+const express = require('express');
 const activityService = require('../services/activity.service');
-function handle(req, res) { /* ... res.end(JSON.stringify(result)); */ }
-module.exports = { handle };
+const { requireToken } = require('../middleware/auth');
+const { asyncHandler } = require('../middleware/async-handler');
+const { defaultBodyLimit } = require('../middleware/body');
+
+// strict 这一句是必须的：app.js 里那句 app.set('strict routing') 只管 app 自己的路由器
+const router = express.Router({ strict: true });
+
+router.get('/api/activities', asyncHandler(async (req, res) => {
+  res.json(await activityService.list(req.query));
+}));
+
+router.post(
+  '/api/activities',
+  requireToken(),          // 未登录回哪句、令牌无效回哪句，都在这个闸的参数里写死
+  defaultBodyLimit(),      // 5MB 那条：超限回 413 +「请求体过大，最大允许5MB」
+  asyncHandler(async (req, res) => {
+    const result = await activityService.create(JSON.parse(req.body));
+    res.status(result.success ? 200 : 400).json(result);
+  }),
+);
+
+module.exports = router;
 ```
+
+三条约定：`asyncHandler` 必须包（否则 async 里 reject 会漏成未处理拒绝，进程直接退）；
+鉴权闸挂在路由上而不是在 handler 里手写 `if (!token)`；文案与状态码按旧契约给（`docs/API接口文档` 那份对差过的口径）。
 
 ### 7.4 注册路由
 
-在 `server.js` 中注册新路由即可。
+在 `routes/index.js` 的 `API_ROUTERS` 数组里加一项，位置按"路径重叠时谁先命中"来定，不要按字母插。
+新增文件记得同时补 `backend/test/route-parity.test.js` 那句入口总数（10-30 现量 76）——这条断言就是为了让"加了一条没人记账的接口"当场变红。
 
 ---
 
