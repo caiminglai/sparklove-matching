@@ -3,7 +3,7 @@
 //
 // 本文件只剩三件事：按顺序初始化、listen、进程级收尾。
 // 原来那 618 行 if 链（HTTP 分发、限流计数、请求体读取、静态文件；10-30 现量
-// `git show HEAD:backend/server.js | wc -l` = 618）已经搬到
+// `git show 6cf49e6:backend/server.js | wc -l` = 618）已经搬到
 //   app.js            —— 中间件顺序与四个改变框架默认的开关
 //   routes/index.js   —— 路由装配表（命中顺序）
 //   routes/*.js       —— 各接口自己那一族

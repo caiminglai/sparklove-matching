@@ -33,7 +33,7 @@ function createApp() {
   // 旧写法不发 X-Powered-By，Express 默认发
   app.disable('x-powered-by');
   // 线上是 Caddy 反代到本容器。旧 utils/clientIp.js 取的是 x-forwarded-for 的**最后一项**
-  // （Caddy 追加的那个直连地址，访客自己伪造不了），10-30 现量：`git show HEAD:backend/utils/clientIp.js`
+  // （Caddy 追加的那个直连地址，访客自己伪造不了），10-30 现量：`git show 6cf49e6:backend/utils/clientIp.js`
   // 里那句 `return hops[hops.length - 1]`。trust proxy 取 1 就是同一个位置，口径没换。
   // 不声明 trust proxy，req.ip 会恒等于容器网络地址，限流就变成"全场共用一个额度"。
   // 取 1（只信最靠近本站的那一跳）而不是 true：写成 true 等于接受任何人伪造的 XFF。

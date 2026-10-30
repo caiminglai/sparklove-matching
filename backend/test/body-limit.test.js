@@ -148,7 +148,7 @@ test('21MB 由全局闸先挡：连路由都没匹配上，也要回同一句话
 test('multipart 不被全局 text 读过：非上传路由收到 multipart 时体一律是空串', async () => {
   // /api/ratings 只吃 JSON。multipart 由 type 谓词挡在门外（multer 那条流不能被两个读者都读一次），
   // 于是 req.body 归一成 ''，handler 自己的 JSON.parse('') 抛错收尾——
-  // 旧写法同样是读到手再 JSON.parse 失败回这句（git show HEAD:backend/server.js 的 readBodyWithLimit）。
+  // 旧写法同样是读到手再 JSON.parse 失败回这句（git show 6cf49e6:backend/server.js 的 readBodyWithLimit）。
   //
   // 顺带记下这一族唯一的口径差：超大体。旧写法在累到 5MB 的那一刻 reject 之后还 req.destroy()
   // （HEAD:server.js:129-131），客户端拿到的是连接被掐断；新写法在全局 20MB 闸之内由那条路由

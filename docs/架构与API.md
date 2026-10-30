@@ -581,7 +581,7 @@ server: {
   | `POST /api/auth/register` | 按 IP 30 次 | 10 分钟 |
   | `POST /api/auth/register` | 按手机号 10 次 | 1 小时 |
 
-  上表这七档现在**各用各的桶**（10-30 起：`middleware/rate-limit.js` 里每一档是一个独立的 `rateLimit()` 实例，express-rate-limit 的内存桶跟着实例走）。旧写法是滑块、短信发送、短信校验、自定义字段四处共用一张手写的 `rateLimitMap`（`git show HEAD:backend/server.js` 的 333/340/345/397 行），只各自拿不同的上限去比 ⇒ 一个 IP 先打满 `custom-fields`，紧接着的短信发送也会 429；这条已经改掉，`backend/test/rate-limit.test.js` 里「一档耗尽不牵连另一档」那句就是钉它的。
+  上表这七档现在**各用各的桶**（10-30 起：`middleware/rate-limit.js` 里每一档是一个独立的 `rateLimit()` 实例，express-rate-limit 的内存桶跟着实例走）。旧写法是滑块、短信发送、短信校验、自定义字段四处共用一张手写的 `rateLimitMap`（`git show 6cf49e6:backend/server.js` 的 333/340/345/397 行；`6cf49e6` 是 Express 那一笔之前的最后一笔，HEAD 里已经没有那段 if 链），只各自拿不同的上限去比 ⇒ 一个 IP 先打满 `custom-fields`，紧接着的短信发送也会 429；这条已经改掉，`backend/test/rate-limit.test.js` 里「一档耗尽不牵连另一档」那句就是钉它的。
   `custom-fields` 的 GET 免拦现在写在 `makeLimiter({ skip: req => req.method === 'GET' })` 里（先前是路由文件里包了一层内联函数，结构检查看不见那个 limiter，才改成 skip 的）。
   还有一处口径差别要知道：旧写法在 handler 内部先判限流再读请求体，现在请求体由全局 body 解析先读过 ⇒ 「又超限又被限流」的那条请求回 413 而不是 429。
   "全局限流"仍是对读接口关闭的，上表这些是逐条显式挂上的写入口。重启容器（`docker restart jzxr-local`）清桶这件事不变：内存桶不落盘。
