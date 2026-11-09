@@ -53,6 +53,8 @@ coverage/
 # 保留收款码图片(生产资源,server.js 会读取 app/public/ 下的图片)
 !app/public/wechat-qr.png
 !app/public/alipay-qr.png
+# README portfolio screenshots (needed for GitHub rendering)
+!docs/images/*.png
 
 # ===== 文档(不提交)=====
 *.pdf
