@@ -14,7 +14,7 @@
 ## 目录结构
 
 ```
-2.my-two-website/
+sparklove-matching/
 ├── app/                    # 前端(React + Vite)
 │   ├── src/
 │   │   ├── components/     # 公共组件(15 个；10-14 现量 `ls app/src/components/*.tsx`＝15)
@@ -44,13 +44,13 @@
 
 ```bash
 # 后端(终端1,国内用户推荐用镜像源加速)
-cd E:\website\2.my-two-website\backend
+cd E:\website\sparklove-matching\backend
 npm install --registry=https://registry.npmmirror.com
 npm start
 # -> http://localhost:8080
 
 # 前端(终端2)
-cd E:\website\2.my-two-website\app
+cd E:\website\sparklove-matching\app
 npm install --registry=https://registry.npmmirror.com
 npm run dev
 # -> http://localhost:4000/      （根路径；旧的 /jzxr 前缀已废除，见 docs/部署运维.md 故障排查表）

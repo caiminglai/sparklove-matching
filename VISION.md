@@ -63,7 +63,7 @@ Phase 2 要做的是：
 - **可选**：引入 LLM 对匹配结果给出自然语言解释
 
 已完成工作（代码与库结构层面，2026-10-14 线上现量核对）：
-- ✅ PostgreSQL 数据库迁移（从 SQLite）。**现在线上与本机都是同一份 compose 里的 `postgres` 容器**（镜像 `pgvector/pgvector:pg18`，实测量 PostgreSQL 18.6），数据在 Docker 命名卷（compose 里叫 `pgdata`，Docker 实际卷名带项目前缀 = `www_pgdata`）。服务器上已经没有自建 PG：2026-10-14 现量 `systemctl is-active postgresql` = **inactive**，早期目录 `/var/www/2.my-two-website/data/pg_data` **不存在**。
+- ✅ PostgreSQL 数据库迁移（从 SQLite）。**现在线上与本机都是同一份 compose 里的 `postgres` 容器**（镜像 `pgvector/pgvector:pg18`，实测量 PostgreSQL 18.6），数据在 Docker 命名卷（compose 里叫 `pgdata`，Docker 实际卷名带项目前缀 = `www_pgdata`）。服务器上已经没有自建 PG：2026-10-14 现量 `systemctl is-active postgresql` = **inactive**，早期目录 `/var/www/sparklove-matching/data/pg_data` **不存在**。
 - ✅ pgvector 扩展（线上现量 `pg_extension` = **vector 0.8.6**，随镜像自带；旧文档写的「v0.8.2 编译安装」属于已作废的 Nginx + PM2 裸机栈）
 - ✅ 向量表结构（`user_vectors` 表在、HNSW 索引 `idx_user_vectors_profile`／`idx_user_vectors_expectation` 在）——⚠️ 但**线上 0 行**，表是空壳
 - ✅ 向量数据库操作模块（db/vector.js）
@@ -159,5 +159,5 @@ Phase 1 解决"我知道我要什么"的问题，Phase 2 解决"我觉得合适�
 
 ---
 
-*项目路径：`E:\website\2.my-two-website`*
-*GitHub：[caiminglai/2.my-two-website](https://github.com/caiminglai/2.my-two-website)*
+*项目路径：`E:\website\sparklove-matching`*
+*GitHub：[caiminglai/sparklove-matching](https://github.com/caiminglai/sparklove-matching)*

@@ -5,7 +5,7 @@
 ## 1. 整体目录结构（详细）
 
 ```
-2.my-two-website/
+sparklove-matching/
 ├── app/                          # 前端应用（React + Vite）
 │   ├── public/                   # 静态资源（不参与打包）
 │   ├── src/                      # 业务源代码
